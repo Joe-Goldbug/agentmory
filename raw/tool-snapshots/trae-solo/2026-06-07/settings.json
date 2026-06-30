@@ -1,0 +1,27 @@
+{
+  "AI.toolcall.v2.ide.mcp.autoRun": "alwaysRun",
+  "AI.task.showMenuBarIcon": true,
+  "AI.rules.importClaudeMd": true,
+  "gitlens.telemetry.enabled": false,
+  "telemetry.editStats.enabled": false,
+  "AI.toolcall.v2.command.allowList": "[\"chmod\",\"bash\",\"/bin/bash\",\"mkdir\",\"cp\",\"launchctl\",\"true\",\"grep\",\"echo\",\"tail\",\"continue\",\"mv\",\"git\",\"expect\",\"cat\",\"claude\",\"kill\",\"cd\",\"node\",\"sleep\",\"wait\",\"exit\",\"./poe-best-setup.sh\",\"source\",\"alias\",\"cpoe-start\",\"type\",\"env\",\"./poe-global-install.sh\",\"command\",\"ClaudePoe\",\"head\",\"set\",\"python3\",\"security\",\"curl\",\"\\\"/Users/ethan/Library/Mobile\\\"\",\"which\",\"Codex\",\"npm\",\"rm\",\"hash\",\"ls\",\"printf\",\"wc\",\"gh\",\"ssh-keygen\",\"eval\",\"ssh-add\",\"ssh\",\"pwd\",\"pgrep\",\"pkill\",\"readlink\",\"egrep\",\"tee\",\"./sync_github.sh\",\"./START_ALL.sh\",\"ln\",\"trae\",\"sed\",\"sqlite3\",\"find\",\"n\"]",
+  "workbench.settings.applyToAllProfiles": [
+    "gitlens.telemetry.enabled"
+  ],
+  "trae.notification.enableOffersAndPromotions": false,
+  "trae.notification.enableTipsAndSuggestions": false,
+  "trae.notification.enableFeedbackAndSurveys": false,
+  "workbench.sideBar.location": "left",
+  "workbench.statusBar.visible": true,
+  "comments.openView": "never",
+  "claudeCode.preferredLocation": "panel",
+  "kilo-code.debug": false,
+  "kilo-code.allowedCommands": [
+    "git log",
+    "git diff",
+    "git show"
+  ],
+  "kilo-code.deniedCommands": [],
+  "workbench.colorTheme": "Light",
+  "AI.toolcall.v2.fileOp.allowPaths": "[\"/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/Trae solo配置\"]"
+}

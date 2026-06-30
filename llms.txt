@@ -1,1 +1,64 @@
-/Users/ethan/Library/Application Support/llm-wiki-runtime/llm-wiki/llms.txt
+# LLM Wiki Export — LLM wiki
+
+Generated: 2026-06-30
+
+## Purpose
+
+> Evolving synthesis across all sources.
+
+## Overview
+
+> Evolving synthesis across all sources. Updated on each ingest or review.
+
+## Pages
+
+- wiki/concepts/ai-product-code-iteration-memory.md | AI Product + Code Iteration Memory | concept | 本文件定义了针对产品从想法（Idea）到规模化（Scale）的四大阶段迭代模型，并为 AI 编码助手（Claude Code, Codex 等）设立了安全边界和运行提示词。
+- wiki/concepts/architecture-policy.md | Architecture Policy | concept | The wiki is the shared knowledge body; tools are readers and writers, not the final memory store.
+- wiki/concepts/code-graph-querying.md | Code Graph Querying | concept | > Replacing file-by-file exploration (grep + read) with a queryable graph of
+- wiki/concepts/memory-governance.md | Memory Governance | concept | This page defines the working memory lifecycle for the llm-wiki-first setup.
+- wiki/concepts/memory-policy.md | Memory Policy | concept | The global layer holds durable working style, communication preferences, and cross-project rules.
+- wiki/concepts/tooling-policy.md | Tooling Policy | concept | Claude Code, Codex, VSCode, Trae, Cursor, and OpenCode are execution surfaces that read the same wiki rules.
+- wiki/concepts/workflow-policy.md | Workflow Policy | concept | The default workflow is explore, plan, execute, verify.
+- wiki/entities/ai-hub-架构.md | AI Hub 架构 | entity | Canonical anchor for historical references to AI Hub architecture.
+- wiki/entities/ai-tools-hub.md | AI Tools Hub | entity | AI Tools Hub 是你把 llm-wiki 全局规则整理出去后形成的只读副本，供各种 AI 工具统一读取。
+- wiki/entities/antigravity.md | Antigravity | entity | This page is kept fresh by `lwiki harvest`.
+- wiki/entities/claude-code.md | Claude Code | entity | This page is kept fresh by `lwiki harvest`.
+- wiki/entities/codebase-memory.md | Codebase Memory (cbmem) | entity | > An indexable, queryable code graph for any project directory. Wrapped in lwiki
+- wiki/entities/codex.md | Codex | entity | This page is kept fresh by `lwiki harvest`.
+- wiki/entities/cursor.md | Cursor | entity | This page is kept fresh by `lwiki harvest`.
+- wiki/entities/github-copilot.md | GitHub Copilot | entity | This page is kept fresh by `lwiki harvest`.
+- wiki/entities/kiro.md | Kiro | entity | This page is kept fresh by `lwiki harvest`.
+- wiki/entities/legacy-source-vault.md | Legacy Source Vault | entity | This node represents older source material that has been migrated into the wiki.
+- wiki/entities/master-记忆体.md | MASTER 记忆体 | entity | Canonical anchor page for references pointing to the historical `MASTER-记忆体` source concept.
+- wiki/entities/minimax.md | MiniMax | entity | This page is kept fresh by `lwiki harvest`.
+- wiki/entities/obsidian.md | Obsidian | entity | Obsidian is the historical note surface, now treated as a legacy source vault in this setup.
+- wiki/entities/opencode.md | OpenCode | entity | This page is kept fresh by `lwiki harvest`.
+- wiki/entities/project-memory.md | Project Memory | entity | Project memory is the local place for bugs, implementation notes, and project-specific judgment.
+- wiki/entities/shell.md | Shell | entity | This page is kept fresh by `lwiki harvest`.
+- wiki/entities/tool-harvest.md | Tool Harvest | entity | Canonical hub for recurring tool-memory harvest snapshots.
+- wiki/entities/trae-solo.md | Trae Solo | entity | This page is kept fresh by `lwiki harvest`.
+- wiki/entities/vscode.md | VSCode | entity | This page is kept fresh by `lwiki harvest`.
+- wiki/entities/workspace-memory.md | Workspace Memory | entity | Stable target for references to the consolidated workspace memory system.
+- wiki/index.md | Wiki Index — LLM wiki | wiki | | Page | Summary | Updated |
+- wiki/insights/integrations-2026-06-30.md | Integration Decisions 2026-06-30 | insight | > A single day of work produced two new tools and a hard rule. This page
+- wiki/insights/knowledge-radar-2026-05-17.md | Knowledge Radar | insight | - Pages: 20
+- wiki/insights/knowledge-radar-2026-05-18.md | Knowledge Radar | insight | - Pages: 22
+- wiki/insights/knowledge-radar-2026-05-22.md | Knowledge Radar | insight | - Pages: 31
+- wiki/insights/knowledge-radar-2026-06-03.md | Knowledge Radar | insight | - Pages: 32
+- wiki/insights/knowledge-radar-2026-06-07.md | Knowledge Radar | insight | - Pages: 37
+- wiki/insights/knowledge-radar-2026-06-24.md | Knowledge Radar | insight | - Pages: 44
+- wiki/insights/knowledge-radar-2026-06-25.md | Knowledge Radar | insight | - Pages: 45
+- wiki/insights/tool-harvest-2026-05-17.md | Tool Harvest | insight | This snapshot is generated automatically from the active tool memory sources and working docs.
+- wiki/insights/tool-harvest-2026-05-18.md | Tool Harvest | insight | This snapshot is generated automatically from the active tool memory sources and working docs.
+- wiki/insights/tool-harvest-2026-05-22.md | Tool Harvest | insight | This snapshot is generated automatically from the active tool memory sources and working docs.
+- wiki/insights/tool-harvest-2026-06-03.md | Tool Harvest | insight | This snapshot is generated automatically from the active tool memory sources and working docs.
+- wiki/insights/tool-harvest-2026-06-07.md | Tool Harvest | insight | This snapshot is generated automatically from the active tool memory sources and working docs.
+- wiki/insights/tool-harvest-2026-06-24.md | Tool Harvest | insight | This snapshot is generated automatically from the active tool memory sources and working docs.
+- wiki/insights/tool-harvest-2026-06-25.md | Tool Harvest | insight | This snapshot is generated automatically from the active tool memory sources and working docs.
+- wiki/insights/what-survives-promotion.md | What Survives Promotion | insight | Only stable working style, communication preferences, and AI rules should move into the global layer.
+- wiki/overview.md | Overview | overview | > Evolving synthesis across all sources. Updated on each ingest or review.
+- wiki/purpose.md | Purpose | purpose | > Evolving synthesis across all sources.
+- wiki/review/review-queue-2026-05-22.md | Review Queue 2026-05-22 | review | - Items: 0
+- wiki/summaries/lwiki-cbmem-cheatsheet.md | lwiki cbmem Cheatsheet | summary | > One-page reference for the 9 `lwiki cbmem *` subcommands. For *why*
+- wiki/summaries/obsidian-vault-memory-system.md | Workflow Memory System | summary | This page is kept fresh by `lwiki harvest`.
+- wiki/summaries/tooling-stack-comparison.md | Tooling Stack Comparison | summary | > 这一页把你常用的四个工具统一成同一种观察框架：谁负责执行、谁负责记忆、谁负责同步、谁负责归档。

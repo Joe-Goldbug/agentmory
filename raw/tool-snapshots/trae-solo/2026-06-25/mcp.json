@@ -1,0 +1,39 @@
+{
+  "mcpServers": {
+    "context7": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@upstash/context7-mcp@latest"
+      ],
+      "env": {
+        "DEFAULT_MINIMUM_TOKENS": "10000"
+      },
+      "fromGalleryId": "upstash.context7"
+    },
+    "DuckDuckGo Search Server": {
+      "command": "uvx",
+      "args": [
+        "duckduckgo-mcp-server"
+      ],
+      "env": {},
+      "fromGalleryId": "nickclyde.duckduckgo-mcp-server"
+    },
+    "Multi Fetch": {
+      "command": "npx -y @lmcc-dev/mult-fetch-mcp-server",
+      "args": [],
+      "env": {
+        "MCP_LANG": "Auto-detected based on system"
+      },
+      "fromGalleryId": "lmcc-dev.mult-fetch-mcp-server"
+    },
+    "Fetch": {
+      "command": "uvx",
+      "args": [
+        "mcp-server-fetch"
+      ],
+      "env": {},
+      "fromGalleryId": "modelcontextprotocol.servers_fetch"
+    }
+  }
+}

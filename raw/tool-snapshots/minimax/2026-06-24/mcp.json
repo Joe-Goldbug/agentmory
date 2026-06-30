@@ -1,0 +1,49 @@
+{
+  "mcpServers": {
+    "matrix": {
+      "command": "/Applications/MiniMax Code.app/Contents/MacOS/MiniMax Code",
+      "args": [
+        "/Applications/MiniMax Code.app/Contents/Resources/resources/matrix-mcp-cli/index.js"
+      ],
+      "env": {
+        "MATRIX_BASE_URL": "https://agent.minimaxi.com",
+        "MATRIX_TIMEOUT_MS": "1500000"
+      },
+      "enabled": true,
+      "configured": true,
+      "builtin": true,
+      "description": "Matrix biz-gateway — you can process images, videos, and audio; generate images, videos, and music; and search the web. Your available capabilities: (1) IMAGE UNDERSTANDING — describe, analyze, read, OCR any image (file / url / base64); (2) VIDEO UNDERSTANDING — watch and answer questions about video content; (3) AUDIO UNDERSTANDING — transcribe speech-to-text, analyze audio content; (4) IMAGE GENERATION — text-to-image and image-to-image generation; (5) VIDEO GENERATION — text-to-video and image-to-video generation; (6) AUDIO GENERATION — text-to-speech (TTS), music, songs, BGM generation; (7) WEB SEARCH — live web search and bulk web-page content extraction; (8) IMAGE SEARCH — web image search and reverse image search. Use these tools whenever the user asks for any image, video, audio, music, TTS, web search, or media generation task. CDN upload also available.",
+      "timeout": 1500000
+    },
+    "playwright": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@playwright/mcp@0.0.70"
+      ],
+      "env": {},
+      "enabled": true,
+      "configured": true,
+      "builtin": true,
+      "description": "Playwright browser automation: navigate, click, fill, screenshot, PDF generation, accessibility snapshots."
+    },
+    "cu": {
+      "env": {},
+      "url": "http://127.0.0.1:15321/mavis/mcp/cu",
+      "type": "streamable-http",
+      "enabled": true,
+      "configured": true,
+      "builtin": true,
+      "description": "Computer Use — control the local desktop (mouse, keyboard, screen, windows, clipboard) through 25 desktop_* tools. Requires the renderer Computer Use toggle to be enabled. Use desktop_screenshot to see the screen, then desktop_left_click / desktop_type / etc. to act on it. Coordinates are 0-1000 normalized screen coordinates: top-left [0,0], center [500,500], bottom-right [1000,1000]. They are relative to the current primary display / screenshot content, not absolute pixels. Window bounds remain absolute pixels."
+    },
+    "trash": {
+      "env": {},
+      "url": "http://127.0.0.1:15321/mavis/mcp/trash",
+      "type": "streamable-http",
+      "enabled": true,
+      "configured": true,
+      "builtin": true,
+      "description": "Recoverable file deletion. Use the `trash` tool whenever you need to delete files / directories — it moves them to the OS trash so the user can restore later. ALWAYS prefer `trash` over `rm`; `rm` is irreversible without daemon safety nets. Supported on macOS (Finder Trash), Linux (gio trash / freedesktop), and Windows (Recycle Bin)."
+    }
+  }
+}

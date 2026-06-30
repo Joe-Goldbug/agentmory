@@ -1,1 +1,384 @@
-/Users/ethan/Library/Application Support/llm-wiki-runtime/llm-wiki/knowledge-digest.html
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LLM Wiki Desktop</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f6f8fc;
+      --panel: #ffffff;
+      --panel-2: #f1f5fb;
+      --text: #101828;
+      --muted: #667085;
+      --border: #d9e2ef;
+      --accent: #2457d6;
+      --accent-2: #0f766e;
+      --warn: #9a3412;
+      --shadow: 0 18px 40px rgba(16, 24, 40, 0.08);
+      --radius: 10px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif;
+      color: var(--text);
+      background: linear-gradient(180deg, #f8fbff 0%, var(--bg) 22%);
+    }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .shell {
+      min-height: 100vh;
+      display: grid;
+      grid-template-rows: auto auto 1fr;
+    }
+    header {
+      padding: 22px 28px 12px;
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 20px;
+    }
+    h1 {
+      margin: 0;
+      font-size: 24px;
+      line-height: 1.1;
+      letter-spacing: 0;
+    }
+    .subhead {
+      margin-top: 8px;
+      color: var(--muted);
+      max-width: 78ch;
+    }
+    .meta {
+      display: grid;
+      gap: 4px;
+      justify-items: end;
+      color: var(--muted);
+      text-align: right;
+      font-size: 12px;
+    }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 12px;
+      padding: 0 28px 16px;
+    }
+    .stat-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 14px 16px;
+      display: grid;
+      gap: 8px;
+      min-height: 88px;
+    }
+    .stat-card span {
+      color: var(--muted);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .stat-card strong {
+      font-size: 28px;
+      line-height: 1;
+    }
+    .layout {
+      display: grid;
+      grid-template-columns: 1.1fr 1.9fr 1.15fr;
+      gap: 14px;
+      padding: 0 28px 28px;
+      align-items: start;
+    }
+    .stack {
+      display: grid;
+      gap: 14px;
+    }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 16px;
+    }
+    .panel h2 {
+      margin: 0 0 10px;
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #344054;
+    }
+    .panel h3 {
+      margin: 18px 0 8px;
+      font-size: 13px;
+      color: #344054;
+    }
+    .muted { color: var(--muted); }
+    .purpose {
+      display: grid;
+      gap: 10px;
+    }
+    .purpose-body {
+      display: grid;
+      gap: 10px;
+      padding: 10px 12px;
+      border-left: 3px solid var(--accent);
+      background: #f5f8ff;
+      border-radius: 8px;
+      color: #1d2939;
+    }
+    .issue-list, .link-list, .log-list, .component-list {
+      margin: 0;
+      padding-left: 18px;
+      display: grid;
+      gap: 8px;
+    }
+    .link-list li {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .link-list span {
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    .table-wrap {
+      overflow: auto;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--panel);
+    }
+    th, td {
+      padding: 10px 12px;
+      border-bottom: 1px solid #edf2f7;
+      text-align: left;
+      vertical-align: top;
+      font-size: 13px;
+    }
+    th {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      background: var(--panel-2);
+      color: #344054;
+      font-weight: 600;
+    }
+    tr:hover td {
+      background: #f8fafc;
+    }
+    .searchbar {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    .searchbar input {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #fff;
+      color: var(--text);
+      font: inherit;
+    }
+    .section-grid {
+      display: grid;
+      gap: 14px;
+    }
+    .page-preview {
+      display: grid;
+      gap: 8px;
+      font-size: 13px;
+      color: #344054;
+    }
+    .page-preview .chip-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 8px;
+      border-radius: 999px;
+      background: #eef4ff;
+      color: #1d4ed8;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    .warning {
+      color: var(--warn);
+      font-weight: 600;
+    }
+    .empty {
+      color: var(--muted);
+      text-align: center;
+      padding: 20px 12px;
+    }
+    .wikilink.missing {
+      color: #b42318;
+    }
+    .footer-note {
+      padding: 0 28px 24px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    @media (max-width: 1180px) {
+      .stats, .layout { grid-template-columns: 1fr 1fr; }
+      .layout { grid-template-columns: 1fr; }
+      header { align-items: start; flex-direction: column; }
+      .meta { justify-items: start; text-align: left; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header>
+      <div>
+        <h1>LLM Wiki Desktop</h1>
+        <div class="subhead">LLM wiki · Wiki Purpose</div>
+      </div>
+      <div class="meta">
+        <div>2026-06-30 12:16</div>
+        <div>50 pages · 1 components</div>
+      </div>
+    </header>
+
+    <section class="stats">
+      <article class="stat-card"><span>Pages</span><strong>50</strong></article><article class="stat-card"><span>Hubs</span><strong>50</strong></article><article class="stat-card"><span>Orphans</span><strong>0</strong></article><article class="stat-card"><span>Broken links</span><strong>0</strong></article><article class="stat-card"><span>Missing sources</span><strong>0</strong></article><article class="stat-card"><span>Components</span><strong>1</strong></article>
+    </section>
+
+    <main class="layout">
+      <section class="stack">
+        <article class="panel purpose">
+          <h2>Purpose</h2>
+          <div class="purpose-body"><h1>Wiki Purpose</h1>
+<blockquote>Evolving synthesis across all sources.</blockquote>
+<h2>Why this wiki exists</h2>
+<ul>
+<li>What is this wiki for?</li>
+<li>What questions should it answer repeatedly?</li>
+<li>Which source domains belong here?</li>
+<li>What should the LLM preserve when it compiles new knowledge?</li>
+</ul>
+<h2>Guardrails</h2>
+<ul>
+<li>Keep the raw sources immutable.</li>
+<li>Promote only stable, reusable, high-signal structure.</li>
+<li>Separate temporary observations from durable principles.</li>
+<li>Use the purpose page to steer ingest, query, and review.</li>
+</ul>
+<h2>See Also</h2>
+<ul>
+<li><a class="wikilink" href="knowledge-digest.pages/wiki__index.html">index</a></li>
+<li><a class="wikilink" href="knowledge-digest.pages/wiki__overview.html">overview</a></li>
+</ul></div>
+        </article>
+        <article class="panel">
+          <h2>Next Actions</h2>
+          <ul class="issue-list">
+            <li>Workspace is structurally healthy. Ingest the next batch.</li>
+          </ul>
+        </article>
+        <article class="panel">
+          <h2>Page Types</h2>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Type</th><th>Pages</th></tr></thead>
+              <tbody><tr><td>entity</td><td>20</td></tr><tr><td>insight</td><td>16</td></tr><tr><td>concept</td><td>7</td></tr><tr><td>summary</td><td>3</td></tr><tr><td>overview</td><td>1</td></tr><tr><td>purpose</td><td>1</td></tr><tr><td>review</td><td>1</td></tr><tr><td>wiki</td><td>1</td></tr></tbody>
+            </table>
+          </div>
+        </article>
+        <article class="panel">
+          <h2>Log Tail</h2>
+          <ul class="log-list"><li>## [2026-06-24] compile | raw-to-summary</li><li>Pages compiled: 0</li><li>## [2026-06-24] compile | raw-to-summary</li><li>Pages compiled: 0</li><li>## [2026-06-24] compile | raw-to-summary</li><li>Pages compiled: 0</li><li>## [2026-06-24] compile | raw-to-summary</li><li>Pages compiled: 0</li><li>## [2026-06-24] compile | raw-to-summary</li><li>Pages compiled: 0</li><li>## [2026-06-25] compile | raw-to-summary</li><li>Pages compiled: 0</li></ul>
+        </article>
+      </section>
+
+      <section class="section-grid">
+        <article class="panel">
+          <h2>Knowledge Body</h2>
+          <div class="page-preview">
+            <div class="muted">LLM wiki — Overview</div>
+            <div class="chip-row">
+              <span class="chip">root: LLM wiki</span>
+              <span class="chip">pages: 50</span>
+              <span class="chip">issues: 0</span>
+            </div>
+            <p>Use the table below to search pages, jump into markdown, and inspect structure.</p>
+          </div>
+        </article>
+
+        <article class="panel">
+          <h2>Pages</h2>
+          <div class="searchbar">
+            <input id="page-filter" type="search" placeholder="Filter pages, types, tags, paths..." />
+          </div>
+          <div class="table-wrap">
+            <table id="pages-table">
+              <thead>
+                <tr>
+                  <th>Page</th>
+                  <th>Type</th>
+                  <th>In</th>
+                  <th>Out</th>
+                  <th>Src</th>
+                  <th>Path</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr data-search="ai product + code iteration memory wiki/concepts/ai-product-code-iteration-memory.md concept concept memory workflow iteration"><td><a href="knowledge-digest.pages/wiki__concepts__ai-product-code-iteration-memory.html">AI Product + Code Iteration Memory</a></td><td>concept</td><td>4</td><td>0</td><td>0</td><td>wiki/concepts/ai-product-code-iteration-memory.md</td></tr><tr data-search="architecture policy wiki/concepts/architecture-policy.md concept concept architecture hub"><td><a href="knowledge-digest.pages/wiki__concepts__architecture-policy.html">Architecture Policy</a></td><td>concept</td><td>24</td><td>3</td><td>0</td><td>wiki/concepts/architecture-policy.md</td></tr><tr data-search="code graph querying wiki/concepts/code-graph-querying.md concept concept cbmem code-graph code-intelligence static-analysis"><td><a href="knowledge-digest.pages/wiki__concepts__code-graph-querying.html">Code Graph Querying</a></td><td>concept</td><td>4</td><td>5</td><td>0</td><td>wiki/concepts/code-graph-querying.md</td></tr><tr data-search="memory governance wiki/concepts/memory-governance.md concept concept memory governance workflow"><td><a href="knowledge-digest.pages/wiki__concepts__memory-governance.html">Memory Governance</a></td><td>concept</td><td>46</td><td>15</td><td>0</td><td>wiki/concepts/memory-governance.md</td></tr><tr data-search="memory policy wiki/concepts/memory-policy.md concept concept memory policy"><td><a href="knowledge-digest.pages/wiki__concepts__memory-policy.html">Memory Policy</a></td><td>concept</td><td>21</td><td>3</td><td>0</td><td>wiki/concepts/memory-policy.md</td></tr><tr data-search="tooling policy wiki/concepts/tooling-policy.md concept concept tooling claude-code cursor vscode opencode"><td><a href="knowledge-digest.pages/wiki__concepts__tooling-policy.html">Tooling Policy</a></td><td>concept</td><td>17</td><td>3</td><td>0</td><td>wiki/concepts/tooling-policy.md</td></tr><tr data-search="workflow policy wiki/concepts/workflow-policy.md concept concept workflow epev"><td><a href="knowledge-digest.pages/wiki__concepts__workflow-policy.html">Workflow Policy</a></td><td>concept</td><td>17</td><td>3</td><td>0</td><td>wiki/concepts/workflow-policy.md</td></tr><tr data-search="ai hub 架构 wiki/entities/ai-hub-架构.md entity entity architecture hub"><td><a href="knowledge-digest.pages/wiki__entities__ai-hub-架构.html">AI Hub 架构</a></td><td>entity</td><td>19</td><td>3</td><td>0</td><td>wiki/entities/ai-hub-架构.md</td></tr><tr data-search="ai tools hub wiki/entities/ai-tools-hub.md entity entity hub readonly"><td><a href="knowledge-digest.pages/wiki__entities__ai-tools-hub.html">AI Tools Hub</a></td><td>entity</td><td>11</td><td>4</td><td>0</td><td>wiki/entities/ai-tools-hub.md</td></tr><tr data-search="antigravity wiki/entities/antigravity.md entity entity tool antigravity ide"><td><a href="knowledge-digest.pages/wiki__entities__antigravity.html">Antigravity</a></td><td>entity</td><td>5</td><td>2</td><td>2</td><td>wiki/entities/antigravity.md</td></tr><tr data-search="claude code wiki/entities/claude-code.md entity entity tool claude-code cli"><td><a href="knowledge-digest.pages/wiki__entities__claude-code.html">Claude Code</a></td><td>entity</td><td>18</td><td>2</td><td>1</td><td>wiki/entities/claude-code.md</td></tr><tr data-search="codebase memory (cbmem) wiki/entities/codebase-memory.md entity entity cbmem codebase-memory code-graph mcp lwiki-extension"><td><a href="knowledge-digest.pages/wiki__entities__codebase-memory.html">Codebase Memory (cbmem)</a></td><td>entity</td><td>4</td><td>5</td><td>0</td><td>wiki/entities/codebase-memory.md</td></tr><tr data-search="codex wiki/entities/codex.md entity entity tool codex cli"><td><a href="knowledge-digest.pages/wiki__entities__codex.html">Codex</a></td><td>entity</td><td>11</td><td>2</td><td>12</td><td>wiki/entities/codex.md</td></tr><tr data-search="cursor wiki/entities/cursor.md entity entity tool cursor ide"><td><a href="knowledge-digest.pages/wiki__entities__cursor.html">Cursor</a></td><td>entity</td><td>7</td><td>2</td><td>3</td><td>wiki/entities/cursor.md</td></tr><tr data-search="github copilot wiki/entities/github-copilot.md entity entity tool copilot github vscode"><td><a href="knowledge-digest.pages/wiki__entities__github-copilot.html">GitHub Copilot</a></td><td>entity</td><td>11</td><td>2</td><td>16</td><td>wiki/entities/github-copilot.md</td></tr><tr data-search="kiro wiki/entities/kiro.md entity entity tool kiro ide"><td><a href="knowledge-digest.pages/wiki__entities__kiro.html">Kiro</a></td><td>entity</td><td>7</td><td>2</td><td>10</td><td>wiki/entities/kiro.md</td></tr><tr data-search="legacy source vault wiki/entities/legacy-source-vault.md entity entity legacy source vault"><td><a href="knowledge-digest.pages/wiki__entities__legacy-source-vault.html">Legacy Source Vault</a></td><td>entity</td><td>13</td><td>3</td><td>0</td><td>wiki/entities/legacy-source-vault.md</td></tr><tr data-search="master 记忆体 wiki/entities/master-记忆体.md entity entity memory master"><td><a href="knowledge-digest.pages/wiki__entities__master-记忆体.html">MASTER 记忆体</a></td><td>entity</td><td>27</td><td>3</td><td>0</td><td>wiki/entities/master-记忆体.md</td></tr><tr data-search="minimax wiki/entities/minimax.md entity entity tool minimax agent"><td><a href="knowledge-digest.pages/wiki__entities__minimax.html">MiniMax</a></td><td>entity</td><td>5</td><td>2</td><td>27477</td><td>wiki/entities/minimax.md</td></tr><tr data-search="obsidian wiki/entities/obsidian.md entity entity vault notes"><td><a href="knowledge-digest.pages/wiki__entities__obsidian.html">Obsidian</a></td><td>entity</td><td>15</td><td>2</td><td>0</td><td>wiki/entities/obsidian.md</td></tr><tr data-search="opencode wiki/entities/opencode.md entity entity tool opencode cli"><td><a href="knowledge-digest.pages/wiki__entities__opencode.html">OpenCode</a></td><td>entity</td><td>7</td><td>2</td><td>11</td><td>wiki/entities/opencode.md</td></tr><tr data-search="project memory wiki/entities/project-memory.md entity entity memory project"><td><a href="knowledge-digest.pages/wiki__entities__project-memory.html">Project Memory</a></td><td>entity</td><td>17</td><td>2</td><td>0</td><td>wiki/entities/project-memory.md</td></tr><tr data-search="shell wiki/entities/shell.md entity entity tool shell zsh"><td><a href="knowledge-digest.pages/wiki__entities__shell.html">Shell</a></td><td>entity</td><td>7</td><td>2</td><td>2</td><td>wiki/entities/shell.md</td></tr><tr data-search="tool harvest wiki/entities/tool-harvest.md entity entity harvest automation"><td><a href="knowledge-digest.pages/wiki__entities__tool-harvest.html">Tool Harvest</a></td><td>entity</td><td>46</td><td>3</td><td>0</td><td>wiki/entities/tool-harvest.md</td></tr><tr data-search="trae solo wiki/entities/trae-solo.md entity entity tool trae ide"><td><a href="knowledge-digest.pages/wiki__entities__trae-solo.html">Trae Solo</a></td><td>entity</td><td>11</td><td>2</td><td>3</td><td>wiki/entities/trae-solo.md</td></tr><tr data-search="vscode wiki/entities/vscode.md entity entity tool vscode ide"><td><a href="knowledge-digest.pages/wiki__entities__vscode.html">VSCode</a></td><td>entity</td><td>11</td><td>2</td><td>2</td><td>wiki/entities/vscode.md</td></tr><tr data-search="workspace memory wiki/entities/workspace-memory.md entity entity memory workspace"><td><a href="knowledge-digest.pages/wiki__entities__workspace-memory.html">Workspace Memory</a></td><td>entity</td><td>15</td><td>3</td><td>0</td><td>wiki/entities/workspace-memory.md</td></tr><tr data-search="wiki index — llm wiki wiki/index.md wiki "><td><a href="knowledge-digest.pages/wiki__index.html">Wiki Index — LLM wiki</a></td><td>wiki</td><td>11</td><td>0</td><td>0</td><td>wiki/index.md</td></tr><tr data-search="integration decisions 2026-06-30 wiki/insights/integrations-2026-06-30.md insight insight cbmem integration decision agent-reach social-copilot tool-scope"><td><a href="knowledge-digest.pages/wiki__insights__integrations-2026-06-30.html">Integration Decisions 2026-06-30</a></td><td>insight</td><td>4</td><td>5</td><td>0</td><td>wiki/insights/integrations-2026-06-30.md</td></tr><tr data-search="knowledge radar wiki/insights/knowledge-radar-2026-05-17.md insight insight analysis radar"><td><a href="knowledge-digest.pages/wiki__insights__knowledge-radar-2026-05-17.html">Knowledge Radar</a></td><td>insight</td><td>10</td><td>42</td><td>0</td><td>wiki/insights/knowledge-radar-2026-05-17.md</td></tr><tr data-search="knowledge radar wiki/insights/knowledge-radar-2026-05-18.md insight insight analysis radar"><td><a href="knowledge-digest.pages/wiki__insights__knowledge-radar-2026-05-18.html">Knowledge Radar</a></td><td>insight</td><td>8</td><td>61</td><td>0</td><td>wiki/insights/knowledge-radar-2026-05-18.md</td></tr><tr data-search="knowledge radar wiki/insights/knowledge-radar-2026-05-22.md insight insight analysis radar"><td><a href="knowledge-digest.pages/wiki__insights__knowledge-radar-2026-05-22.html">Knowledge Radar</a></td><td>insight</td><td>8</td><td>41</td><td>0</td><td>wiki/insights/knowledge-radar-2026-05-22.md</td></tr><tr data-search="knowledge radar wiki/insights/knowledge-radar-2026-06-03.md insight insight analysis radar"><td><a href="knowledge-digest.pages/wiki__insights__knowledge-radar-2026-06-03.html">Knowledge Radar</a></td><td>insight</td><td>4</td><td>42</td><td>0</td><td>wiki/insights/knowledge-radar-2026-06-03.md</td></tr><tr data-search="knowledge radar wiki/insights/knowledge-radar-2026-06-07.md insight insight analysis radar"><td><a href="knowledge-digest.pages/wiki__insights__knowledge-radar-2026-06-07.html">Knowledge Radar</a></td><td>insight</td><td>6</td><td>74</td><td>0</td><td>wiki/insights/knowledge-radar-2026-06-07.md</td></tr><tr data-search="knowledge radar wiki/insights/knowledge-radar-2026-06-24.md insight insight analysis radar"><td><a href="knowledge-digest.pages/wiki__insights__knowledge-radar-2026-06-24.html">Knowledge Radar</a></td><td>insight</td><td>4</td><td>88</td><td>0</td><td>wiki/insights/knowledge-radar-2026-06-24.md</td></tr><tr data-search="knowledge radar wiki/insights/knowledge-radar-2026-06-25.md insight insight analysis radar"><td><a href="knowledge-digest.pages/wiki__insights__knowledge-radar-2026-06-25.html">Knowledge Radar</a></td><td>insight</td><td>0</td><td>90</td><td>0</td><td>wiki/insights/knowledge-radar-2026-06-25.md</td></tr><tr data-search="tool harvest wiki/insights/tool-harvest-2026-05-17.md insight insight harvest automation memory"><td><a href="knowledge-digest.pages/wiki__insights__tool-harvest-2026-05-17.html">Tool Harvest</a></td><td>insight</td><td>11</td><td>7</td><td>0</td><td>wiki/insights/tool-harvest-2026-05-17.md</td></tr><tr data-search="tool harvest wiki/insights/tool-harvest-2026-05-18.md insight insight harvest automation memory"><td><a href="knowledge-digest.pages/wiki__insights__tool-harvest-2026-05-18.html">Tool Harvest</a></td><td>insight</td><td>10</td><td>7</td><td>0</td><td>wiki/insights/tool-harvest-2026-05-18.md</td></tr><tr data-search="tool harvest wiki/insights/tool-harvest-2026-05-22.md insight insight harvest automation memory"><td><a href="knowledge-digest.pages/wiki__insights__tool-harvest-2026-05-22.html">Tool Harvest</a></td><td>insight</td><td>8</td><td>7</td><td>0</td><td>wiki/insights/tool-harvest-2026-05-22.md</td></tr><tr data-search="tool harvest wiki/insights/tool-harvest-2026-06-03.md insight insight harvest automation memory"><td><a href="knowledge-digest.pages/wiki__insights__tool-harvest-2026-06-03.html">Tool Harvest</a></td><td>insight</td><td>5</td><td>7</td><td>0</td><td>wiki/insights/tool-harvest-2026-06-03.md</td></tr><tr data-search="tool harvest wiki/insights/tool-harvest-2026-06-07.md insight insight harvest automation memory"><td><a href="knowledge-digest.pages/wiki__insights__tool-harvest-2026-06-07.html">Tool Harvest</a></td><td>insight</td><td>6</td><td>4</td><td>0</td><td>wiki/insights/tool-harvest-2026-06-07.md</td></tr><tr data-search="tool harvest wiki/insights/tool-harvest-2026-06-24.md insight insight harvest automation memory"><td><a href="knowledge-digest.pages/wiki__insights__tool-harvest-2026-06-24.html">Tool Harvest</a></td><td>insight</td><td>4</td><td>4</td><td>0</td><td>wiki/insights/tool-harvest-2026-06-24.md</td></tr><tr data-search="tool harvest wiki/insights/tool-harvest-2026-06-25.md insight insight harvest automation memory"><td><a href="knowledge-digest.pages/wiki__insights__tool-harvest-2026-06-25.html">Tool Harvest</a></td><td>insight</td><td>2</td><td>4</td><td>0</td><td>wiki/insights/tool-harvest-2026-06-25.md</td></tr><tr data-search="what survives promotion wiki/insights/what-survives-promotion.md insight insight promotion memory"><td><a href="knowledge-digest.pages/wiki__insights__what-survives-promotion.html">What Survives Promotion</a></td><td>insight</td><td>13</td><td>3</td><td>0</td><td>wiki/insights/what-survives-promotion.md</td></tr><tr data-search="overview wiki/overview.md overview overview synthesis"><td><a href="knowledge-digest.pages/wiki__overview.html">Overview</a></td><td>overview</td><td>25</td><td>2</td><td>0</td><td>wiki/overview.md</td></tr><tr data-search="purpose wiki/purpose.md purpose purpose scope"><td><a href="knowledge-digest.pages/wiki__purpose.html">Purpose</a></td><td>purpose</td><td>18</td><td>2</td><td>0</td><td>wiki/purpose.md</td></tr><tr data-search="review queue 2026-05-22 wiki/review/review-queue-2026-05-22.md review review queue quality"><td><a href="knowledge-digest.pages/wiki__review__review-queue-2026-05-22.html">Review Queue 2026-05-22</a></td><td>review</td><td>8</td><td>2</td><td>0</td><td>wiki/review/review-queue-2026-05-22.md</td></tr><tr data-search="lwiki cbmem cheatsheet wiki/summaries/lwiki-cbmem-cheatsheet.md summary summary cbmem lwiki-extension cheatsheet reference"><td><a href="knowledge-digest.pages/wiki__summaries__lwiki-cbmem-cheatsheet.html">lwiki cbmem Cheatsheet</a></td><td>summary</td><td>3</td><td>8</td><td>0</td><td>wiki/summaries/lwiki-cbmem-cheatsheet.md</td></tr><tr data-search="workflow memory system wiki/summaries/obsidian-vault-memory-system.md summary summary memory workflow hub"><td><a href="knowledge-digest.pages/wiki__summaries__obsidian-vault-memory-system.html">Workflow Memory System</a></td><td>summary</td><td>10</td><td>2</td><td>0</td><td>wiki/summaries/obsidian-vault-memory-system.md</td></tr><tr data-search="tooling stack comparison wiki/summaries/tooling-stack-comparison.md summary summary tooling codex claude-code trae copilot"><td><a href="knowledge-digest.pages/wiki__summaries__tooling-stack-comparison.html">Tooling Stack Comparison</a></td><td>summary</td><td>10</td><td>4</td><td>0</td><td>wiki/summaries/tooling-stack-comparison.md</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </article>
+      </section>
+
+      <section class="stack">
+        <article class="panel">
+          <h2>Hubs</h2>
+          <ul class="link-list"><li><a href="knowledge-digest.pages/wiki__concepts__memory-governance.html">memory-governance</a><span>46 inbound · 15 outbound</span></li><li><a href="knowledge-digest.pages/wiki__entities__tool-harvest.html">tool-harvest</a><span>46 inbound · 3 outbound</span></li><li><a href="knowledge-digest.pages/wiki__entities__master-记忆体.html">master-记忆体</a><span>27 inbound · 3 outbound</span></li><li><a href="knowledge-digest.pages/wiki__overview.html">overview</a><span>25 inbound · 2 outbound</span></li><li><a href="knowledge-digest.pages/wiki__concepts__architecture-policy.html">architecture-policy</a><span>24 inbound · 3 outbound</span></li><li><a href="knowledge-digest.pages/wiki__concepts__memory-policy.html">memory-policy</a><span>21 inbound · 3 outbound</span></li><li><a href="knowledge-digest.pages/wiki__entities__ai-hub-架构.html">ai-hub-架构</a><span>19 inbound · 3 outbound</span></li><li><a href="knowledge-digest.pages/wiki__entities__claude-code.html">claude-code</a><span>18 inbound · 2 outbound</span></li><li><a href="knowledge-digest.pages/wiki__purpose.html">purpose</a><span>18 inbound · 2 outbound</span></li><li><a href="knowledge-digest.pages/wiki__concepts__tooling-policy.html">tooling-policy</a><span>17 inbound · 3 outbound</span></li><li><a href="knowledge-digest.pages/wiki__concepts__workflow-policy.html">workflow-policy</a><span>17 inbound · 3 outbound</span></li><li><a href="knowledge-digest.pages/wiki__entities__project-memory.html">project-memory</a><span>17 inbound · 2 outbound</span></li><li><a href="knowledge-digest.pages/wiki__entities__workspace-memory.html">workspace-memory</a><span>15 inbound · 3 outbound</span></li><li><a href="knowledge-digest.pages/wiki__entities__obsidian.html">obsidian</a><span>15 inbound · 2 outbound</span></li><li><a href="knowledge-digest.pages/wiki__entities__legacy-source-vault.html">legacy-source-vault</a><span>13 inbound · 3 outbound</span></li><li><a href="knowledge-digest.pages/wiki__insights__what-survives-promotion.html">what-survives-promotion</a><span>13 inbound · 3 outbound</span></li><li><a href="knowledge-digest.pages/wiki__insights__tool-harvest-2026-05-17.html">tool-harvest-2026-05-17</a><span>11 inbound · 7 outbound</span></li><li><a href="knowledge-digest.pages/wiki__entities__ai-tools-hub.html">ai-tools-hub</a><span>11 inbound · 4 outbound</span></li><li><a href="knowledge-digest.pages/wiki__entities__codex.html">codex</a><span>11 inbound · 2 outbound</span></li><li><a href="knowledge-digest.pages/wiki__entities__github-copilot.html">github-copilot</a><span>11 inbound · 2 outbound</span></li><li><a href="knowledge-digest.pages/wiki__entities__trae-solo.html">trae-solo</a><span>11 inbound · 2 outbound</span></li><li><a href="knowledge-digest.pages/wiki__entities__vscode.html">vscode</a><span>11 inbound · 2 outbound</span></li><li><a href="knowledge-digest.pages/wiki__index.html">index</a><span>11 inbound · 0 outbound</span></li><li><a href="knowledge-digest.pages/wiki__insights__knowledge-radar-2026-05-17.html">knowledge-radar-2026-05-17</a><span>10 inbound · 42 outbound</span></li><li><a href="knowledge-digest.pages/wiki__insights__tool-harvest-2026-05-18.html">tool-harvest-2026-05-18</a><span>10 inbound · 7 outbound</span></li><li><a href="knowledge-digest.pages/wiki__summaries__tooling-stack-comparison.html">tooling-stack-comparison</a><span>10 inbound · 4 outbound</span></li><li><a href="knowledge-digest.pages/wiki__summaries__obsidian-vault-memory-system.html">obsidian-vault-memory-system</a><span>10 inbound · 2 outbound</span></li><li><a href="knowledge-digest.pages/wiki__insights__knowledge-radar-2026-05-18.html">knowledge-radar-2026-05-18</a><span>8 inbound · 61 outbound</span></li><li><a href="knowledge-digest.pages/wiki__insights__knowledge-radar-2026-05-22.html">knowledge-radar-2026-05-22</a><span>8 inbound · 41 outbound</span></li><li><a href="knowledge-digest.pages/wiki__insights__tool-harvest-2026-05-22.html">tool-harvest-2026-05-22</a><span>8 inbound · 7 outbound</span></li><li><a href="knowledge-digest.pages/wiki__review__review-queue-2026-05-22.html">review-queue-2026-05-22</a><span>8 inbound · 2 outbound</span></li><li><a href="knowledge-digest.pages/wiki__entities__cursor.html">cursor</a><span>7 inbound · 2 outbound</span></li><li><a href="knowledge-digest.pages/wiki__entities__kiro.html">kiro</a><span>7 inbound · 2 outbound</span></li><li><a href="knowledge-digest.pages/wiki__entities__opencode.html">opencode</a><span>7 inbound · 2 outbound</span></li><li><a href="knowledge-digest.pages/wiki__entities__shell.html">shell</a><span>7 inbound · 2 outbound</span></li><li><a href="knowledge-digest.pages/wiki__insights__knowledge-radar-2026-06-07.html">knowledge-radar-2026-06-07</a><span>6 inbound · 74 outbound</span></li><li><a href="knowledge-digest.pages/wiki__insights__tool-harvest-2026-06-07.html">tool-harvest-2026-06-07</a><span>6 inbound · 4 outbound</span></li><li><a href="knowledge-digest.pages/wiki__insights__tool-harvest-2026-06-03.html">tool-harvest-2026-06-03</a><span>5 inbound · 7 outbound</span></li><li><a href="knowledge-digest.pages/wiki__entities__antigravity.html">antigravity</a><span>5 inbound · 2 outbound</span></li><li><a href="knowledge-digest.pages/wiki__entities__minimax.html">minimax</a><span>5 inbound · 2 outbound</span></li><li><a href="knowledge-digest.pages/wiki__insights__knowledge-radar-2026-06-24.html">knowledge-radar-2026-06-24</a><span>4 inbound · 88 outbound</span></li><li><a href="knowledge-digest.pages/wiki__insights__knowledge-radar-2026-06-03.html">knowledge-radar-2026-06-03</a><span>4 inbound · 42 outbound</span></li><li><a href="knowledge-digest.pages/wiki__concepts__code-graph-querying.html">code-graph-querying</a><span>4 inbound · 5 outbound</span></li><li><a href="knowledge-digest.pages/wiki__entities__codebase-memory.html">codebase-memory</a><span>4 inbound · 5 outbound</span></li><li><a href="knowledge-digest.pages/wiki__insights__integrations-2026-06-30.html">integrations-2026-06-30</a><span>4 inbound · 5 outbound</span></li><li><a href="knowledge-digest.pages/wiki__insights__tool-harvest-2026-06-24.html">tool-harvest-2026-06-24</a><span>4 inbound · 4 outbound</span></li><li><a href="knowledge-digest.pages/wiki__concepts__ai-product-code-iteration-memory.html">ai-product-code-iteration-memory</a><span>4 inbound · 0 outbound</span></li><li><a href="knowledge-digest.pages/wiki__summaries__lwiki-cbmem-cheatsheet.html">lwiki-cbmem-cheatsheet</a><span>3 inbound · 8 outbound</span></li><li><a href="knowledge-digest.pages/wiki__insights__tool-harvest-2026-06-25.html">tool-harvest-2026-06-25</a><span>2 inbound · 4 outbound</span></li><li><a href="knowledge-digest.pages/wiki__insights__knowledge-radar-2026-06-25.html">knowledge-radar-2026-06-25</a><span>0 inbound · 90 outbound</span></li></ul>
+        </article>
+        <article class="panel">
+          <h2>Orphans</h2>
+          <p class="muted">None.</p>
+        </article>
+        <article class="panel">
+          <h2>Connected Components</h2>
+          <ol class="component-list"><li><a href="knowledge-digest.pages/wiki__concepts__ai-product-code-iteration-memory.html">ai-product-code-iteration-memory</a>, <a href="knowledge-digest.pages/wiki__concepts__architecture-policy.html">architecture-policy</a>, <a href="knowledge-digest.pages/wiki__concepts__code-graph-querying.html">code-graph-querying</a>, <a href="knowledge-digest.pages/wiki__concepts__memory-governance.html">memory-governance</a>, <a href="knowledge-digest.pages/wiki__concepts__memory-policy.html">memory-policy</a>, <a href="knowledge-digest.pages/wiki__concepts__tooling-policy.html">tooling-policy</a>, <a href="knowledge-digest.pages/wiki__concepts__workflow-policy.html">workflow-policy</a>, <a href="knowledge-digest.pages/wiki__entities__ai-hub-架构.html">ai-hub-架构</a>, <a href="knowledge-digest.pages/wiki__entities__ai-tools-hub.html">ai-tools-hub</a>, <a href="knowledge-digest.pages/wiki__entities__antigravity.html">antigravity</a>, <a href="knowledge-digest.pages/wiki__entities__claude-code.html">claude-code</a>, <a href="knowledge-digest.pages/wiki__entities__codebase-memory.html">codebase-memory</a>, <a href="knowledge-digest.pages/wiki__entities__codex.html">codex</a>, <a href="knowledge-digest.pages/wiki__entities__cursor.html">cursor</a>, <a href="knowledge-digest.pages/wiki__entities__github-copilot.html">github-copilot</a>, <a href="knowledge-digest.pages/wiki__entities__kiro.html">kiro</a>, <a href="knowledge-digest.pages/wiki__entities__legacy-source-vault.html">legacy-source-vault</a>, <a href="knowledge-digest.pages/wiki__entities__master-记忆体.html">master-记忆体</a>, <a href="knowledge-digest.pages/wiki__entities__minimax.html">minimax</a>, <a href="knowledge-digest.pages/wiki__entities__obsidian.html">obsidian</a>, <a href="knowledge-digest.pages/wiki__entities__opencode.html">opencode</a>, <a href="knowledge-digest.pages/wiki__entities__project-memory.html">project-memory</a>, <a href="knowledge-digest.pages/wiki__entities__shell.html">shell</a>, <a href="knowledge-digest.pages/wiki__entities__tool-harvest.html">tool-harvest</a>, <a href="knowledge-digest.pages/wiki__entities__trae-solo.html">trae-solo</a>, <a href="knowledge-digest.pages/wiki__entities__vscode.html">vscode</a>, <a href="knowledge-digest.pages/wiki__entities__workspace-memory.html">workspace-memory</a>, <a href="knowledge-digest.pages/wiki__index.html">index</a>, <a href="knowledge-digest.pages/wiki__insights__integrations-2026-06-30.html">integrations-2026-06-30</a>, <a href="knowledge-digest.pages/wiki__insights__knowledge-radar-2026-05-17.html">knowledge-radar-2026-05-17</a>, <a href="knowledge-digest.pages/wiki__insights__knowledge-radar-2026-05-18.html">knowledge-radar-2026-05-18</a>, <a href="knowledge-digest.pages/wiki__insights__knowledge-radar-2026-05-22.html">knowledge-radar-2026-05-22</a>, <a href="knowledge-digest.pages/wiki__insights__knowledge-radar-2026-06-03.html">knowledge-radar-2026-06-03</a>, <a href="knowledge-digest.pages/wiki__insights__knowledge-radar-2026-06-07.html">knowledge-radar-2026-06-07</a>, <a href="knowledge-digest.pages/wiki__insights__knowledge-radar-2026-06-24.html">knowledge-radar-2026-06-24</a>, <a href="knowledge-digest.pages/wiki__insights__knowledge-radar-2026-06-25.html">knowledge-radar-2026-06-25</a>, <a href="knowledge-digest.pages/wiki__insights__tool-harvest-2026-05-17.html">tool-harvest-2026-05-17</a>, <a href="knowledge-digest.pages/wiki__insights__tool-harvest-2026-05-18.html">tool-harvest-2026-05-18</a>, <a href="knowledge-digest.pages/wiki__insights__tool-harvest-2026-05-22.html">tool-harvest-2026-05-22</a>, <a href="knowledge-digest.pages/wiki__insights__tool-harvest-2026-06-03.html">tool-harvest-2026-06-03</a>, <a href="knowledge-digest.pages/wiki__insights__tool-harvest-2026-06-07.html">tool-harvest-2026-06-07</a>, <a href="knowledge-digest.pages/wiki__insights__tool-harvest-2026-06-24.html">tool-harvest-2026-06-24</a>, <a href="knowledge-digest.pages/wiki__insights__tool-harvest-2026-06-25.html">tool-harvest-2026-06-25</a>, <a href="knowledge-digest.pages/wiki__insights__what-survives-promotion.html">what-survives-promotion</a>, <a href="knowledge-digest.pages/wiki__overview.html">overview</a>, <a href="knowledge-digest.pages/wiki__purpose.html">purpose</a>, <a href="knowledge-digest.pages/wiki__review__review-queue-2026-05-22.html">review-queue-2026-05-22</a>, <a href="knowledge-digest.pages/wiki__summaries__lwiki-cbmem-cheatsheet.html">lwiki-cbmem-cheatsheet</a>, <a href="knowledge-digest.pages/wiki__summaries__obsidian-vault-memory-system.html">obsidian-vault-memory-system</a>, <a href="knowledge-digest.pages/wiki__summaries__tooling-stack-comparison.html">tooling-stack-comparison</a></li></ol>
+        </article>
+        <article class="panel">
+          <h2>Issues</h2>
+          <ul class="issue-list">
+            <li>0 broken links</li><li>0 missing sources</li><li>0 orphans</li><li>0 duplicate slugs</li>
+          </ul>
+        </article>
+      </section>
+    </main>
+
+    <div class="footer-note">
+      Desktop mode is local-first. Use <code>lwiki dashboard</code> for a snapshot or <code>lwiki serve</code> for a live workspace.
+    </div>
+  </div>
+
+  <script>
+    const input = document.getElementById('page-filter');
+    const rows = Array.from(document.querySelectorAll('#pages-table tbody tr'));
+    input.addEventListener('input', () => {
+      const q = input.value.trim().toLowerCase();
+      rows.forEach((row) => {
+        const hay = row.getAttribute('data-search') || '';
+        row.style.display = hay.includes(q) ? '' : 'none';
+      });
+    });
+  </script>
+</body>
+</html>

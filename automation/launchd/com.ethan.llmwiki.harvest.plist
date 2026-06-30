@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.ethan.llmwiki.harvest</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/bin/python3</string>
+    <string>/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM wiki/automation/launchd/com.ethan.llmwiki.harvest/run-harvest.py</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>StartInterval</key>
+  <integer>43200</integer>
+  <key>StandardOutPath</key>
+  <string>/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM wiki/automation/logs/harvest.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM wiki/automation/logs/harvest.err.log</string>
+</dict>
+</plist>
