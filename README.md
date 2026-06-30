@@ -16,6 +16,8 @@ This repo ships two things:
 | **Skill** | `skills/llm-wiki/` | Agent skill (OpenCode, Claude Code / Cursor / Copilot) — INIT, INGEST, QUERY, UPDATE, LINT |
 | **CLI** | `lwiki/` | Python CLI — scaffold wiki trees and track `raw/` drift |
 
+For a more opinionated personal knowledge body, use `lwiki init --profile personal` and `lwiki analyze` to inspect hubs, orphans, broken links, and missing sources. Use `lwiki query` for quick/deep/thesis synthesis, `lwiki dashboard` for a desktop-style snapshot, `lwiki serve` for the live local workspace, `lwiki harvest` to snapshot tool memories into the wiki, `lwiki watch` to refresh only when source drift changes, `lwiki export` to write `llms.txt`/`llms-full.txt`/`llms.json`, `lwiki adapters`/`lwiki attach` to let IDEs and shells consume the wiki, and `lwiki schedule` to generate a recurring launchd bundle.
+
 ## Quick Start
 
 You can do the manual installation without needing `uv` or `act-cli`.
@@ -77,7 +79,7 @@ cp -r skills/llm-wiki /path/to/project/.claude/skills/
 The `skills/llm-wiki/` directory is a self-contained agent skill with:
 
 - **`SKILL.md`** — main instructions (gather context, route to operation, execute)
-- **`references/`** — per-operation playbooks: `init.md`, `ingest.md`, `query.md`, `update.md`, `lint.md`
+- **`references/`** — per-operation playbooks: `init.md`, `ingest.md`, `query.md`, `update.md`, `lint.md`, `harvest.md`, `watch.md`, `export.md`, `schedule.md`
 - **`templates/`** — starter page templates: `index.md`, `concept.md`, `entity.md`, `insight.md`, `summary.md`
 
 Works with any agent that reads `SKILL.md` from `.claude/skills/` or similar conventions.
@@ -86,7 +88,7 @@ Works with any agent that reads `SKILL.md` from `.claude/skills/` or similar con
 
 ## Usage
 
-This wiki skill was designed for Obsidian, but it can work with any frontend. The typical workflow can be described as below.
+This wiki skill is markdown-first and works with any frontend that can read the generated wiki pages. The typical workflow can be described as below.
 
 <p align="center">
   <img src="assets/flow.svg" alt="wiki-flow" width="600" /><br />
@@ -116,6 +118,7 @@ wiki/greek-history/
 └── wiki/
     ├── index.md
     ├── log.md
+    ├── purpose.md
     ├── overview.md
     ├── summaries/
     ├── concepts/
@@ -245,6 +248,13 @@ Each wiki is fully independent with its own `AGENTS.md` schema. Agent loads the 
 - **Graph view** in Obsidian shows wiki structure — hubs, orphans, clusters
 - **Dataview** plugin lets you query pages by type, tags, or date
 - You never write wiki pages yourself — AI handles all the maintenance
+- `lwiki dashboard` gives you a desktop-style HTML view of the wiki
+- `lwiki query` searches and synthesizes from wiki pages
+- `lwiki serve` turns the repo into a live local workspace you can browse
+- `lwiki harvest` snapshots tool-memory sources and refreshes the wiki
+- `lwiki watch` refreshes only when source drift changes, then audits the result
+- `lwiki export` writes agent-consumable `llms.txt`, `llms-full.txt`, and `llms.json`
+- `lwiki schedule` writes a launchd bundle for recurring watch + audit runs
 
 ## License
 

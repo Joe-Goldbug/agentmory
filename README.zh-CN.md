@@ -14,6 +14,8 @@
 | **Skill** | `skills/llm-wiki/` | Agent 技能（Claude Code / Cursor / Copilot）— INIT、INGEST、QUERY、UPDATE、LINT |
 | **CLI** | `lwiki/` | Python 命令行工具 — 构建 wiki 目录树并追踪 `raw/` 变更 |
 
+如果你要做更偏“个人知识体”的版本，可以直接用 `lwiki init --profile personal`，再用 `lwiki analyze` 看图谱里的枢纽、孤立页、断链和缺失来源。`lwiki query` 支持 quick / deep / thesis 分层查询，`lwiki dashboard` 会生成桌面式 HTML 总览，`lwiki serve` 可以启动本地工作台，`lwiki harvest` 会把工具记忆体快照进 wiki，`lwiki watch` 会在源文件真的变化时才刷新，`lwiki export` 会输出 `llms.txt` / `llms-full.txt` / `llms.json`，`lwiki adapters` / `lwiki attach` 会让 IDE 和 shell 读取这套 wiki，`lwiki schedule` 会生成定时运行的 launchd 包。
+
 > **模型建议：** 由于 wiki 的构建和维护会产生大量 token 消耗，建议使用按计划订阅的服务（如 Claude Max、Cursor 等），或自行部署模型（如 [MiniMax](https://www.minimaxi.com/)、[GLM](https://open.bigmodel.cn/) 等），以避免按量计费带来的高额成本。
 
 ## 快速开始
@@ -78,7 +80,7 @@ cp -r skills/llm-wiki /path/to/project/.claude/skills/
 `skills/llm-wiki/` 目录是一个独立的 agent 技能，包含：
 
 - **`SKILL.md`** — 主指令文件（收集上下文、路由操作、执行任务）
-- **`references/`** — 各操作的详细手册：`init.md`、`ingest.md`、`query.md`、`update.md`、`lint.md`
+- **`references/`** — 各操作的详细手册：`init.md`、`ingest.md`、`query.md`、`update.md`、`lint.md`、`harvest.md`、`watch.md`、`export.md`、`schedule.md`
 - **`templates/`** — 初始页面模板：`index.md`、`concept.md`、`entity.md`、`insight.md`、`summary.md`
 
 兼容任何从 `.claude/skills/` 或类似路径读取 `SKILL.md` 的 agent。
@@ -117,6 +119,7 @@ wiki/greek-history/
 └── wiki/
     ├── index.md
     ├── log.md
+    ├── purpose.md
     ├── overview.md
     ├── summaries/
     ├── concepts/
@@ -246,6 +249,13 @@ vault/wiki/
 - Obsidian 中的**图谱视图**可展示 wiki 结构 — 枢纽、孤立节点、集群
 - **Dataview** 插件可按类型、标签或日期查询页面
 - 你永远不需要自己写 wiki 页面 — AI 会处理所有维护工作
+- `lwiki dashboard` 会生成一个可直接打开的桌面式 HTML 页面
+- `lwiki query` 会在 wiki 页面里做分层查询和综合输出
+- `lwiki serve` 会把整个 wiki 启动成一个本地工作区
+- `lwiki harvest` 会把工具记忆体快照并刷新 wiki
+- `lwiki watch` 会在源文件有漂移时才刷新并审计结果
+- `lwiki export` 会输出可供其他 agent 直接消费的 `llms.txt`、`llms-full.txt` 和 `llms.json`
+- `lwiki schedule` 会生成定时 watch + audit 的 launchd 包
 
 ## 许可证
 

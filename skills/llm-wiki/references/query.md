@@ -35,6 +35,18 @@ Read identified pages in full. Follow one level of `[[wikilinks]]` if they point
   - What-do-we-know → structured summary with open questions
 - Suggest follow-up sources to ingest or questions to investigate
 
+### 4. Use the Right Depth
+
+- `quick` — index / title / tags / source hints only
+- `standard` — balanced default for most questions
+- `deep` — full-body scan plus connected context
+- `thesis` — evidence for/against a claim, with extra weight on decisions, conflicts, principles, and questions
+- `list` — ranked matches only, no prose synthesis
+
+### 5. Save the Synthesis
+
+If the answer is useful beyond the current thread, save it back into `wiki/insights/` and update the index + log. Use a stable slug tied to the question.
+
 ### 4. Report Issues Found in Existing Pages
 
 Query does NOT modify existing pages. But if during reading you discover errors, outdated information, or inconsistencies in existing wiki pages, report them at the end of your answer:

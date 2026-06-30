@@ -22,9 +22,9 @@ Bootstrap with **`lwiki init`**. If the **`lwiki`** command is not available, as
 
 `lwiki init <wiki-root> --domain "<one-sentence purpose>"`
 
-Add **`--sources "..."`** only when the user specified source types in step 3; otherwise omit it and the defaults apply.
+Add **`--sources "..."`** only when the user specified source types in step 3; otherwise omit it and the defaults apply. If the user wants the personal knowledge body layout, add `--profile personal`.
 
-That command creates the directories, **`AGENTS.md`** (domain schema), a thin **`CLAUDE.md`** that imports `@AGENTS.md` per [Claude Code AGENTS.md](https://code.claude.com/docs/en/memory#agents-md), **`wiki/index.md`**, **`wiki/log.md`**, **`wiki/overview.md`**, runs an initial **`lwiki raw sync`**, and does not require hand-writing the files below.
+That command creates the directories, **`AGENTS.md`** (domain schema), a thin **`CLAUDE.md`** that imports `@AGENTS.md` per [Claude Code AGENTS.md](https://code.claude.com/docs/en/memory#agents-md), **`wiki/index.md`**, **`wiki/log.md`**, **`wiki/purpose.md`**, **`wiki/overview.md`**, runs an initial **`lwiki raw sync`**, and does not require hand-writing the files below.
 
 ### 3. Starter Files (AGENTS.md, CLAUDE.md, index, log, overview)
 
@@ -32,8 +32,9 @@ That command creates the directories, **`AGENTS.md`** (domain schema), a thin **
 
 - **`AGENTS.md`** — `# <Domain> Wiki Schema` with **Domain**, **Source Types** (from `--sources` or default), and **Conventions** (frontmatter, wikilinks, immutable `raw/`, append-only `log.md`, co-evolving schema). This is the file to edit for schema changes (also consumed by other agents).
 - **`CLAUDE.md`** — Fixed stub: `@AGENTS.md` plus a short **LLM Wiki (Claude Code)** note so Claude Code loads the same instructions without duplicating them.
-- **`wiki/index.md`** — empty tables per category (Summaries, Concepts, Entities, Insights).
+- **`wiki/index.md`** — empty tables per category. Default profile uses Summaries, Concepts, Entities, Insights. Personal profile adds Projects, Decisions, Patterns, Conflicts, Questions, Principles, and Preferences.
 - **`wiki/log.md`** — header + first `## [date] init | <domain>` entry.
+- **`wiki/purpose.md`** — why this wiki exists, the questions it should answer, and the guardrails for ingest/query/review.
 - **`wiki/overview.md`** — frontmatter + empty “Current Understanding” / “Open Questions” sections.
 
 Edit **AGENTS.md** (and only adjust **CLAUDE.md** for Claude-specific add-ons). If `lwiki` could not be run (rare), follow the same two-file pattern by hand.

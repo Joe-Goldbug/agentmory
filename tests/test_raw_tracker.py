@@ -2,8 +2,6 @@
 
 from pathlib import Path
 
-import pytest
-
 from lwiki.raw_tracker import (
     compute_drift,
     format_drift_report,
@@ -11,7 +9,6 @@ from lwiki.raw_tracker import (
     run_raw_status,
     run_raw_sync,
     scan_directory,
-    write_log,
 )
 
 

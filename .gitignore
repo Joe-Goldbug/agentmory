@@ -205,3 +205,12 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# macOS
+.DS_Store
+**/.DS_Store
+
+# LLM Wiki runtime symlinks (machine-specific, point to ~/Library/Application Support/llm-wiki-runtime/)
+# These are symlinks with spaces in the name, hard to pattern-match in .gitignore
+# Workaround: add with explicit paths via shell. See sync script.
+
