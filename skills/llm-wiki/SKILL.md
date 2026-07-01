@@ -64,9 +64,10 @@ wiki/index.md + wiki/log.md present at wiki root?
    │   ├─ "watch" / source drift / auto-refresh if changed? → WATCH → references/watch.md
    │   ├─ "export" / llms.txt / machine-readable exports? → EXPORT → references/export.md
    │   ├─ "schedule" / recurring harvest / launchd bundle? → SCHEDULE → references/schedule.md
+│   ├─ "code structure / call graph / symbol / dead code" question about a specific project? → CBMEM → references/cbmem.md
 │   ├─ "lint" / health check / find gaps? → LINT → references/lint.md
 │   ├─ Revise or correct existing pages? → UPDATE → references/update.md
-│   └─ Paste or URL only? → save under raw/, then INGEST → references/ingest.md
+└─ Paste or URL only? → save under raw/, then INGEST → references/ingest.md
 ```
 
 ## Wiki Structure

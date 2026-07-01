@@ -186,6 +186,26 @@ def cbmem_index_cmd(
     raise typer.Exit(0 if result.ok else 1)
 
 
+@cbmem_app.command("index-status")
+def cbmem_index_status_cmd(
+    project: Path = typer.Argument(
+        ...,
+        help="Project directory whose graph status to report",
+        exists=True,
+        file_okay=False,
+        dir_okay=True,
+    ),
+) -> None:
+    """Print the current indexing status of a project directory."""
+    try:
+        result = lwiki_cbmem.index_status(project)
+    except lwiki_cbmem.CbmemNotFoundError as exc:
+        typer.secho(str(exc), err=True, fg=typer.colors.RED)
+        raise typer.Exit(1) from exc
+    typer.echo(result.stdout.rstrip() or "(no output)")
+    raise typer.Exit(0 if result.ok else 1)
+
+
 @cbmem_app.command("search")
 def cbmem_search_cmd(
     project: Path = typer.Argument(
@@ -361,6 +381,13 @@ def cbmem_query_cmd(
     ),
 ) -> None:
     """Run a Cypher-like graph query."""
+    if not cypher or not cypher.strip():
+        typer.secho(
+            "Cypher / search string must be non-empty.",
+            err=True,
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(2)
     if not lwiki_cbmem.is_indexed(project):
         typer.secho(
             f"{project} has no .codebase-memory/graph.db.zst — run `lwiki cbmem index {project}` first",
@@ -376,6 +403,9 @@ def cbmem_query_cmd(
     except lwiki_cbmem.CbmemNotFoundError as exc:
         typer.secho(str(exc), err=True, fg=typer.colors.RED)
         raise typer.Exit(1) from exc
+    except ValueError as exc:
+        typer.secho(str(exc), err=True, fg=typer.colors.RED)
+        raise typer.Exit(2) from exc
     typer.echo(lwiki_cbmem.render_query_report(result))
     raise typer.Exit(0 if result.ok else 1)
 

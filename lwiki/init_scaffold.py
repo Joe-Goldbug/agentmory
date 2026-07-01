@@ -371,3 +371,44 @@ def init_wiki_tree(
         render_eval_suite_template(),
         encoding="utf-8",
     )
+
+    _ensure_cbmem_sources_json(wiki_root)
+
+
+def _ensure_cbmem_sources_json(wiki_root: Path) -> str:
+    """Write (or merge) the ``cbmem`` section of ``lwiki-sources.json`` and
+    print a one-line install status. Returns the printed line so the caller
+    can echo it elsewhere if desired.
+    """
+    import json
+    import os
+    from pathlib import Path as _P
+
+    bin_path = _P(os.environ.get("HOME", str(_P.home()))) / "bin" / "codebase-memory-mcp"
+    installed = bin_path.is_file()
+    status_line = (
+        "CBMEM: installed (run `lwiki cbmem doctor` to verify)"
+        if installed
+        else "CBMEM: not installed (run `bash automation/install-cbmem.sh`)"
+    )
+
+    sources_path = wiki_root / "lwiki-sources.json"
+    if sources_path.is_file():
+        try:
+            payload = json.loads(sources_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            payload = {}
+    else:
+        payload = {}
+    if not isinstance(payload, dict):
+        payload = {}
+    cbmem_block = payload.get("cbmem")
+    if not isinstance(cbmem_block, dict):
+        cbmem_block = {}
+    cbmem_block.setdefault("projects", [])
+    cbmem_block.setdefault("search_queries", ["<TODO>", "<FIXME>", "<XXX>"])
+    payload["cbmem"] = cbmem_block
+    sources_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+    print(status_line)
+    return status_line

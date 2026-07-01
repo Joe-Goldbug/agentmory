@@ -257,6 +257,21 @@ vault/wiki/
 - `lwiki export` 会输出可供其他 agent 直接消费的 `llms.txt`、`llms-full.txt` 和 `llms.json`
 - `lwiki schedule` 会生成定时 watch + audit 的 launchd 包
 
+## 代码库记忆（`lwiki cbmem`）
+
+`lwiki cbmem` 封装了 [DeusData/codebase-memory-mcp](https://github.com/DeusData/codebase-memory-mcp)，让 wiki 能对任意项目目录回答代码结构问题。封装在 `lwiki/cbmem.py`；决策记录在 [wiki/insights/integrations-2026-06-30.md](wiki/insights/integrations-2026-06-30.md)；速查表在 [wiki/summaries/lwiki-cbmem-cheatsheet.md](wiki/summaries/lwiki-cbmem-cheatsheet.md)。
+
+一次性安装（下载约 270 MB 到 `~/bin/`）：
+
+```bash
+bash automation/install-cbmem.sh
+lwiki cbmem doctor
+```
+
+子命令：`doctor`、`index`、`index-status`、`search`、`architecture`、`trace`、`changes`、`dead`、`query`、`semantic`。完整列表见 `lwiki cbmem --help`。
+
+> **关于 macOS 沙箱。** 一些 agent 沙箱（特别是 Claude Code 的 Bash）会以退出码 137 SIGKILL 掉这 270 MB 的二进制。请在真实终端中运行 `lwiki cbmem *`，而不要在沙箱中运行。完整原因见 [wiki/insights/integrations-2026-06-30.md](wiki/insights/integrations-2026-06-30.md) 决策 1。
+
 ## 许可证
 
 [MIT](LICENSE)

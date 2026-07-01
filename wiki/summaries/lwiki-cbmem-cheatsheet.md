@@ -8,7 +8,7 @@ updated: 2026-06-30
 
 # lwiki cbmem Cheatsheet
 
-> One-page reference for the 9 `lwiki cbmem *` subcommands. For *why*
+> One-page reference for the 10 `lwiki cbmem *` subcommands. For *why*
 > see [[integrations-2026-06-30]]. For *what* see [[codebase-memory]].
 > For the underlying concept see [[code-graph-querying]].
 
@@ -33,6 +33,7 @@ lwiki cbmem doctor   # should print [cbmem doctor] OK
 |---|---|---|
 | `lwiki cbmem doctor` | Check binary resolves + responds | First run, after upgrades |
 | `lwiki cbmem index <dir>` | Build / refresh the code graph for `<dir>` | First use of `<dir>`, after major refactors |
+| `lwiki cbmem index-status <dir>` | Show index freshness (path, size, age) | Check if a re-index is needed |
 | `lwiki cbmem search <dir> <q>` | Symbol/text search across the graph | "Where is X defined or used?" |
 | `lwiki cbmem architecture <dir>` | Languages, packages, entry points, routes, hotspots | Onboarding to a new project |
 | `lwiki cbmem trace <dir> <sym>` | Call-graph edges from `<sym>` | "What does X call / who calls X?" |
@@ -49,7 +50,7 @@ lwiki cbmem doctor   # should print [cbmem doctor] OK
 | `1` | Binary not found / API call failed |
 | `2` | `<dir>` is not yet indexed (run `lwiki cbmem index <dir>` first) |
 
-The four commands that need an existing graph
+The seven commands that need an existing graph
 (`search`, `architecture`, `trace`, `changes`, `dead`, `query`, `semantic`)
 all check `is_indexed(<dir>)` and return `2` with a clear hint if the
 `.codebase-memory/graph.db.zst` artifact is missing.
@@ -116,6 +117,35 @@ else:
 if not cbmem.is_indexed(Path(".")):
     cbmem.index_project(Path("."))
 ```
+
+## Automation: as part of `lwiki harvest`
+
+`lwiki harvest` (and the launchd-powered `lwiki watch`) automatically
+captures cbmem snapshots for every project listed in `lwiki-sources.json`
+under `cbmem.projects`. For each project, the harvest cycle runs:
+
+1. `index` → refreshes the code graph
+2. `architecture` → languages, packages, entry points
+3. `search <query>` → per-query symbol hits (default: `<TODO>`, `<FIXME>`, `<XXX>`)
+4. `dead_code` → dead-code candidates
+5. `changes` → git-diff impact map (base = `HEAD`)
+
+Output lands under `raw/cbmem-snapshots/<YYYY-MM-DD>/<project>/` and is
+picked up by the next `lwiki compile` cycle. cbmem failures never block
+the other 11 source groups.
+
+To add a project:
+```bash
+# Edit lwiki-sources.json → cbmem.projects and cbmem.search_queries
+# Then trigger a cycle manually or wait for the next launchd tick:
+lwiki harvest
+```
+
+### When NOT to use harvest-based cbmem
+
+- Interactive exploration → use `lwiki cbmem search|trace|architecture *` directly
+- The harvest snapshot is a regular dump, not a live graph pointer
+- If a project is not in `lwiki-sources.json::cbmem.projects`, it won't be indexed by harvest
 
 ## Troubleshooting
 

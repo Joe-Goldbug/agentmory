@@ -176,10 +176,13 @@ def doctor(*, timeout: float = 15.0) -> CbmemResult:
     """Check binary health by asking for the indexed-status of a fake project.
 
     This works because ``indexed`` only needs a project path; we pass ``.``
-    and check whether the binary responds at all.
+    and check whether the binary responds at all. We deliberately do not
+    pass ``--json`` here — the wrapper only needs ``result.ok``, and
+    emitting JSON forces the binary to round-trip the payload through its
+    encoder, which is wasted work for a liveness check.
     """
     binary = resolve_binary()
-    return _run(binary, "indexed", {"path": "."}, timeout=timeout)
+    return _run(binary, "indexed", {"path": "."}, timeout=timeout, as_json=False)
 
 
 def index_project(

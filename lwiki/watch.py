@@ -120,6 +120,13 @@ def run_watch(root: Path, *, eval_suite: Path | None = None, eval_mode: str = "s
         harvest_sources(root)
         harvested = True
 
+    # cbmem harvest runs after the file-based sources so it never blocks them.
+    # ``harvest_cbmem`` swallows all exceptions internally and returns
+    # ``list[CbmemSnapshotOutcome]``; we intentionally ignore the return
+    # value here — the audit step is what surfaces failures to the user.
+    from lwiki.cbmem_source import harvest_cbmem
+    harvest_cbmem(root)
+
     audit = run_audit(root, eval_suite=eval_suite, eval_mode=eval_mode)
     _save_state(state_path, current)
     return WatchReport(

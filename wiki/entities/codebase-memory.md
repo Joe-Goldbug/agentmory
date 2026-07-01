@@ -21,10 +21,7 @@ updated: 2026-06-30
 | Binary | `~/bin/codebase-memory-mcp` (270 MB, Mach-O arm64) |
 | Alias | `~/bin/cbmem` (symlink) |
 | Wrapper module | `lwiki/cbmem.py` |
-| CLI surface | `lwiki cbmem {doctor,index,search,architecture,trace,changes,dead,query,semantic}` |
-| Languages parsed | 158 (tree-sitter, vendored) |
-| Index speed | Linux kernel (28M LOC, 75K files) in 3 min |
-| Query latency | < 1 ms (Cypher) / < 10 ms (name search) |
+| CLI surface | `lwiki cbmem {doctor,index,index-status,search,architecture,trace,changes,dead,query,semantic}` |
 | Distribution | Single static binary, no Docker, no API key |
 | Added to lwiki | 2026-06-30 |
 
@@ -64,8 +61,11 @@ itself supports MCP stdio.
 
 ## Source Set
 
-- `lwiki/cbmem.py` (wrapper module, 22 public APIs)
-- `lwiki/cli.py` (subcommand registration, 9 commands)
+- `lwiki/cbmem.py` (wrapper module, 20 public functions)
+- `lwiki/cli.py` (subcommand registration, 10 commands)
+- `lwiki/cbmem_source.py` (harvest bridge — writes `raw/cbmem-snapshots/`)
+- `lwiki-sources.json` (config: `cbmem.projects` + `cbmem.search_queries`)
+- `automation/install-cbmem.sh` (one-shot binary installer)
 - `~/bin/codebase-memory-mcp` (vendored binary)
 
 ## See Also

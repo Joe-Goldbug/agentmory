@@ -1,0 +1,8 @@
+{
+  "$comment": "LLM Wiki source group registry. Each group contributes to harvest. Add project paths under cbmem.projects so the cbmem harvest snapshots them on every launchd run.",
+  "groups": [],
+  "cbmem": {
+    "projects": [],
+    "search_queries": ["<TODO>", "<FIXME>", "<XXX>"]
+  }
+}

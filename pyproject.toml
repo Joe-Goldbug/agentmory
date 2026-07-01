@@ -8,6 +8,16 @@ version = "0.1.0"
 description = "CLI for LLM Wiki: init wiki trees and track raw/ against files.log"
 readme = "README.md"
 requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Ethan" }]
+keywords = ["llm", "wiki", "knowledge-base", "mcp", "code-graph"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Documentation",
+]
 dependencies = [
     "typer>=0.12.0",
 ]
@@ -17,6 +27,16 @@ dev = [
     "pytest>=8.0.0",
     "ruff>=0.8.0",
 ]
+# Marker extra — installing ``lwiki[cbmem]`` is a no-op today, but the
+# extra name documents that cbmem is a vendored, system-level dependency
+# whose installer lives at ``automation/install-cbmem.sh``.
+cbmem = []
+
+[project.urls]
+Homepage = "https://github.com/hsuanguo/llm-wiki"
+Source = "https://github.com/hsuanguo/llm-wiki"
+Issues = "https://github.com/hsuanguo/llm-wiki/issues"
+Changelog = "https://github.com/hsuanguo/llm-wiki/blob/main/CHANGELOG.md"
 
 [project.scripts]
 lwiki = "lwiki.cli:main"

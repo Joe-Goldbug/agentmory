@@ -112,11 +112,28 @@ The two push-backs above establish a pattern. Codified in
 Any future "agent capability" proposal must first answer the
 scope question before any code is written.
 
+## Implementation status (as of 2026-07-01)
+
+8 tasks completed — cbmem is now fully integrated into the lwiki
+automation pipeline:
+
+| Task | What | Status |
+|---|---|---|
+| Task 1 | `automation/install-cbmem.sh` — one-shot binary installer | done |
+| Task 2 | `cbmem.py` bug fixes (`doctor as_json=False`, `cbmem_index_status_cmd`, empty Cypher guard) | done |
+| Task 3 | 41 unit tests in `test_cbmem.py` | done |
+| Task 4 | 20 CLI contract tests in `test_cbmem_cli.py` | done |
+| Task 5 | `cbmem_source.py` harvest bridge + `watch.py` integration + `lwiki-sources.json` template | done |
+| Task 6 | `init_scaffold.py` cbmem probe + `audit.py` cbmem-indexed check | done |
+| Task 7 | `pyproject.toml`, README bilingual, `SKILL.md` routing, `references/cbmem.md` | done |
+| Task 8 | 3 wiki pages updated (entity, cheatsheet, integrations) | done |
+
+Core automation loop: `lwiki watch` → `harvest_cbmem(root)` → 5 tools
+per project → `raw/cbmem-snapshots/<date>/<project>/` → `lwiki compile` → `wiki/`.
+cbmem failures never block the other 11 source groups.
+
 ## Open questions
 
-- **Auto-reindex.** Should `lwiki watch` (the existing 12-hour
-  scheduler) trigger a cbmem reindex on detected source drift?
-  Currently it does not. Probably should.
 - **Graph sharing across repos.** codebase-memory supports cross-repo
   linking. lwiki does not expose it yet. Likely a future subcommand.
 - **agent-reach CLI vs MCP.** The `agent-reach` package itself is a

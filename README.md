@@ -256,6 +256,21 @@ Each wiki is fully independent with its own `AGENTS.md` schema. Agent loads the 
 - `lwiki export` writes agent-consumable `llms.txt`, `llms-full.txt`, and `llms.json`
 - `lwiki schedule` writes a launchd bundle for recurring watch + audit runs
 
+## Codebase Memory (`lwiki cbmem`)
+
+`lwiki cbmem` wraps [DeusData/codebase-memory-mcp](https://github.com/DeusData/codebase-memory-mcp) so the wiki can answer code-structure questions about any project directory. The wrapper is in `lwiki/cbmem.py`; the decision record is in [wiki/insights/integrations-2026-06-30.md](wiki/insights/integrations-2026-06-30.md); the cheatsheet is in [wiki/summaries/lwiki-cbmem-cheatsheet.md](wiki/summaries/lwiki-cbmem-cheatsheet.md).
+
+One-time install (downloads ~270 MB into `~/bin/`):
+
+```bash
+bash automation/install-cbmem.sh
+lwiki cbmem doctor
+```
+
+Subcommands: `doctor`, `index`, `index-status`, `search`, `architecture`, `trace`, `changes`, `dead`, `query`, `semantic`. See `lwiki cbmem --help` for the full list.
+
+> **Note on the macOS sandbox.** Some agent sandboxes (notably Claude Code's Bash) SIGKILL the 270 MB binary with exit 137. Run `lwiki cbmem *` from a real terminal, not from inside the sandbox. See [wiki/insights/integrations-2026-06-30.md](wiki/insights/integrations-2026-06-30.md) Decision 1 for the full rationale.
+
 ## License
 
 [MIT](LICENSE)

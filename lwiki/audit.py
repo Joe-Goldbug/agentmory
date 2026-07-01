@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -19,6 +20,8 @@ class AuditReport:
     review_items: int
     eval_pass: int
     eval_total: int
+    cbmem_indexed: int = 0
+    cbmem_projects_total: int = 0
 
     @property
     def ok(self) -> bool:
@@ -29,6 +32,36 @@ class AuditReport:
             and self.review_items == 0
             and eval_ok
         )
+
+
+def _check_cbmem_indexed(root: Path) -> tuple[int, int]:
+    """Return (indexed_count, projects_total). Reads ``lwiki-sources.json::cbmem.projects``
+    and counts how many of those paths have a ``.codebase-memory/graph.db.zst`` artifact.
+
+    Audit is a status report — never raises. Returns ``(0, 0)`` if the
+    config file is missing or malformed.
+    """
+    path = root / "lwiki-sources.json"
+    if not path.is_file():
+        return (0, 0)
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return (0, 0)
+    cbmem_block = payload.get("cbmem")
+    if not isinstance(cbmem_block, dict):
+        return (0, 0)
+    projects = cbmem_block.get("projects", [])
+    if not isinstance(projects, list):
+        return (0, 0)
+    indexed = 0
+    for p in projects:
+        if not isinstance(p, str) or not p.strip():
+            continue
+        artifact = Path(p) / ".codebase-memory" / "graph.db.zst"
+        if artifact.is_file():
+            indexed += 1
+    return (indexed, len([p for p in projects if isinstance(p, str) and p.strip()]))
 
 
 def run_audit(root: Path, *, eval_suite: Path | None = None, eval_mode: str = "standard") -> AuditReport:
@@ -44,6 +77,8 @@ def run_audit(root: Path, *, eval_suite: Path | None = None, eval_mode: str = "s
         eval_pass = eval_report.pass_count
         eval_total = eval_report.total
 
+    cbmem_indexed, cbmem_total = _check_cbmem_indexed(root)
+
     return AuditReport(
         root=root,
         analysis_errors=len(analysis.errors),
@@ -51,6 +86,8 @@ def run_audit(root: Path, *, eval_suite: Path | None = None, eval_mode: str = "s
         review_items=len(review.items),
         eval_pass=eval_pass,
         eval_total=eval_total,
+        cbmem_indexed=cbmem_indexed,
+        cbmem_projects_total=cbmem_total,
     )
 
 
@@ -62,6 +99,7 @@ def render_audit_report(report: AuditReport) -> str:
         f"- Schema issues: {report.schema_issues}",
         f"- Review queue items: {report.review_items}",
         f"- Eval: {report.eval_pass}/{report.eval_total}" if report.eval_total else "- Eval: skipped",
+        f"- CBMEM: {report.cbmem_indexed}/{report.cbmem_projects_total} projects indexed",
         "",
         f"Status: {'OK' if report.ok else 'FAILED'}",
     ]
