@@ -2,8 +2,8 @@
 title: OpenCode
 type: entity
 tags: [entity, tool, opencode, cli]
-sources: [raw/tool-snapshots/opencode/2026-06-25/agents.md, raw/tool-snapshots/opencode/2026-06-25/commands/analyze.md, raw/tool-snapshots/opencode/2026-06-25/commands/lint.md, raw/tool-snapshots/opencode/2026-06-25/commands/module.md, raw/tool-snapshots/opencode/2026-06-25/commands/quality.md, raw/tool-snapshots/opencode/2026-06-25/commands/review.md, raw/tool-snapshots/opencode/2026-06-25/commands/test.md, raw/tool-snapshots/opencode/2026-06-25/commands/todo.md, raw/tool-snapshots/opencode/2026-06-25/commands/update.md, raw/tool-snapshots/opencode/2026-06-25/readme.md, raw/tool-snapshots/opencode/2026-06-25/validation_report.md]
-updated: 2026-06-25
+sources: [raw/tool-snapshots/opencode/2026-07-01/agents.md, raw/tool-snapshots/opencode/2026-07-01/commands/analyze.md, raw/tool-snapshots/opencode/2026-07-01/commands/lint.md, raw/tool-snapshots/opencode/2026-07-01/commands/module.md, raw/tool-snapshots/opencode/2026-07-01/commands/quality.md, raw/tool-snapshots/opencode/2026-07-01/commands/review.md, raw/tool-snapshots/opencode/2026-07-01/commands/test.md, raw/tool-snapshots/opencode/2026-07-01/commands/todo.md, raw/tool-snapshots/opencode/2026-07-01/commands/update.md, raw/tool-snapshots/opencode/2026-07-01/readme.md, raw/tool-snapshots/opencode/2026-07-01/validation_report.md]
+updated: 2026-07-01
 ---
 
 # OpenCode
@@ -12,17 +12,17 @@ This page is kept fresh by `lwiki harvest`.
 
 ## Source Set
 
-- `raw/tool-snapshots/opencode/2026-06-25/agents.md`
-- `raw/tool-snapshots/opencode/2026-06-25/commands/analyze.md`
-- `raw/tool-snapshots/opencode/2026-06-25/commands/lint.md`
-- `raw/tool-snapshots/opencode/2026-06-25/commands/module.md`
-- `raw/tool-snapshots/opencode/2026-06-25/commands/quality.md`
-- `raw/tool-snapshots/opencode/2026-06-25/commands/review.md`
-- `raw/tool-snapshots/opencode/2026-06-25/commands/test.md`
-- `raw/tool-snapshots/opencode/2026-06-25/commands/todo.md`
-- `raw/tool-snapshots/opencode/2026-06-25/commands/update.md`
-- `raw/tool-snapshots/opencode/2026-06-25/readme.md`
-- `raw/tool-snapshots/opencode/2026-06-25/validation_report.md`
+- `raw/tool-snapshots/opencode/2026-07-01/agents.md`
+- `raw/tool-snapshots/opencode/2026-07-01/commands/analyze.md`
+- `raw/tool-snapshots/opencode/2026-07-01/commands/lint.md`
+- `raw/tool-snapshots/opencode/2026-07-01/commands/module.md`
+- `raw/tool-snapshots/opencode/2026-07-01/commands/quality.md`
+- `raw/tool-snapshots/opencode/2026-07-01/commands/review.md`
+- `raw/tool-snapshots/opencode/2026-07-01/commands/test.md`
+- `raw/tool-snapshots/opencode/2026-07-01/commands/todo.md`
+- `raw/tool-snapshots/opencode/2026-07-01/commands/update.md`
+- `raw/tool-snapshots/opencode/2026-07-01/readme.md`
+- `raw/tool-snapshots/opencode/2026-07-01/validation_report.md`
 
 ## Notes
 

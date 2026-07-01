@@ -24,9 +24,9 @@ updated: 2026-06-24
 
 ## Automation Status
 
-- Latest harvest: 2026-06-25
-- Sources captured: 27539
-- Missing source slots: 76
+- Latest harvest: 2026-07-01
+- Sources captured: 27548
+- Missing source slots: 71
 - Workflow memory is now maintained by `lwiki harvest`.
 
 ## See Also

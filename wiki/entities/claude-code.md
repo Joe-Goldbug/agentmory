@@ -2,8 +2,8 @@
 title: Claude Code
 type: entity
 tags: [entity, tool, claude-code, cli]
-sources: [raw/tool-snapshots/claude-code/2026-06-25/global-claude.md]
-updated: 2026-06-25
+sources: [raw/tool-snapshots/claude-code/2026-07-01/global-claude.md]
+updated: 2026-07-01
 ---
 
 # Claude Code
@@ -12,7 +12,7 @@ This page is kept fresh by `lwiki harvest`.
 
 ## Source Set
 
-- `raw/tool-snapshots/claude-code/2026-06-25/global-claude.md`
+- `raw/tool-snapshots/claude-code/2026-07-01/global-claude.md`
 
 ## Notes
 

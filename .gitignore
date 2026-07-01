@@ -239,3 +239,6 @@ knowledge-digest.pages/
 # launchd harvest logs (rewritten on every run; runtime artefact only)
 /automation/logs/
 
+# Tool snapshot data (auto-harvested per-machine; large, not for version control)
+/raw/tool-snapshots/
+
