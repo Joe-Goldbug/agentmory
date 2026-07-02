@@ -3,14 +3,14 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "lwiki"
+name = "lwm"
 version = "0.1.0"
-description = "CLI for LLM Wiki: init wiki trees and track raw/ against files.log"
+description = "CLI for LLM-WorkMem: init wiki trees and track raw/ against files.log"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [{ name = "Ethan" }]
-keywords = ["llm", "wiki", "knowledge-base", "mcp", "code-graph"]
+keywords = ["llm", "llm-workmem", "knowledge-base", "mcp", "code-graph", "working-memory"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
@@ -27,22 +27,22 @@ dev = [
     "pytest>=8.0.0",
     "ruff>=0.8.0",
 ]
-# Marker extra — installing ``lwiki[cbmem]`` is a no-op today, but the
+# Marker extra — installing ``lwm[cbmem]`` is a no-op today, but the
 # extra name documents that cbmem is a vendored, system-level dependency
 # whose installer lives at ``automation/install-cbmem.sh``.
 cbmem = []
 
 [project.urls]
-Homepage = "https://github.com/hsuanguo/llm-wiki"
-Source = "https://github.com/hsuanguo/llm-wiki"
-Issues = "https://github.com/hsuanguo/llm-wiki/issues"
-Changelog = "https://github.com/hsuanguo/llm-wiki/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/EthanLau1/LLM-WorkMem"
+Source = "https://github.com/EthanLau1/LLM-WorkMem"
+Issues = "https://github.com/EthanLau1/LLM-WorkMem/issues"
+Changelog = "https://github.com/EthanLau1/LLM-WorkMem/blob/main/CHANGELOG.md"
 
 [project.scripts]
-lwiki = "lwiki.cli:main"
+lwm = "lwm.cli:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["lwiki"]
+packages = ["lwm"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -1,4 +1,4 @@
-"""Unit tests for ``lwiki.cbmem`` — argv shape and error paths, no real binary."""
+"""Unit tests for ``lwm.cbmem`` — argv shape and error paths, no real binary."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from lwiki import cbmem
+from lwm import cbmem
 
 
 # ---------- resolve_binary -------------------------------------------------
@@ -96,7 +96,7 @@ def _ok_proc(stdout: str = "{}", stderr: str = "") -> MagicMock:
 
 
 def test_run_uses_cli_json_wrapper(stub_cbmem_binary: Path) -> None:
-    with patch("lwiki.cbmem.subprocess.run", return_value=_ok_proc()) as pr:
+    with patch("lwm.cbmem.subprocess.run", return_value=_ok_proc()) as pr:
         cbmem._run(str(stub_cbmem_binary), "indexed", {"path": "."})  # noqa: SLF001
     cmd = pr.call_args.args[0]
     assert cmd[:3] == (str(stub_cbmem_binary), "cli", "--json")
@@ -105,7 +105,7 @@ def test_run_uses_cli_json_wrapper(stub_cbmem_binary: Path) -> None:
 
 
 def test_run_as_json_false_omits_flag(stub_cbmem_binary: Path) -> None:
-    with patch("lwiki.cbmem.subprocess.run", return_value=_ok_proc()) as pr:
+    with patch("lwm.cbmem.subprocess.run", return_value=_ok_proc()) as pr:
         cbmem._run(str(stub_cbmem_binary), "indexed", {"path": "."}, as_json=False)  # noqa: SLF001
     cmd = pr.call_args.args[0]
     assert cmd == (str(stub_cbmem_binary), "cli", "indexed", '{"path": "."}')
@@ -113,7 +113,7 @@ def test_run_as_json_false_omits_flag(stub_cbmem_binary: Path) -> None:
 
 def test_run_timeout_returns_normalised_result(stub_cbmem_binary: Path) -> None:
     exc = subprocess.TimeoutExpired(cmd=["x"], timeout=0.1, output=b"partial", stderr=b"oops")
-    with patch("lwiki.cbmem.subprocess.run", side_effect=exc):
+    with patch("lwm.cbmem.subprocess.run", side_effect=exc):
         r = cbmem._run(str(stub_cbmem_binary), "search", {"path": ".", "query": "x"})  # noqa: SLF001
     assert r.ok is False
     assert r.returncode == 124
@@ -132,7 +132,7 @@ def patched_run():
         captured.append((cmd, kwargs))
         return _ok_proc(stdout='{"ok": true}')
 
-    with patch("lwiki.cbmem.subprocess.run", side_effect=_runner) as pr:
+    with patch("lwm.cbmem.subprocess.run", side_effect=_runner) as pr:
         yield pr, captured
 
 

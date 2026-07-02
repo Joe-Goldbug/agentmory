@@ -1,11 +1,11 @@
-# llm-wiki
+# llm-workmem
 
 <p align="center">
-  <img src="assets/logo.svg" alt="llm-wiki" width="480" /><br />
+  <img src="assets/logo.svg" alt="llm-workmem" width="480" /><br />
   <sub>LLM-powered personal knowledge base</sub>
 </p>
 
-An LLM wiki that evolves with you. Based on [Karpathy's LLM Wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f).
+An LLM-WorkMem that evolves with you. Based on [Karpathy's LLM-WorkMem](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f).
 
 [Chinese](README.zh-CN.md)
 
@@ -13,10 +13,10 @@ This repo ships two things:
 
 | What | Path | Purpose |
 |------|------|---------|
-| **Skill** | `skills/llm-wiki/` | Agent skill (OpenCode, Claude Code / Cursor / Copilot) — INIT, INGEST, QUERY, UPDATE, LINT |
-| **CLI** | `lwiki/` | Python CLI — scaffold wiki trees and track `raw/` drift |
+| **Skill** | `skills/llm-workmem/` | Agent skill (OpenCode, Claude Code / Cursor / Copilot) — INIT, INGEST, QUERY, UPDATE, LINT |
+| **CLI** | `lwm/` | Python CLI — scaffold wiki trees and track `raw/` drift |
 
-For a more opinionated personal knowledge body, use `lwiki init --profile personal` and `lwiki analyze` to inspect hubs, orphans, broken links, and missing sources. Use `lwiki query` for quick/deep/thesis synthesis, `lwiki dashboard` for a desktop-style snapshot, `lwiki serve` for the live local workspace, `lwiki harvest` to snapshot tool memories into the wiki, `lwiki watch` to refresh only when source drift changes, `lwiki export` to write `llms.txt`/`llms-full.txt`/`llms.json`, `lwiki adapters`/`lwiki attach` to let IDEs and shells consume the wiki, and `lwiki schedule` to generate a recurring launchd bundle.
+For a more opinionated personal knowledge body, use `lwm init --profile personal` and `lwm analyze` to inspect hubs, orphans, broken links, and missing sources. Use `lwm query` for quick/deep/thesis synthesis, `lwm dashboard` for a desktop-style snapshot, `lwm serve` for the live local workspace, `lwm harvest` to snapshot tool memories into the wiki, `lwm watch` to refresh only when source drift changes, `lwm export` to write `llms.txt`/`llms-full.txt`/`llms.json`, `lwm adapters`/`lwm attach` to let IDEs and shells consume the wiki, and `lwm schedule` to generate a recurring launchd bundle.
 
 ## Quick Start
 
@@ -39,13 +39,13 @@ Add an `act.toml` to your wiki root:
 ```toml
 [project]
 name = "my-wiki"
-description = "My LLM Wiki"
+description = "My LLM-WorkMem"
 
 [skills]
-llm-wiki = "hsuanguo/llm-wiki/skills/llm-wiki"
+llm-workmem = "hsuanguo/llm-workmem/skills/llm-workmem"
 
 [dependencies.tools.uv]
-lwiki = "git+https://github.com/hsuanguo/llm-wiki.git"
+lwm = "git+https://github.com/hsuanguo/llm-workmem.git"
 ```
 
 ### 3. Sync
@@ -56,7 +56,7 @@ Just do:
 act
 ```
 
-This installs the `llm-wiki` agent skill and the `lwiki` CLI tool.
+This installs the `llm-workmem` agent skill and the `lwm` CLI tool.
 
 ## Manual Setup
 
@@ -71,12 +71,12 @@ uv tool install .
 Copy the skill into your wiki:
 
 ```bash
-cp -r skills/llm-wiki /path/to/project/.claude/skills/
+cp -r skills/llm-workmem /path/to/project/.claude/skills/
 ```
 
 ## Skill
 
-The `skills/llm-wiki/` directory is a self-contained agent skill with:
+The `skills/llm-workmem/` directory is a self-contained agent skill with:
 
 - **`SKILL.md`** — main instructions (gather context, route to operation, execute)
 - **`references/`** — per-operation playbooks: `init.md`, `ingest.md`, `query.md`, `update.md`, `lint.md`, `harvest.md`, `watch.md`, `export.md`, `schedule.md`
@@ -103,7 +103,7 @@ Init a wiki at wiki/greek-history for Greek history
 ```
 
 AI Agent will:
-- Run `lwiki init` to create the directory structure
+- Run `lwm init` to create the directory structure
 - Generate `AGENTS.md` (domain schema), `CLAUDE.md`, and starter wiki files
 - Create empty `raw/`, `assets/`, and wiki subdirectories
 
@@ -152,7 +152,7 @@ AI will:
 3. Run a backlink audit — add `[[wikilinks]]` across existing pages
 4. Scan the entire wiki for pages affected by the new information (cascade update)
 5. Update `index.md`, `overview.md`, and `log.md`
-6. Sync `raw/files.log` via `lwiki raw sync`
+6. Sync `raw/files.log` via `lwm raw sync`
 
 **Note:** AI Agent proceeds autonomously. It only asks you when something is genuinely unclear (ambiguous facts, conflicting sources it can't resolve).
 
@@ -216,8 +216,8 @@ Any new files in raw/?
 Or run directly:
 
 ```bash
-lwiki raw status    # report only
-lwiki raw sync      # update files.log
+lwm raw status    # report only
+lwm raw sync      # update files.log
 ```
 
 ## Daily Workflow
@@ -248,28 +248,28 @@ Each wiki is fully independent with its own `AGENTS.md` schema. Agent loads the 
 - **Graph view** in Obsidian shows wiki structure — hubs, orphans, clusters
 - **Dataview** plugin lets you query pages by type, tags, or date
 - You never write wiki pages yourself — AI handles all the maintenance
-- `lwiki dashboard` gives you a desktop-style HTML view of the wiki
-- `lwiki query` searches and synthesizes from wiki pages
-- `lwiki serve` turns the repo into a live local workspace you can browse
-- `lwiki harvest` snapshots tool-memory sources and refreshes the wiki
-- `lwiki watch` refreshes only when source drift changes, then audits the result
-- `lwiki export` writes agent-consumable `llms.txt`, `llms-full.txt`, and `llms.json`
-- `lwiki schedule` writes a launchd bundle for recurring watch + audit runs
+- `lwm dashboard` gives you a desktop-style HTML view of the wiki
+- `lwm query` searches and synthesizes from wiki pages
+- `lwm serve` turns the repo into a live local workspace you can browse
+- `lwm harvest` snapshots tool-memory sources and refreshes the wiki
+- `lwm watch` refreshes only when source drift changes, then audits the result
+- `lwm export` writes agent-consumable `llms.txt`, `llms-full.txt`, and `llms.json`
+- `lwm schedule` writes a launchd bundle for recurring watch + audit runs
 
-## Codebase Memory (`lwiki cbmem`)
+## Codebase Memory (`lwm cbmem`)
 
-`lwiki cbmem` wraps [DeusData/codebase-memory-mcp](https://github.com/DeusData/codebase-memory-mcp) so the wiki can answer code-structure questions about any project directory. The wrapper is in `lwiki/cbmem.py`; the decision record is in [wiki/insights/integrations-2026-06-30.md](wiki/insights/integrations-2026-06-30.md); the cheatsheet is in [wiki/summaries/lwiki-cbmem-cheatsheet.md](wiki/summaries/lwiki-cbmem-cheatsheet.md).
+`lwm cbmem` wraps [DeusData/codebase-memory-mcp](https://github.com/DeusData/codebase-memory-mcp) so the wiki can answer code-structure questions about any project directory. The wrapper is in `lwm/cbmem.py`; the decision record is in [wiki/insights/integrations-2026-06-30.md](wiki/insights/integrations-2026-06-30.md); the cheatsheet is in [wiki/summaries/lwm-cbmem-cheatsheet.md](wiki/summaries/lwm-cbmem-cheatsheet.md).
 
 One-time install (downloads ~270 MB into `~/bin/`):
 
 ```bash
 bash automation/install-cbmem.sh
-lwiki cbmem doctor
+lwm cbmem doctor
 ```
 
-Subcommands: `doctor`, `index`, `index-status`, `search`, `architecture`, `trace`, `changes`, `dead`, `query`, `semantic`. See `lwiki cbmem --help` for the full list.
+Subcommands: `doctor`, `index`, `index-status`, `search`, `architecture`, `trace`, `changes`, `dead`, `query`, `semantic`. See `lwm cbmem --help` for the full list.
 
-> **Note on the macOS sandbox.** Some agent sandboxes (notably Claude Code's Bash) SIGKILL the 270 MB binary with exit 137. Run `lwiki cbmem *` from a real terminal, not from inside the sandbox. See [wiki/insights/integrations-2026-06-30.md](wiki/insights/integrations-2026-06-30.md) Decision 1 for the full rationale.
+> **Note on the macOS sandbox.** Some agent sandboxes (notably Claude Code's Bash) SIGKILL the 270 MB binary with exit 137. Run `lwm cbmem *` from a real terminal, not from inside the sandbox. See [wiki/insights/integrations-2026-06-30.md](wiki/insights/integrations-2026-06-30.md) Decision 1 for the full rationale.
 
 ## License
 

@@ -12,21 +12,21 @@ updated: 2026-06-30
 > records the *decisions*, not the docs. The docs live in their respective
 > entities / concepts / summaries.
 
-## Decision 1: codebase-memory-mcp is wrapped in lwiki, not Claude Code MCP
+## Decision 1: codebase-memory-mcp is wrapped in lwm, not Claude Code MCP
 
 **Date:** 2026-06-30
 **Decider:** user
-**Status:** accepted, implemented in `lwiki/cbmem.py`
+**Status:** accepted, implemented in `lwm/cbmem.py`
 
 ### Context
 
 GitHub trending the week of 2026-06-23 highlighted `DeusData/codebase-memory-mcp`
 (weekly +8,926 ⭐). The user asked how to integrate it into their local
-LLM wiki. The naive answer was "install as a Claude Code MCP server."
+LLM-WorkMem. The naive answer was "install as a Claude Code MCP server."
 
 The user pushed back twice:
 
-1. "方案 a 集成 mcp 是给 Claude code 用的——不，是融入 LLM wiki"
+1. "方案 a 集成 mcp 是给 Claude code 用的——不，是融入 LLM-WorkMem"
 2. "**没有东西是给 Claude code 用**"
 
 ### Options considered
@@ -34,7 +34,7 @@ The user pushed back twice:
 | Option | Pros | Cons | Outcome |
 |---|---|---|---|
 | A. Claude Code MCP server | Auto-loaded for the agent | Violates user's tool-scope rule; expands agent's secret-bearing surface | ❌ rejected |
-| B. lwiki subcommand | Stays in wiki, follows the wiki's role per `architecture-policy`; agent reads wiki rules, not the binary | Slight friction: agent has to call `lwiki cbmem ...` via Bash | ✅ **accepted** |
+| B. lwm subcommand | Stays in wiki, follows the wiki's role per `architecture-policy`; agent reads wiki rules, not the binary | Slight friction: agent has to call `lwm cbmem ...` via Bash | ✅ **accepted** |
 | C. Standalone CLI in `~/tools/` | Decoupled from any wiki | Loses the wiki as the single coordination layer; reinvents the wheel | ❌ rejected |
 
 ### Why B
@@ -42,8 +42,8 @@ The user pushed back twice:
 - The wiki is the durable coordination layer for cross-tool rules
   (per `architecture-policy`). A new capability should land as a wiki
   capability, not as a side-channel.
-- An `lwiki cbmem *` command is first-class in the same way that
-  `lwiki query`, `lwiki harvest`, `lwiki audit` are first-class.
+- An `lwm cbmem *` command is first-class in the same way that
+  `lwm query`, `lwm harvest`, `lwm audit` are first-class.
 - It keeps the binary out of any agent's secret-bearing runtime.
 
 ### Constraints discovered during integration
@@ -105,7 +105,7 @@ The two push-backs above establish a pattern. Codified in
 `feedback-tool-scope-separation` (memory):
 
 > 工具归属必须分清 ——
-> - LLM Wiki 用 → 走 lwiki 集成
+> - LLM-WorkMem 用 → 走 lwm 集成
 > - 本地独立工具 → 纯 CLI，**不**接入任何 agent
 > - Claude Code 自身不装任何 MCP server 来做这两类事
 
@@ -114,7 +114,7 @@ scope question before any code is written.
 
 ## Implementation status (as of 2026-07-01)
 
-8 tasks completed — cbmem is now fully integrated into the lwiki
+8 tasks completed — cbmem is now fully integrated into the lwm
 automation pipeline:
 
 | Task | What | Status |
@@ -123,19 +123,19 @@ automation pipeline:
 | Task 2 | `cbmem.py` bug fixes (`doctor as_json=False`, `cbmem_index_status_cmd`, empty Cypher guard) | done |
 | Task 3 | 41 unit tests in `test_cbmem.py` | done |
 | Task 4 | 20 CLI contract tests in `test_cbmem_cli.py` | done |
-| Task 5 | `cbmem_source.py` harvest bridge + `watch.py` integration + `lwiki-sources.json` template | done |
+| Task 5 | `cbmem_source.py` harvest bridge + `watch.py` integration + `lwm-sources.json` template | done |
 | Task 6 | `init_scaffold.py` cbmem probe + `audit.py` cbmem-indexed check | done |
 | Task 7 | `pyproject.toml`, README bilingual, `SKILL.md` routing, `references/cbmem.md` | done |
 | Task 8 | 3 wiki pages updated (entity, cheatsheet, integrations) | done |
 
-Core automation loop: `lwiki watch` → `harvest_cbmem(root)` → 5 tools
-per project → `raw/cbmem-snapshots/<date>/<project>/` → `lwiki compile` → `wiki/`.
+Core automation loop: `lwm watch` → `harvest_cbmem(root)` → 5 tools
+per project → `raw/cbmem-snapshots/<date>/<project>/` → `lwm compile` → `wiki/`.
 cbmem failures never block the other 11 source groups.
 
 ## Open questions
 
 - **Graph sharing across repos.** codebase-memory supports cross-repo
-  linking. lwiki does not expose it yet. Likely a future subcommand.
+  linking. lwm does not expose it yet. Likely a future subcommand.
 - **agent-reach CLI vs MCP.** The `agent-reach` package itself is a
   provisioning tool that registers a SKILL.md for Claude Code. The
   user does not want that path. social-copilot therefore calls the
@@ -147,6 +147,6 @@ cbmem failures never block the other 11 source groups.
 
 - [[codebase-memory]] — the tool entity
 - [[code-graph-querying]] — the concept
-- [[lwiki-cbmem-cheatsheet]] — command reference
+- [[lwm-cbmem-cheatsheet]] — command reference
 - [[architecture-policy]]
 - [[memory-governance]]

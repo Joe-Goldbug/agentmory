@@ -1,14 +1,14 @@
 ---
-title: lwiki cbmem Cheatsheet
+title: lwm cbmem Cheatsheet
 type: summary
-tags: [summary, cbmem, lwiki-extension, cheatsheet, reference]
+tags: [summary, cbmem, lwm-extension, cheatsheet, reference]
 sources: []
 updated: 2026-06-30
 ---
 
-# lwiki cbmem Cheatsheet
+# lwm cbmem Cheatsheet
 
-> One-page reference for the 10 `lwiki cbmem *` subcommands. For *why*
+> One-page reference for the 10 `lwm cbmem *` subcommands. For *why*
 > see [[integrations-2026-06-30]]. For *what* see [[codebase-memory]].
 > For the underlying concept see [[code-graph-querying]].
 
@@ -24,23 +24,23 @@ chmod +x ~/bin/codebase-memory-mcp
 ln -sf ~/bin/codebase-memory-mcp ~/bin/cbmem
 
 # Verify
-lwiki cbmem doctor   # should print [cbmem doctor] OK
+lwm cbmem doctor   # should print [cbmem doctor] OK
 ```
 
 ## Commands at a glance
 
 | Command | What it does | When to use |
 |---|---|---|
-| `lwiki cbmem doctor` | Check binary resolves + responds | First run, after upgrades |
-| `lwiki cbmem index <dir>` | Build / refresh the code graph for `<dir>` | First use of `<dir>`, after major refactors |
-| `lwiki cbmem index-status <dir>` | Show index freshness (path, size, age) | Check if a re-index is needed |
-| `lwiki cbmem search <dir> <q>` | Symbol/text search across the graph | "Where is X defined or used?" |
-| `lwiki cbmem architecture <dir>` | Languages, packages, entry points, routes, hotspots | Onboarding to a new project |
-| `lwiki cbmem trace <dir> <sym>` | Call-graph edges from `<sym>` | "What does X call / who calls X?" |
-| `lwiki cbmem changes <dir>` | Map a git diff to affected symbols with risk classification | Pre-merge impact check |
-| `lwiki cbmem dead <dir>` | Symbols with no incoming callers | Dead-code candidate hunt |
-| `lwiki cbmem query <dir> <cypher>` | Ad-hoc graph query | "Show me routes that call into package Y" |
-| `lwiki cbmem semantic <dir> "<q>"` | Vector search over indexed symbols | "Find code semantically similar to…" |
+| `lwm cbmem doctor` | Check binary resolves + responds | First run, after upgrades |
+| `lwm cbmem index <dir>` | Build / refresh the code graph for `<dir>` | First use of `<dir>`, after major refactors |
+| `lwm cbmem index-status <dir>` | Show index freshness (path, size, age) | Check if a re-index is needed |
+| `lwm cbmem search <dir> <q>` | Symbol/text search across the graph | "Where is X defined or used?" |
+| `lwm cbmem architecture <dir>` | Languages, packages, entry points, routes, hotspots | Onboarding to a new project |
+| `lwm cbmem trace <dir> <sym>` | Call-graph edges from `<sym>` | "What does X call / who calls X?" |
+| `lwm cbmem changes <dir>` | Map a git diff to affected symbols with risk classification | Pre-merge impact check |
+| `lwm cbmem dead <dir>` | Symbols with no incoming callers | Dead-code candidate hunt |
+| `lwm cbmem query <dir> <cypher>` | Ad-hoc graph query | "Show me routes that call into package Y" |
+| `lwm cbmem semantic <dir> "<q>"` | Vector search over indexed symbols | "Find code semantically similar to…" |
 
 ## Exit codes
 
@@ -48,7 +48,7 @@ lwiki cbmem doctor   # should print [cbmem doctor] OK
 |---|---|
 | `0` | OK |
 | `1` | Binary not found / API call failed |
-| `2` | `<dir>` is not yet indexed (run `lwiki cbmem index <dir>` first) |
+| `2` | `<dir>` is not yet indexed (run `lwm cbmem index <dir>` first) |
 
 The seven commands that need an existing graph
 (`search`, `architecture`, `trace`, `changes`, `dead`, `query`, `semantic`)
@@ -73,25 +73,25 @@ Most subcommands accept:
 cd ~/code/some-project
 
 # First time on a project
-lwiki cbmem index .
-lwiki cbmem architecture .
+lwm cbmem index .
+lwm cbmem architecture .
 
 # Find something
-lwiki cbmem search . QueryReport
-lwiki cbmem trace . run_query
+lwm cbmem search . QueryReport
+lwm cbmem trace . run_query
 
 # Pre-merge check
-lwiki cbmem changes . --base main
+lwm cbmem changes . --base main
 
 # Quarterly cleanup
-lwiki cbmem dead . | head -30
+lwm cbmem dead . | head -30
 ```
 
 ## Output handling
 
-- The wrapper preserves the binary's stdout verbatim. With `lwiki cbmem`
+- The wrapper preserves the binary's stdout verbatim. With `lwm cbmem`
   subcommands that map to `--json` upstream, the output is JSON.
-- Pretty-printers (`render_*_report` in `lwiki/cbmem.py`) are used by
+- Pretty-printers (`render_*_report` in `lwm/cbmem.py`) are used by
   the CLI layer; programmatic callers get the raw `CbmemResult` and
   decide their own formatting.
 - Long outputs are truncated to 500–2000 chars in the pretty-printer
@@ -101,7 +101,7 @@ lwiki cbmem dead . | head -30
 
 ```python
 from pathlib import Path
-from lwiki import cbmem
+from lwm import cbmem
 
 # Get a structured result
 result = cbmem.search(Path("."), "QueryReport", limit=10)
@@ -118,10 +118,10 @@ if not cbmem.is_indexed(Path(".")):
     cbmem.index_project(Path("."))
 ```
 
-## Automation: as part of `lwiki harvest`
+## Automation: as part of `lwm harvest`
 
-`lwiki harvest` (and the launchd-powered `lwiki watch`) automatically
-captures cbmem snapshots for every project listed in `lwiki-sources.json`
+`lwm harvest` (and the launchd-powered `lwm watch`) automatically
+captures cbmem snapshots for every project listed in `lwm-sources.json`
 under `cbmem.projects`. For each project, the harvest cycle runs:
 
 1. `index` → refreshes the code graph
@@ -131,21 +131,21 @@ under `cbmem.projects`. For each project, the harvest cycle runs:
 5. `changes` → git-diff impact map (base = `HEAD`)
 
 Output lands under `raw/cbmem-snapshots/<YYYY-MM-DD>/<project>/` and is
-picked up by the next `lwiki compile` cycle. cbmem failures never block
+picked up by the next `lwm compile` cycle. cbmem failures never block
 the other 11 source groups.
 
 To add a project:
 ```bash
-# Edit lwiki-sources.json → cbmem.projects and cbmem.search_queries
+# Edit lwm-sources.json → cbmem.projects and cbmem.search_queries
 # Then trigger a cycle manually or wait for the next launchd tick:
-lwiki harvest
+lwm harvest
 ```
 
 ### When NOT to use harvest-based cbmem
 
-- Interactive exploration → use `lwiki cbmem search|trace|architecture *` directly
+- Interactive exploration → use `lwm cbmem search|trace|architecture *` directly
 - The harvest snapshot is a regular dump, not a live graph pointer
-- If a project is not in `lwiki-sources.json::cbmem.projects`, it won't be indexed by harvest
+- If a project is not in `lwm-sources.json::cbmem.projects`, it won't be indexed by harvest
 
 ## Troubleshooting
 
@@ -153,8 +153,8 @@ lwiki harvest
 |---|---|---|
 | `CbmemNotFoundError` | Binary not on PATH or in `~/bin/` | Run the install block above; or `export LBM_CBMEM_BIN=/path/to/binary` |
 | Exit 137 / -9 | Sandbox / shell killed the 270 MB binary | Run from a real terminal, not the Claude Code Bash sandbox |
-| Exit 2 on `search` | `<dir>` is not indexed | `lwiki cbmem index <dir>` first |
-| Stale results | Graph is from before recent edits | `lwiki cbmem index <dir> --force` |
+| Exit 2 on `search` | `<dir>` is not indexed | `lwm cbmem index <dir>` first |
+| Stale results | Graph is from before recent edits | `lwm cbmem index <dir> --force` |
 
 ## See Also
 

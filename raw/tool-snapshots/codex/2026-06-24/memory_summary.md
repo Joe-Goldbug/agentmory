@@ -48,12 +48,12 @@ Environment signal in memory: macOS with `zsh`, file-based memory under `/Users/
   - desc: Search this first in `cwd=/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/Ather` when the task touches login-to-chat routing, local mock verification, blast radius reporting, or quota-aware profile/chat growth.
   - learnings: preserve `returnTo=%2Fchat` only through a safe local-path allowlist, validate local auth/chat with the mock bundle, and do quota math before changing profile/chat behavior.
 
-### /Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM wiki
+### /Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem
 
 #### 2026-06-06
 
-- llm-wiki personal knowledge body, multi-tool harvest, and shell/web startup: llm-wiki, --profile personal, harvest, watch, adapters, install-global, Kiro, shell, 127.0.0.1:8765
-  - desc: Search this first in `cwd=/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM wiki` when the task is to build the user's central knowledge body, harvest tool memories, expose adapters back to tools, or explain shell vs web vs background roles.
+- llm-workmem personal knowledge body, multi-tool harvest, and shell/web startup: llm-workmem, --profile personal, harvest, watch, adapters, install-global, Kiro, shell, 127.0.0.1:8765
+  - desc: Search this first in `cwd=/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem` when the task is to build the user's central knowledge body, harvest tool memories, expose adapters back to tools, or explain shell vs web vs background roles.
   - learnings: use `/private/tmp` for `uv` cache/venv in this repo, think in pairs `harvest + adapter/install`, and verify local serve with GET or `lsof` because HEAD returns 501.
 
 ### Older Memory Topics

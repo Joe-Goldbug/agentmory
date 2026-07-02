@@ -1,4 +1,4 @@
-# Wiki Index — LLM wiki
+# Wiki Index — LLM-WorkMem
 
 ## Summaries
 

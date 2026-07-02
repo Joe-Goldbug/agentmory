@@ -210,26 +210,26 @@ applies_to: cwd=/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downlo
 - Symptom: later planning turns lost live repo access with `Operation not permitted`. Cause: the quota model could not be recomputed from the worktree at that point. Fix: use public pricing pages plus previously verified architecture notes, and label the result as a planning estimate rather than live accounting [Task 2]
 - Symptom: product planning reaches for a paywall too early. Cause: cost pressure gets solved before the user experiences the core value loop. Fix: preserve `test -> result -> save -> short debrief` before locking persistent chat or deeper profile updates behind payment [Task 2]
 
-# Task Group: llm-wiki automated knowledge body, adapters, and local startup workflow
+# Task Group: llm-workmem automated knowledge body, adapters, and local startup workflow
 
-scope: Durable memory for turning `llm-wiki` into the user's central automated knowledge body, harvesting multiple tool ecosystems, feeding adapters back into those tools, and explaining local shell/web usage.
-applies_to: cwd=/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM wiki; reuse_rule=safe for llm-wiki work in this repo family and related local-tooling discussions, but revalidate exact source paths and install targets before rerunning automation
+scope: Durable memory for turning `llm-workmem` into the user's central automated knowledge body, harvesting multiple tool ecosystems, feeding adapters back into those tools, and explaining local shell/web usage.
+applies_to: cwd=/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem; reuse_rule=safe for llm-workmem work in this repo family and related local-tooling discussions, but revalidate exact source paths and install targets before rerunning automation
 
 ## Task 1: Build personal knowledge-body base, outcome success
 
 ### rollout_summary_files
 
-- rollout_summaries/2026-05-06T05-13-43-4xVW-llmwiki_personal_knowledge_body_and_multi_tool_adapters.md (cwd=/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM wiki, rollout_path=/Users/ethan/.codex/sessions/2026/05/06/rollout-2026-05-06T13-13-43-019dfbb4-cd6c-7ce3-8b37-14a8c559976c.jsonl, updated_at=2026-06-06T17:16:29+00:00, thread_id=019dfbb4-cd6c-7ce3-8b37-14a8c559976c, personal knowledge-body base plus local serve/analysis validation)
+- rollout_summaries/2026-05-06T05-13-43-4xVW-lwm_personal_knowledge_body_and_multi_tool_adapters.md (cwd=/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem, rollout_path=/Users/ethan/.codex/sessions/2026/05/06/rollout-2026-05-06T13-13-43-019dfbb4-cd6c-7ce3-8b37-14a8c559976c.jsonl, updated_at=2026-06-06T17:16:29+00:00, thread_id=019dfbb4-cd6c-7ce3-8b37-14a8c559976c, personal knowledge-body base plus local serve/analysis validation)
 
 ### keywords
 
-- llm-wiki, 建立我自己知识体, --profile personal, lwiki analyze, wiki/insights, graph-health, hubs, orphans, duplicate slugs, UV_CACHE_DIR, UV_PROJECT_ENVIRONMENT
+- llm-workmem, 建立我自己知识体, --profile personal, lwm analyze, wiki/insights, graph-health, hubs, orphans, duplicate slugs, UV_CACHE_DIR, UV_PROJECT_ENVIRONMENT
 
 ## Task 2: Harvest and re-export all tool memories, outcome success
 
 ### rollout_summary_files
 
-- rollout_summaries/2026-05-06T05-13-43-4xVW-llmwiki_personal_knowledge_body_and_multi_tool_adapters.md (cwd=/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM wiki, rollout_path=/Users/ethan/.codex/sessions/2026/05/06/rollout-2026-05-06T13-13-43-019dfbb4-cd6c-7ce3-8b37-14a8c559976c.jsonl, updated_at=2026-06-06T17:16:29+00:00, thread_id=019dfbb4-cd6c-7ce3-8b37-14a8c559976c, harvest/watch/export/adapters/install-global/attach loop exercised end-to-end)
+- rollout_summaries/2026-05-06T05-13-43-4xVW-lwm_personal_knowledge_body_and_multi_tool_adapters.md (cwd=/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem, rollout_path=/Users/ethan/.codex/sessions/2026/05/06/rollout-2026-05-06T13-13-43-019dfbb4-cd6c-7ce3-8b37-14a8c559976c.jsonl, updated_at=2026-06-06T17:16:29+00:00, thread_id=019dfbb4-cd6c-7ce3-8b37-14a8c559976c, harvest/watch/export/adapters/install-global/attach loop exercised end-to-end)
 
 ### keywords
 
@@ -239,11 +239,11 @@ applies_to: cwd=/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downlo
 
 ### rollout_summary_files
 
-- rollout_summaries/2026-05-06T05-13-43-4xVW-llmwiki_personal_knowledge_body_and_multi_tool_adapters.md (cwd=/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM wiki, rollout_path=/Users/ethan/.codex/sessions/2026/05/06/rollout-2026-05-06T13-13-43-019dfbb4-cd6c-7ce3-8b37-14a8c559976c.jsonl, updated_at=2026-06-06T17:16:29+00:00, thread_id=019dfbb4-cd6c-7ce3-8b37-14a8c559976c, shell-vs-web startup clarification and local server verification)
+- rollout_summaries/2026-05-06T05-13-43-4xVW-lwm_personal_knowledge_body_and_multi_tool_adapters.md (cwd=/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem, rollout_path=/Users/ethan/.codex/sessions/2026/05/06/rollout-2026-05-06T13-13-43-019dfbb4-cd6c-7ce3-8b37-14a8c559976c.jsonl, updated_at=2026-06-06T17:16:29+00:00, thread_id=019dfbb4-cd6c-7ce3-8b37-14a8c559976c, shell-vs-web startup clarification and local server verification)
 
 ### keywords
 
-- shell 还是网页, lwiki serve, 127.0.0.1:8765, 501 Unsupported method ('HEAD'), curl -I, lsof -nP -iTCP:8765 -sTCP:LISTEN, launchd
+- shell 还是网页, lwm serve, 127.0.0.1:8765, 501 Unsupported method ('HEAD'), curl -I, lsof -nP -iTCP:8765 -sTCP:LISTEN, launchd
 
 ## User preferences
 
@@ -257,12 +257,12 @@ applies_to: cwd=/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downlo
 
 - `uv run` in this repository works with `UV_CACHE_DIR=/private/tmp/uv-cache` and `UV_PROJECT_ENVIRONMENT=/private/tmp/uv-venv` when the default cache/venv paths are blocked by permissions [Task 1]
 - `pytest -q` and `ruff check .` both pass when run in the temp environment; use those exact env vars for repeatable verification [Task 1]
-- `lwiki analyze` inspects hubs, orphans, broken links, missing sources, duplicate slugs, and connected components, and can write reports into `wiki/insights/` [Task 1]
+- `lwm analyze` inspects hubs, orphans, broken links, missing sources, duplicate slugs, and connected components, and can write reports into `wiki/insights/` [Task 1]
 - The new `personal` profile creates a project/decision/pattern/conflict/question/principle/preference-oriented structure that matches the user's "知识体" framing [Task 1]
-- The repository now has a `lwiki watch` flow that harvests active tool-memory sources into `raw/tool-snapshots/`, refreshes the wiki, writes `llms.txt`, `llms-full.txt`, and `llms.json`, and then audits the result [Task 2]
-- `lwiki sources list` reports configured tool-memory source groups and marks each path as found or missing, including Kiro and shell [Task 2]
-- `lwiki adapters` writes adapter files under `adapters/`, `lwiki attach <project>` installs project-level entrypoints, and `lwiki install-global <root>` writes global entrypoints such as `~/.codex/AGENTS.md`, `~/CLAUDE.md`, `~/.traerules`, `~/.kiro/steering/llm-wiki.md`, `~/.zshrc`, and `~/.config/lwiki/context.json` [Task 2]
-- `lwiki serve` provides the local web UI on port 8765; shell is the command/control plane, the browser is the display plane, and background is only needed for automated `watch/harvest/audit` scheduling [Task 3]
+- The repository now has a `lwm watch` flow that harvests active tool-memory sources into `raw/tool-snapshots/`, refreshes the wiki, writes `llms.txt`, `llms-full.txt`, and `llms.json`, and then audits the result [Task 2]
+- `lwm sources list` reports configured tool-memory source groups and marks each path as found or missing, including Kiro and shell [Task 2]
+- `lwm adapters` writes adapter files under `adapters/`, `lwm attach <project>` installs project-level entrypoints, and `lwm install-global <root>` writes global entrypoints such as `~/.codex/AGENTS.md`, `~/CLAUDE.md`, `~/.traerules`, `~/.kiro/steering/llm-workmem.md`, `~/.zshrc`, and `~/.config/lwm/context.json` [Task 2]
+- `lwm serve` provides the local web UI on port 8765; shell is the command/control plane, the browser is the display plane, and background is only needed for automated `watch/harvest/audit` scheduling [Task 3]
 - Related skill: skills/product-code-iteration-loop/SKILL.md
 
 ## Failures and how to do differently

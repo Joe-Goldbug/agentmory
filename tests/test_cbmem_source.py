@@ -1,6 +1,6 @@
 """Tests for the cbmem source harvester.
 
-These tests mock ``lwiki.cbmem`` at the module level so no real subprocess
+These tests mock ``lwm.cbmem`` at the module level so no real subprocess
 is ever spawned. The goal is to lock:
 
 - ``raw/cbmem-snapshots/<date>/<project>/<tool>.json`` is written per tool.
@@ -16,7 +16,7 @@ from unittest.mock import patch
 
 import pytest
 
-from lwiki import cbmem, cbmem_source
+from lwm import cbmem, cbmem_source
 
 
 def _ok(stdout: str = '{"ok": true}') -> cbmem.CbmemResult:
@@ -30,7 +30,7 @@ def _bad(error: str = "boom", rc: int = 1) -> cbmem.CbmemResult:
 @pytest.fixture
 def wiki_root(tmp_path: Path) -> Path:
     (tmp_path / "raw").mkdir()
-    (tmp_path / "lwiki-sources.json").write_text(
+    (tmp_path / "lwm-sources.json").write_text(
         json.dumps(
             {
                 "cbmem": {

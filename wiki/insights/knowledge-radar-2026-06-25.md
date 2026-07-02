@@ -7,7 +7,7 @@ sources: []
 updated: 2026-06-25
 ---
 
-# Wiki Analysis — llm-wiki
+# Wiki Analysis — llm-workmem
 
 ## Summary
 - Pages: 45

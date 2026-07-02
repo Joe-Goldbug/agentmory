@@ -218,36 +218,36 @@ applies_to: cwd=/Users/ethan/Documents/Codex/2026-05-18/https-mp-weixin-qq-com-s
 - Symptom: a framework mapping answer stays abstract and does not help the user act on named projects. Cause: the framework was summarized once instead of being decomposed into project-specific outputs. Fix: split the synthesis into separate files, keep a common structure, and map each project against its own repo/doc reality [Task 1]
 - Symptom: a multi-project mapping stalls because one local project is not in the current working directory. Cause: the search stayed too narrow. Fix: use repo memory plus broader filesystem search early, then record which projects were code-backed versus doc-backed [Task 1]
 
-# Task Group: llm-wiki knowledge-body migration, ObsidianVault consolidation, and hourly automation
+# Task Group: llm-workmem knowledge-body migration, ObsidianVault consolidation, and hourly automation
 
-scope: Building and extending the local `llm-wiki` repo as a personal knowledge body, migrating real Obsidian content into it, encoding the user’s multi-tool operating model, and automating periodic harvest/query output with markdown + HTML layers.
-applies_to: cwd=/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM wiki; reuse_rule=safe inside the local llm-wiki repo and nearby knowledge-body migration work, but source vault paths, iCloud-backed permissions, and exact tool-note locations should be rechecked on other machines
+scope: Building and extending the local `llm-workmem` repo as a personal knowledge body, migrating real Obsidian content into it, encoding the user’s multi-tool operating model, and automating periodic harvest/query output with markdown + HTML layers.
+applies_to: cwd=/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem; reuse_rule=safe inside the local llm-workmem repo and nearby knowledge-body migration work, but source vault paths, iCloud-backed permissions, and exact tool-note locations should be rechecked on other machines
 
-## Task 1: Extend llm-wiki into a personal knowledge-body base
+## Task 1: Extend llm-workmem into a personal knowledge-body base
 
 ### rollout_summary_files
 
-- rollout_summaries/2026-05-06T05-13-43-4xVW-llm_wiki_personal_knowledge_body_and_hourly_harvest.md (cwd=/Users/ethan/Documents/Codex/2026-05-06/new-chat, rollout_path=/Users/ethan/.codex/sessions/2026/05/06/rollout-2026-05-06T13-13-43-019dfbb4-cd6c-7ce3-8b37-14a8c559976c.jsonl, updated_at=2026-05-17T09:01:52+00:00, thread_id=019dfbb4-cd6c-7ce3-8b37-14a8c559976c, personal profile, query/harvest/schedule workflow, and verified CLI expansion)
+- rollout_summaries/2026-05-06T05-13-43-4xVW-lwm_personal_knowledge_body_and_hourly_harvest.md (cwd=/Users/ethan/Documents/Codex/2026-05-06/new-chat, rollout_path=/Users/ethan/.codex/sessions/2026/05/06/rollout-2026-05-06T13-13-43-019dfbb4-cd6c-7ce3-8b37-14a8c559976c.jsonl, updated_at=2026-05-17T09:01:52+00:00, thread_id=019dfbb4-cd6c-7ce3-8b37-14a8c559976c, personal profile, query/harvest/schedule workflow, and verified CLI expansion)
 
 ### keywords
 
-- llm-wiki, personal knowledge body, --profile personal, lwiki analyze, lwiki query, lwiki harvest, lwiki schedule, knowledge-radar, dashboard, serve, pytest, ruff
+- llm-workmem, personal knowledge body, --profile personal, lwm analyze, lwm query, lwm harvest, lwm schedule, knowledge-radar, dashboard, serve, pytest, ruff
 
-## Task 2: Migrate real ObsidianVault rules into llm-wiki pages and HTML
+## Task 2: Migrate real ObsidianVault rules into llm-workmem pages and HTML
 
 ### rollout_summary_files
 
-- rollout_summaries/2026-05-06T05-13-43-4xVW-llm_wiki_personal_knowledge_body_and_hourly_harvest.md (cwd=/Users/ethan/Documents/Codex/2026-05-06/new-chat, rollout_path=/Users/ethan/.codex/sessions/2026/05/06/rollout-2026-05-06T13-13-43-019dfbb4-cd6c-7ce3-8b37-14a8c559976c.jsonl, updated_at=2026-05-17T09:01:52+00:00, thread_id=019dfbb4-cd6c-7ce3-8b37-14a8c559976c, real vault migration plus HTML mirror and central-hub rewrite)
+- rollout_summaries/2026-05-06T05-13-43-4xVW-lwm_personal_knowledge_body_and_hourly_harvest.md (cwd=/Users/ethan/Documents/Codex/2026-05-06/new-chat, rollout_path=/Users/ethan/.codex/sessions/2026/05/06/rollout-2026-05-06T13-13-43-019dfbb4-cd6c-7ce3-8b37-14a8c559976c.jsonl, updated_at=2026-05-17T09:01:52+00:00, thread_id=019dfbb4-cd6c-7ce3-8b37-14a8c559976c, real vault migration plus HTML mirror and central-hub rewrite)
 
 ### keywords
 
 - ObsidianVault, MASTER-记忆体.md, MASTER-工作流.md, AI-Hub-架构.md, IDE-CLI 统一集成指南.md, SCHEMA.md, broadcast_to_hub.sh, EPEV, knowledge-digest.html, machine-readable markdown, human-readable HTML
 
-## Task 3: Encode Codex, Claude Code, Trae Solo, and GitHub Copilot in llm-wiki form
+## Task 3: Encode Codex, Claude Code, Trae Solo, and GitHub Copilot in llm-workmem form
 
 ### rollout_summary_files
 
-- rollout_summaries/2026-05-06T05-13-43-4xVW-llm_wiki_personal_knowledge_body_and_hourly_harvest.md (cwd=/Users/ethan/Documents/Codex/2026-05-06/new-chat, rollout_path=/Users/ethan/.codex/sessions/2026/05/06/rollout-2026-05-06T13-13-43-019dfbb4-cd6c-7ce3-8b37-14a8c559976c.jsonl, updated_at=2026-05-17T09:01:52+00:00, thread_id=019dfbb4-cd6c-7ce3-8b37-14a8c559976c, four-tool ontology and comparison pages)
+- rollout_summaries/2026-05-06T05-13-43-4xVW-lwm_personal_knowledge_body_and_hourly_harvest.md (cwd=/Users/ethan/Documents/Codex/2026-05-06/new-chat, rollout_path=/Users/ethan/.codex/sessions/2026/05/06/rollout-2026-05-06T13-13-43-019dfbb4-cd6c-7ce3-8b37-14a8c559976c.jsonl, updated_at=2026-05-17T09:01:52+00:00, thread_id=019dfbb4-cd6c-7ce3-8b37-14a8c559976c, four-tool ontology and comparison pages)
 
 ### keywords
 
@@ -257,16 +257,16 @@ applies_to: cwd=/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downlo
 
 ### rollout_summary_files
 
-- rollout_summaries/2026-05-06T05-13-43-4xVW-llm_wiki_personal_knowledge_body_and_hourly_harvest.md (cwd=/Users/ethan/Documents/Codex/2026-05-06/new-chat, rollout_path=/Users/ethan/.codex/sessions/2026/05/06/rollout-2026-05-06T13-13-43-019dfbb4-cd6c-7ce3-8b37-14a8c559976c.jsonl, updated_at=2026-05-17T09:01:52+00:00, thread_id=019dfbb4-cd6c-7ce3-8b37-14a8c559976c, hourly launchd automation, raw snapshots, and save-as-insight query flow)
+- rollout_summaries/2026-05-06T05-13-43-4xVW-lwm_personal_knowledge_body_and_hourly_harvest.md (cwd=/Users/ethan/Documents/Codex/2026-05-06/new-chat, rollout_path=/Users/ethan/.codex/sessions/2026/05/06/rollout-2026-05-06T13-13-43-019dfbb4-cd6c-7ce3-8b37-14a8c559976c.jsonl, updated_at=2026-05-17T09:01:52+00:00, thread_id=019dfbb4-cd6c-7ce3-8b37-14a8c559976c, hourly launchd automation, raw snapshots, and save-as-insight query flow)
 
 ### keywords
 
-- RunAtLoad, StartInterval, 3600, automation/launchd/com.ethan.llmwiki.harvest.plist, automation/bin/run-harvest.sh, raw/tool-snapshots, wiki/insights, quick, standard, deep, thesis, list
+- RunAtLoad, StartInterval, 3600, automation/launchd/com.ethan.lwm.harvest.plist, automation/bin/run-harvest.sh, raw/tool-snapshots, wiki/insights, quick, standard, deep, thesis, list
 
 ## User preferences
 
 - when the user said "我不是要布丁，我是要自动化处理我项目和想法所有关系的内在联系和洞察" -> default to workflow/relationship automation, not a note-taking toy [Task 1]
-- when the user asked "你先整理完毕告诉我，什么阶段改 llmwiki 代码？llm wiki 有 UI 可以操作吗给我看看？" -> stage the work clearly before code edits and answer whether there is a UI, not only a CLI [Task 1]
+- when the user asked "你先整理完毕告诉我，什么阶段改 lwm 代码？llm wiki 有 UI 可以操作吗给我看看？" -> stage the work clearly before code edits and answer whether there is a UI, not only a CLI [Task 1]
 - when the user said "不是我放材料，而是在指定时间，你自动搜索我指定的项目文件或文档，你搜索完毕整理在这里" -> default to timed directory scanning + automated organization, not manual upload waiting [Task 1][Task 4]
 - when the user said "Claude code 和 codex" 也要读取“我好东西” -> treat working tools as direct readers/executors of the knowledge body, not only human viewers [Task 1][Task 3]
 - when the user said "先去读取 obsidian，把真实的过迁移过来 llm wiki" and "融合两个不一样的obsidian 在一起，然后给 llm wiki 用" -> migrate real source content, not a theoretical summary [Task 2]
@@ -277,17 +277,17 @@ applies_to: cwd=/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downlo
 
 ## Reusable knowledge
 
-- The local repo is a small Python CLI project centered on `lwiki/cli.py`, `lwiki/init_scaffold.py`, `lwiki/structure.py`, `lwiki/raw_tracker.py`, and `skills/llm-wiki/`; it was safe to extend directly as a local product layer [Task 1]
-- `lwiki analyze <wiki-root>` and `lwiki analyze <wiki-root> --write` are deterministic structure checks; they report hubs, orphans, broken links, missing sources, duplicate slugs, and connected components, and `--write` emits `wiki/insights/knowledge-radar-YYYY-MM-DD.md` [Task 1]
+- The local repo is a small Python CLI project centered on `lwm/cli.py`, `lwm/init_scaffold.py`, `lwm/structure.py`, `lwm/raw_tracker.py`, and `skills/llm-workmem/`; it was safe to extend directly as a local product layer [Task 1]
+- `lwm analyze <wiki-root>` and `lwm analyze <wiki-root> --write` are deterministic structure checks; they report hubs, orphans, broken links, missing sources, duplicate slugs, and connected components, and `--write` emits `wiki/insights/knowledge-radar-YYYY-MM-DD.md` [Task 1]
 - The `personal` profile scaffolds a more opinionated knowledge-body layout with `inbox/`, `projects/`, `inventory/`, `datasets/`, `archive/`, `review/`, plus `summaries/`, `concepts/`, `decisions/`, `patterns/`, `conflicts/`, `questions/`, `principles/`, `preferences/`, `entities/`, and `insights/` [Task 1]
-- The expanded CLI surface that proved useful here is `lwiki analyze`, `dashboard`, `serve`, `harvest`, `schedule`, and `query --mode quick|standard|deep|thesis|list --save-as <slug>` [Task 1][Task 4]
+- The expanded CLI surface that proved useful here is `lwm analyze`, `dashboard`, `serve`, `harvest`, `schedule`, and `query --mode quick|standard|deep|thesis|list --save-as <slug>` [Task 1][Task 4]
 - The content-bearing source vault was `/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/ObsidianVault`, and the most useful documents were `MASTER-记忆体.md`, `MASTER-工作流.md`, `AI-Hub-架构.md`, `IDE-CLI 统一集成指南.md`, `SCHEMA.md`, and `06-Agent-Inbox/20260417-002325-claude-code-Memory-Draft.md` [Task 2]
 - The migration preserved a durable layered model: Obsidian = main memory / human brain; project `.memory/` = project facts; `broadcast_to_hub.sh` = read-only share to AI tools; `EPEV` = explore/plan/execute/verify; inbox/global-memory layers = promotion path [Task 2]
-- After the rewrite, `wiki/overview.md`, `wiki/index.md`, `wiki/concepts/memory-policy.md`, `wiki/entities/obsidian.md`, and `wiki/entities/ai-tools-hub.md` frame `llm-wiki` as the current operating hub rather than leaving Obsidian as the active center [Task 2]
+- After the rewrite, `wiki/overview.md`, `wiki/index.md`, `wiki/concepts/memory-policy.md`, `wiki/entities/obsidian.md`, and `wiki/entities/ai-tools-hub.md` frame `llm-workmem` as the current operating hub rather than leaving Obsidian as the active center [Task 2]
 - The resulting pages are concrete retrieval anchors: `wiki/overview.md`, `wiki/index.md`, `wiki/summaries/obsidian-vault-memory-system.md`, `wiki/concepts/{memory-policy,workflow-policy,architecture-policy,tooling-policy,memory-governance}.md`, `wiki/entities/{obsidian,project-memory,claude-code,ai-tools-hub,codex,trae-solo,github-copilot}.md`, `wiki/summaries/tooling-stack-comparison.md`, and `knowledge-digest.html` [Task 2][Task 3][Task 4]
 - The four-tool ontology that finally matched the user’s expectation was concrete: Codex = cross-project executor; Claude Code = strict CLI rule engine; Trae Solo = IDE reflector with Think→Plan→Build→Verify→Reflect→Commit; GitHub Copilot = shared-layer / middle-media node [Task 3]
-- `lwiki harvest <wiki-root>` snapshots Codex, Claude Code, Trae Solo, GitHub Copilot, VSCode, workspace memory, and ObsidianVault into `raw/tool-snapshots/`, then refreshes governance/radar/HTML outputs [Task 4]
-- `lwiki schedule <wiki-root>` writes `automation/bin/run-harvest.sh` plus `automation/launchd/com.ethan.llmwiki.harvest.plist`, and the accepted steady behavior is `RunAtLoad=true` with `StartInterval=3600` [Task 4]
+- `lwm harvest <wiki-root>` snapshots Codex, Claude Code, Trae Solo, GitHub Copilot, VSCode, workspace memory, and ObsidianVault into `raw/tool-snapshots/`, then refreshes governance/radar/HTML outputs [Task 4]
+- `lwm schedule <wiki-root>` writes `automation/bin/run-harvest.sh` plus `automation/launchd/com.ethan.lwm.harvest.plist`, and the accepted steady behavior is `RunAtLoad=true` with `StartInterval=3600` [Task 4]
 - Verified command evidence from this rollout was `UV_CACHE_DIR=/private/tmp/uv-cache UV_PROJECT_ENVIRONMENT=/private/tmp/uv-venv uv run --extra dev pytest -q` -> `31 passed` and the matching `ruff check` with temp caches -> `All checks passed!` [Task 4]
 
 ## Failures and how to do differently
@@ -296,11 +296,11 @@ applies_to: cwd=/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downlo
 - Symptom: tests fail or `uv` behaves strangely in the iCloud-backed repo. Cause: the default environment lacks `pytest` and the normal cache/venv path can hit permission quirks. Fix: run `UV_CACHE_DIR=/private/tmp/uv-cache UV_PROJECT_ENVIRONMENT=/private/tmp/uv-venv uv run --extra dev pytest -q` and the matching `ruff check` command [Task 1]
 - Symptom: large CLI refactors pass functionally but fail lint. Cause: callback-name collisions and stale imports are easy to leave behind. Fix: expect immediate cleanup of renamed entrypoints and old imports after the refactor lands [Task 1]
 - Symptom: migration pulls the wrong `.obsidian` directory or too much unrelated markdown noise. Cause: searching broadly in CloudDocs before anchoring the real source vault. Fix: start from `Downloads/ObsidianVault` and use targeted file reads around confirmed source documents [Task 2]
-- Symptom: users ask whether `llm-wiki` has a UI and the answer drifts. Cause: the repo-native surface is CLI-first, but generated HTML/dashboard/serve layers can still satisfy “can I operate/view it”. Fix: explicitly separate “repo self-contained WebUI” from `knowledge-digest.html`, `lwiki dashboard`, and `lwiki serve` [Task 1][Task 4]
+- Symptom: users ask whether `llm-workmem` has a UI and the answer drifts. Cause: the repo-native surface is CLI-first, but generated HTML/dashboard/serve layers can still satisfy “can I operate/view it”. Fix: explicitly separate “repo self-contained WebUI” from `knowledge-digest.html`, `lwm dashboard`, and `lwm serve` [Task 1][Task 4]
 - Symptom: HTML looks “苍白空洞”. Cause: the display layer reflects abstract principles instead of real vault-derived pages and tool-specific evidence. Fix: migrate real content first, then regenerate the HTML summary from those concrete pages [Task 2][Task 3]
 - Symptom: the first tool-stack summary still feels generic. Cause: describing the tools at a high level instead of assigning concrete roles in the user’s operating model. Fix: rewrite as the four-way division `executor / CLI rule engine / IDE reflector / shared-layer node` [Task 3]
 - Symptom: schedule generation becomes overcomplicated or mismatched to the user’s wording. Cause: using clock-time schedules when the user really asked for “开机，每一小时一次”. Fix: switch directly to interval mode with `RunAtLoad` + `StartInterval=3600` [Task 4]
-- Symptom: migrated pages keep historical-source language and bury the current center. Cause: Obsidian-as-source and llm-wiki-as-runtime-hub were not labeled separately. Fix: rewrite overview/policy/entity pages so historical source and current operating hub are explicit [Task 2]
+- Symptom: migrated pages keep historical-source language and bury the current center. Cause: Obsidian-as-source and llm-workmem-as-runtime-hub were not labeled separately. Fix: rewrite overview/policy/entity pages so historical source and current operating hub are explicit [Task 2]
 
 # Task Group: Codex personalization, workflow memory, and strict coding defaults
 

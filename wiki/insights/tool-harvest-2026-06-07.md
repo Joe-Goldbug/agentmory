@@ -64,7 +64,7 @@ This snapshot is generated automatically from the active tool memory sources and
 | vscode | MEMORY.md | raw/tool-snapshots/vscode/2026-06-07/memory.md |
 | vscode | settings.json | raw/tool-snapshots/vscode/2026-06-07/settings.json |
 | kiro | global-steering | raw/tool-snapshots/kiro/2026-06-07/global-steering/development-standards.md |
-| kiro | global-steering | raw/tool-snapshots/kiro/2026-06-07/global-steering/llm-wiki.md |
+| kiro | global-steering | raw/tool-snapshots/kiro/2026-06-07/global-steering/llm-workmem.md |
 | kiro | global-specs | raw/tool-snapshots/kiro/2026-06-07/global-specs/ai-ml-feature-template.md |
 | kiro | global-specs | raw/tool-snapshots/kiro/2026-06-07/global-specs/web2-feature-template.md |
 | kiro | global-specs | raw/tool-snapshots/kiro/2026-06-07/global-specs/web3-integration-template.md |

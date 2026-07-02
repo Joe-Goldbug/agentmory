@@ -6,7 +6,7 @@ sources: []
 updated: 2026-05-22
 ---
 
-# Review Queue — LLM wiki
+# Review Queue — LLM-WorkMem
 
 - Items: 0
 

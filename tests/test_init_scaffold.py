@@ -1,21 +1,21 @@
-"""Tests for the cbmem-related additions to lwiki.init_scaffold."""
+"""Tests for the cbmem-related additions to lwm.init_scaffold."""
 
 from __future__ import annotations
 
 import json
 from pathlib import Path
 
-from lwiki import init_scaffold
+from lwm import init_scaffold
 
 
 def test_init_writes_cbmem_projects_empty(tmp_path: Path) -> None:
-    """After ``init_wiki_tree`` runs, ``lwiki-sources.json`` must contain
+    """After ``init_wiki_tree`` runs, ``lwm-sources.json`` must contain
     a ``cbmem`` block with ``projects: []`` and the default search queries.
     """
     init_scaffold.init_wiki_tree(
         tmp_path, domain="test", source_types="memory", force=True
     )
-    sources = tmp_path / "lwiki-sources.json"
+    sources = tmp_path / "lwm-sources.json"
     assert sources.is_file()
     payload = json.loads(sources.read_text(encoding="utf-8"))
     assert isinstance(payload, dict)
@@ -25,10 +25,10 @@ def test_init_writes_cbmem_projects_empty(tmp_path: Path) -> None:
 
 
 def test_init_preserves_existing_cbmem_projects(tmp_path: Path) -> None:
-    """If ``lwiki-sources.json`` already lists projects, ``init`` must NOT
+    """If ``lwm-sources.json`` already lists projects, ``init`` must NOT
     clobber them — only fill missing keys.
     """
-    sources_path = tmp_path / "lwiki-sources.json"
+    sources_path = tmp_path / "lwm-sources.json"
     sources_path.write_text(
         json.dumps(
             {"cbmem": {"projects": ["/Users/foo/proj1"], "search_queries": ["<MY>"]}}

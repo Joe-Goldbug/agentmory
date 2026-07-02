@@ -1,6 +1,6 @@
-"""End-to-end CLI tests for ``lwiki cbmem *`` — drives Typer's CliRunner.
+"""End-to-end CLI tests for ``lwm cbmem *`` — drives Typer's CliRunner.
 
-We patch ``lwiki.cli.lwiki_cbmem`` (the alias) so no real subprocess is ever
+We patch ``lwm.cli.lwm_cbmem`` (the alias) so no real subprocess is ever
 spawned. The point of this file is to lock the user-visible contract:
 exit codes, stderr hints, the ``is_indexed`` short-circuit, and the
 mapping from subcommand name to module function.
@@ -15,8 +15,8 @@ from unittest.mock import MagicMock
 import pytest
 from typer.testing import CliRunner
 
-from lwiki import cbmem as cbmem_mod
-from lwiki.cli import app
+from lwm import cbmem as cbmem_mod
+from lwm.cli import app
 
 runner = CliRunner()
 
@@ -30,7 +30,7 @@ def _make_cbmem_callable(return_value):
 
 @pytest.fixture
 def stub_cbmem(monkeypatch: pytest.MonkeyPatch):
-    """Replace the ``lwiki_cbmem`` import inside ``lwiki.cli`` with a
+    """Replace the ``lwm_cbmem`` import inside ``lwm.cli`` with a
     SimpleNamespace holding plain callables for every public function. Using
     SimpleNamespace (not MagicMock) avoids auto-spec quirks where MagicMock
     would refuse to accept positional args that don't match the real
@@ -59,7 +59,7 @@ def stub_cbmem(monkeypatch: pytest.MonkeyPatch):
         render_dead_code_report=_make_cbmem_callable("dead"),
         render_query_report=_make_cbmem_callable("{}"),
     )
-    monkeypatch.setattr("lwiki.cli.lwiki_cbmem", stub)
+    monkeypatch.setattr("lwm.cli.lwm_cbmem", stub)
     return stub
 
 
@@ -133,7 +133,7 @@ def test_graph_subcommand_exits_two_when_not_indexed(
     r = runner.invoke(app, ["cbmem", sub, str(project), *extra])
     assert r.exit_code == 2, r.output
     assert ".codebase-memory/graph.db.zst" in r.output
-    assert "lwiki cbmem index" in r.output
+    assert "lwm cbmem index" in r.output
 
 
 # ---------- per-subcommand happy paths -------------------------------------

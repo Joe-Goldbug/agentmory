@@ -1,11 +1,11 @@
-"""Tests for the cbmem section of ``lwiki.audit.run_audit``."""
+"""Tests for the cbmem section of ``lwm.audit.run_audit``."""
 
 from __future__ import annotations
 
 import json
 from pathlib import Path
 
-from lwiki import audit
+from lwm import audit
 
 
 def _make_artifact(project: Path) -> None:
@@ -15,7 +15,7 @@ def _make_artifact(project: Path) -> None:
 
 
 def test_audit_reports_cbmem_indexed_state_no_config(tmp_path: Path) -> None:
-    """No lwiki-sources.json -> cbmem counts default to (0, 0)."""
+    """No lwm-sources.json -> cbmem counts default to (0, 0)."""
     report = audit.run_audit(tmp_path, eval_suite=None, eval_mode="standard")
     assert report.cbmem_indexed == 0
     assert report.cbmem_projects_total == 0
@@ -29,7 +29,7 @@ def test_audit_reports_cbmem_indexed_state_partial(tmp_path: Path) -> None:
     proj_b.mkdir()
     _make_artifact(proj_a)
 
-    (tmp_path / "lwiki-sources.json").write_text(
+    (tmp_path / "lwm-sources.json").write_text(
         json.dumps({"cbmem": {"projects": [str(proj_a), str(proj_b)]}}),
         encoding="utf-8",
     )

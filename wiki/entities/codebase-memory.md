@@ -1,15 +1,15 @@
 ---
 title: Codebase Memory (cbmem)
 type: entity
-tags: [entity, cbmem, codebase-memory, code-graph, mcp, lwiki-extension]
+tags: [entity, cbmem, codebase-memory, code-graph, mcp, lwm-extension]
 sources: []
 updated: 2026-06-30
 ---
 
 # Codebase Memory (cbmem)
 
-> An indexable, queryable code graph for any project directory. Wrapped in lwiki
-> as the `lwiki cbmem *` subcommand family.
+> An indexable, queryable code graph for any project directory. Wrapped in lwm
+> as the `lwm cbmem *` subcommand family.
 
 ## Profile
 
@@ -20,31 +20,31 @@ updated: 2026-06-30
 | Upstream version | 0.8.1 (released 2026-06-12) |
 | Binary | `~/bin/codebase-memory-mcp` (270 MB, Mach-O arm64) |
 | Alias | `~/bin/cbmem` (symlink) |
-| Wrapper module | `lwiki/cbmem.py` |
-| CLI surface | `lwiki cbmem {doctor,index,index-status,search,architecture,trace,changes,dead,query,semantic}` |
+| Wrapper module | `lwm/cbmem.py` |
+| CLI surface | `lwm cbmem {doctor,index,index-status,search,architecture,trace,changes,dead,query,semantic}` |
 | Distribution | Single static binary, no Docker, no API key |
-| Added to lwiki | 2026-06-30 |
+| Added to lwm | 2026-06-30 |
 
 ## What it does
 
 Indexes a code directory into a persistent knowledge graph of functions,
-classes, call chains, HTTP routes, and cross-service links. Lets lwiki
+classes, call chains, HTTP routes, and cross-service links. Lets lwm
 answer structural questions in milliseconds instead of agent file-by-file
 exploration.
 
-The lwiki wrapper shells out to the binary using the documented contract:
+The lwm wrapper shells out to the binary using the documented contract:
 
 ```text
 codebase-memory-mcp cli [--json] <tool_name> <json_args>
 ```
 
-## Why it is in lwiki (not in Claude Code)
+## Why it is in lwm (not in Claude Code)
 
 Per the user's hard rule (`feedback-tool-scope-separation`):
 
 > 工具归属必须分清 —— Claude Code 用 MCP vs 本地独立 CLI 绝不能混
 
-cbmem is exposed **only** as `lwiki cbmem *` subcommands. It is **not**
+cbmem is exposed **only** as `lwm cbmem *` subcommands. It is **not**
 registered as a Claude Code MCP server, even though the upstream binary
 itself supports MCP stdio.
 
@@ -61,10 +61,10 @@ itself supports MCP stdio.
 
 ## Source Set
 
-- `lwiki/cbmem.py` (wrapper module, 20 public functions)
-- `lwiki/cli.py` (subcommand registration, 10 commands)
-- `lwiki/cbmem_source.py` (harvest bridge — writes `raw/cbmem-snapshots/`)
-- `lwiki-sources.json` (config: `cbmem.projects` + `cbmem.search_queries`)
+- `lwm/cbmem.py` (wrapper module, 20 public functions)
+- `lwm/cli.py` (subcommand registration, 10 commands)
+- `lwm/cbmem_source.py` (harvest bridge — writes `raw/cbmem-snapshots/`)
+- `lwm-sources.json` (config: `cbmem.projects` + `cbmem.search_queries`)
 - `automation/install-cbmem.sh` (one-shot binary installer)
 - `~/bin/codebase-memory-mcp` (vendored binary)
 
@@ -72,6 +72,6 @@ itself supports MCP stdio.
 
 - [[code-graph-querying]] — the concept
 - [[integrations-2026-06-30]] — why we chose this
-- [[lwiki-cbmem-cheatsheet]] — command reference
+- [[lwm-cbmem-cheatsheet]] — command reference
 - [[architecture-policy]] — how this fits the wiki's role
 - [[tooling-policy]] — agent ↔ tool ↔ wiki contract

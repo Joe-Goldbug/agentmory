@@ -64,7 +64,7 @@ This snapshot is generated automatically from the active tool memory sources and
 | vscode | settings.json | raw/tool-snapshots/vscode/2026-06-24/settings.json |
 | kiro | global-steering | raw/tool-snapshots/kiro/2026-06-24/global-steering/communication-preferences.md |
 | kiro | global-steering | raw/tool-snapshots/kiro/2026-06-24/global-steering/development-standards.md |
-| kiro | global-steering | raw/tool-snapshots/kiro/2026-06-24/global-steering/llm-wiki.md |
+| kiro | global-steering | raw/tool-snapshots/kiro/2026-06-24/global-steering/llm-workmem.md |
 | kiro | global-steering | raw/tool-snapshots/kiro/2026-06-24/global-steering/loop-engineering.md |
 | kiro | global-steering | raw/tool-snapshots/kiro/2026-06-24/global-steering/product-iteration.md |
 | kiro | global-steering | raw/tool-snapshots/kiro/2026-06-24/global-steering/workflow-memory.md |
@@ -27830,25 +27830,25 @@ _No available source files were found for this tool._
 - Source: `/Users/ethan/.agents/AGENTS.md`
 ```text
 [L1] <!-- LLM-WIKI:START -->
-[L2] # LLM Wiki Context
-[L4] Use this llm-wiki as the shared workflow and memory source for this tool.
+[L2] # LLM-WorkMem Context
+[L4] Use this llm-workmem as the shared workflow and memory source for this tool.
 [L6] Read order:
-[L7] 1. `/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM wiki/llms.txt` for compact context.
-[L8] 2. `/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM wiki/wiki/purpose.md` for scope and guardrails.
-[L9] 3. `/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM wiki/wiki/overview.md` for the current synthesis.
-[L10] 4. `/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM wiki/llms-full.txt` only when deeper context is needed.
+[L7] 1. `/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/llms.txt` for compact context.
+[L8] 2. `/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/wiki/purpose.md` for scope and guardrails.
+[L9] 3. `/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/wiki/overview.md` for the current synthesis.
+[L10] 4. `/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/llms-full.txt` only when deeper context is needed.
 ```
 ### home-GLOBAL.md
 - Source: `/Users/ethan/.agents/GLOBAL.md`
 ```text
 [L1] <!-- LLM-WIKI:START -->
-[L2] # LLM Wiki Context
-[L4] Use this llm-wiki as the shared workflow and memory source for this tool.
+[L2] # LLM-WorkMem Context
+[L4] Use this llm-workmem as the shared workflow and memory source for this tool.
 [L6] Read order:
-[L7] 1. `/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM wiki/llms.txt` for compact context.
-[L8] 2. `/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM wiki/wiki/purpose.md` for scope and guardrails.
-[L9] 3. `/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM wiki/wiki/overview.md` for the current synthesis.
-[L10] 4. `/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM wiki/llms-full.txt` only when deeper context is needed.
+[L7] 1. `/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/llms.txt` for compact context.
+[L8] 2. `/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/wiki/purpose.md` for scope and guardrails.
+[L9] 3. `/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/wiki/overview.md` for the current synthesis.
+[L10] 4. `/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/llms-full.txt` only when deeper context is needed.
 ```
 
 ## MiniMax

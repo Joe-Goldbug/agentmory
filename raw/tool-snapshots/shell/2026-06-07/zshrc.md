@@ -73,8 +73,8 @@ export PATH="/opt/homebrew/opt/node@20/bin:$PATH"
 export MINIMAX_API_KEY="sk-cp-Vur2RO_jN2A2YmIfmYeqjERqa5W8ek014Hb_CK5doglhTSl6f9S5AxSmREfRfe5sURzJtniE5129yqvo8bPnZwMGco8pQH2W7GrDa2sowJ17MxdvAYEu5B8"
 
 <!-- LLM-WIKI:START -->
-# LLM Wiki shell context
-if [ -f '/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM wiki/adapters/llm-wiki-shell-context.sh' ]; then
-  source '/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM wiki/adapters/llm-wiki-shell-context.sh'
+# LLM-WorkMem shell context
+if [ -f '/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/adapters/llm-workmem-shell-context.sh' ]; then
+  source '/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/adapters/llm-workmem-shell-context.sh'
 fi
 <!-- LLM-WIKI:END -->

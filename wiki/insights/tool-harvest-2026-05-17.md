@@ -48,24 +48,24 @@ This snapshot is generated automatically from the active tool memory sources and
 ## Codex
 ### MEMORY.md
 - Source: `/Users/ethan/.codex/memories/MEMORY.md`
-# Task Group: llm-wiki knowledge-body migration, ObsidianVault consolidation, and tool-stack ontology
-scope: Building and extending the local `llm-wiki` repo as a personal knowledge body, migrating real Obsidian content into it, and encoding...
-applies_to: cwd=/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM wiki; reuse_rule=safe inside the local llm-wiki repo...
-## Task 1: Extend llm-wiki into a personal knowledge-body base
+# Task Group: llm-workmem knowledge-body migration, ObsidianVault consolidation, and tool-stack ontology
+scope: Building and extending the local `llm-workmem` repo as a personal knowledge body, migrating real Obsidian content into it, and encoding...
+applies_to: cwd=/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem; reuse_rule=safe inside the local llm-workmem repo...
+## Task 1: Extend llm-workmem into a personal knowledge-body base
 ### rollout_summary_files
-  - - rollout_summaries/2026-05-06T05-13-43-4xVW-llm_wiki_obisidian_migration_and_tool_stack_summary.md (cwd=/Users/ethan/Documents/Codex/2026-05-06/new-chat, rollout_path=/Users/ethan/.codex/sessions/2026/05/06/rollout-2026-05-06T13-13-43-019dfbb4-cd6c-7ce3-8b37-14a8c559976c.jsonl, updated_at=2026-05-14T13:16:53+00:00, thread_id=019dfbb4-cd6c-7ce3-8b37-14a8c559976c, personal profile, analyze command, and test/ruff verification)
+  - - rollout_summaries/2026-05-06T05-13-43-4xVW-lwm_obisidian_migration_and_tool_stack_summary.md (cwd=/Users/ethan/Documents/Codex/2026-05-06/new-chat, rollout_path=/Users/ethan/.codex/sessions/2026/05/06/rollout-2026-05-06T13-13-43-019dfbb4-cd6c-7ce3-8b37-14a8c559976c.jsonl, updated_at=2026-05-14T13:16:53+00:00, thread_id=019dfbb4-cd6c-7ce3-8b37-14a8c559976c, personal profile, analyze command, and test/ruff verification)
 ### keywords
-  - - llm-wiki, ObsidianVault, personal profile, lwiki analyze, knowledge-radar, YAML frontmatter, wikilinks, pytest, ruff, UV_CACHE_DIR, UV_PROJECT_ENVIRONMENT
+  - - llm-workmem, ObsidianVault, personal profile, lwm analyze, knowledge-radar, YAML frontmatter, wikilinks, pytest, ruff, UV_CACHE_DIR, UV_PROJECT_ENVIRONMENT
 ### memory_summary.md
 - Source: `/Users/ethan/.codex/memories/MEMORY.md`
-# Task Group: llm-wiki knowledge-body migration, ObsidianVault consolidation, and tool-stack ontology
-scope: Building and extending the local `llm-wiki` repo as a personal knowledge body, migrating real Obsidian content into it, and encoding...
-applies_to: cwd=/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM wiki; reuse_rule=safe inside the local llm-wiki repo...
-## Task 1: Extend llm-wiki into a personal knowledge-body base
+# Task Group: llm-workmem knowledge-body migration, ObsidianVault consolidation, and tool-stack ontology
+scope: Building and extending the local `llm-workmem` repo as a personal knowledge body, migrating real Obsidian content into it, and encoding...
+applies_to: cwd=/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem; reuse_rule=safe inside the local llm-workmem repo...
+## Task 1: Extend llm-workmem into a personal knowledge-body base
 ### rollout_summary_files
-  - - rollout_summaries/2026-05-06T05-13-43-4xVW-llm_wiki_obisidian_migration_and_tool_stack_summary.md (cwd=/Users/ethan/Documents/Codex/2026-05-06/new-chat, rollout_path=/Users/ethan/.codex/sessions/2026/05/06/rollout-2026-05-06T13-13-43-019dfbb4-cd6c-7ce3-8b37-14a8c559976c.jsonl, updated_at=2026-05-14T13:16:53+00:00, thread_id=019dfbb4-cd6c-7ce3-8b37-14a8c559976c, personal profile, analyze command, and test/ruff verification)
+  - - rollout_summaries/2026-05-06T05-13-43-4xVW-lwm_obisidian_migration_and_tool_stack_summary.md (cwd=/Users/ethan/Documents/Codex/2026-05-06/new-chat, rollout_path=/Users/ethan/.codex/sessions/2026/05/06/rollout-2026-05-06T13-13-43-019dfbb4-cd6c-7ce3-8b37-14a8c559976c.jsonl, updated_at=2026-05-14T13:16:53+00:00, thread_id=019dfbb4-cd6c-7ce3-8b37-14a8c559976c, personal profile, analyze command, and test/ruff verification)
 ### keywords
-  - - llm-wiki, ObsidianVault, personal profile, lwiki analyze, knowledge-radar, YAML frontmatter, wikilinks, pytest, ruff, UV_CACHE_DIR, UV_PROJECT_ENVIRONMENT
+  - - llm-workmem, ObsidianVault, personal profile, lwm analyze, knowledge-radar, YAML frontmatter, wikilinks, pytest, ruff, UV_CACHE_DIR, UV_PROJECT_ENVIRONMENT
 
 ## Claude Code
 ### CLAUDE.md

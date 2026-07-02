@@ -62,10 +62,10 @@ Environment signal in memory: macOS with `zsh`, file-based memory under `/Users/
 - Ather local auth-routing fix and quota-aware profile planning: returnTo, /chat, /login, baseline_completed, MOCK_DB, Upstash, Resend, /profile
   - desc: Use for `cwd=/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/Ather` when the task touches login-to-chat routing, local mock verification, blast radius reporting, quota-aware profile/chat growth, or `/profile` as the long-lived persona home.
 
-#### /Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM wiki
+#### /Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem
 
-- llm-wiki personal knowledge body, multi-tool harvest, and shell/web startup: llm-wiki, --profile personal, harvest, watch, adapters, install-global, Kiro, shell, 127.0.0.1:8765
-  - desc: Use for `cwd=/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM wiki` when the task is to build the user's central knowledge body, harvest tool memories, expose adapters back to tools, or explain shell vs web vs background roles.
+- llm-workmem personal knowledge body, multi-tool harvest, and shell/web startup: llm-workmem, --profile personal, harvest, watch, adapters, install-global, Kiro, shell, 127.0.0.1:8765
+  - desc: Use for `cwd=/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem` when the task is to build the user's central knowledge body, harvest tool memories, expose adapters back to tools, or explain shell vs web vs background roles.
 
 #### /Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/Sentinel
 

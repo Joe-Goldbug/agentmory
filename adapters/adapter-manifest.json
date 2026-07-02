@@ -1,17 +1,19 @@
 {
-  "root": "/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM wiki",
-  "compact_context": "/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM wiki/llms.txt",
-  "full_context": "/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM wiki/llms-full.txt",
-  "manifest": "/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM wiki/llms.json",
+  "root": "/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem",
+  "compact_context": "/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/llms.txt",
+  "full_context": "/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/llms-full.txt",
+  "manifest": "/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/llms.json",
   "adapters": {
     "codex": "AGENTS.md",
     "claude-code": "CLAUDE.md",
     "github-copilot": "copilot-instructions.md",
-    "kiro": "kiro-steering-llm-wiki.md",
+    "kiro": "kiro-steering-llm-workmem.md",
     "trae": "traerules",
     "antigravity": "antigravity-agents.md",
     "antigravity-global": "antigravity-global.md",
     "minimax": "minimax-agent.md",
-    "shell": "llm-wiki-shell-context.sh"
+    "cursor": "cursor-rules.mdc",
+    "gemini-cli": "gemini-context.md",
+    "shell": "llm-workmem-shell-context.sh"
   }
 }

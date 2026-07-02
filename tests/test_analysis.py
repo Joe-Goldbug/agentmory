@@ -4,8 +4,8 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
-from lwiki.analysis import analyze_wiki, render_analysis_report, write_analysis_report
-from lwiki.cli import app
+from lwm.analysis import analyze_wiki, render_analysis_report, write_analysis_report
+from lwm.cli import app
 
 runner = CliRunner()
 

@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from lwiki.raw_tracker import (
+from lwm.raw_tracker import (
     compute_drift,
     format_drift_report,
     read_log,
@@ -65,7 +65,7 @@ def test_invalid_raw_dir(tmp_path: Path) -> None:
 
 
 def test_format_drift_empty() -> None:
-    from lwiki.raw_tracker import DriftResult
+    from lwm.raw_tracker import DriftResult
 
     r = DriftResult(frozenset(), frozenset(), frozenset())
     assert "No changes" in format_drift_report(r)

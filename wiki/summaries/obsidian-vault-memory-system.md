@@ -14,7 +14,7 @@ updated: 2026-06-03
 
 # Workflow Memory System
 
-This page is kept fresh by `lwiki harvest`.
+This page is kept fresh by `lwm harvest`.
 
 ## Source Set
 

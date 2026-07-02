@@ -6,7 +6,7 @@ sources: []
 updated: 2026-06-24
 ---
 
-# LLM wiki — Overview
+# LLM-WorkMem — Overview
 
 > Evolving synthesis across all sources. Updated on each ingest or review.
 
@@ -27,7 +27,7 @@ updated: 2026-06-24
 - Latest harvest: 2026-07-01
 - Sources captured: 27548
 - Missing source slots: 71
-- Workflow memory is now maintained by `lwiki harvest`.
+- Workflow memory is now maintained by `lwm harvest`.
 
 ## See Also
 

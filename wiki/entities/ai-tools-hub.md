@@ -9,7 +9,7 @@ updated: 2026-05-14
 
 # AI Tools Hub
 
-AI Tools Hub 是你把 llm-wiki 全局规则整理出去后形成的只读副本，供各种 AI 工具统一读取。
+AI Tools Hub 是你把 llm-workmem 全局规则整理出去后形成的只读副本，供各种 AI 工具统一读取。
 
 ## Overview
 

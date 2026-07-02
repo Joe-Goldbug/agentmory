@@ -52,8 +52,8 @@ precmd_functions+=(_deepseek_guard)
 
 
 # LLM-WIKI:START
-# LLM Wiki shell context
-if [ -f '/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM wiki/adapters/llm-wiki-shell-context.sh' ]; then
-  source '/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM wiki/adapters/llm-wiki-shell-context.sh'
+# LLM-WorkMem shell context
+if [ -f '/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/adapters/llm-workmem-shell-context.sh' ]; then
+  source '/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/adapters/llm-workmem-shell-context.sh'
 fi
 # LLM-WIKI:END

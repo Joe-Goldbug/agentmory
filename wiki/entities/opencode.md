@@ -8,7 +8,7 @@ updated: 2026-07-01
 
 # OpenCode
 
-This page is kept fresh by `lwiki harvest`.
+This page is kept fresh by `lwm harvest`.
 
 ## Source Set
 

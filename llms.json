@@ -1,5 +1,5 @@
 {
-  "root": "/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM wiki",
+  "root": "/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem",
   "generated_at": "2026-07-01",
   "page_count": 52,
   "pages": [
@@ -50,7 +50,7 @@
       "outbound_links": [
         "codebase-memory",
         "integrations-2026-06-30",
-        "lwiki-cbmem-cheatsheet",
+        "lwm-cbmem-cheatsheet",
         "architecture-policy",
         "workflow-policy"
       ]
@@ -232,13 +232,13 @@
         "codebase-memory",
         "code-graph",
         "mcp",
-        "lwiki-extension"
+        "lwm-extension"
       ],
       "sources": [],
       "outbound_links": [
         "code-graph-querying",
         "integrations-2026-06-30",
-        "lwiki-cbmem-cheatsheet",
+        "lwm-cbmem-cheatsheet",
         "architecture-policy",
         "tooling-policy"
       ]
@@ -347,7 +347,7 @@
         "raw/tool-snapshots/kiro/2026-07-01/global-specs/web3-integration-template.md",
         "raw/tool-snapshots/kiro/2026-07-01/global-steering/communication-preferences.md",
         "raw/tool-snapshots/kiro/2026-07-01/global-steering/development-standards.md",
-        "raw/tool-snapshots/kiro/2026-07-01/global-steering/llm-wiki.md",
+        "raw/tool-snapshots/kiro/2026-07-01/global-steering/llm-workmem.md",
         "raw/tool-snapshots/kiro/2026-07-01/global-steering/loop-engineering.md",
         "raw/tool-snapshots/kiro/2026-07-01/global-steering/product-iteration.md",
         "raw/tool-snapshots/kiro/2026-07-01/global-steering/workflow-memory.md",
@@ -28047,7 +28047,7 @@
     {
       "rel_path": "wiki/index.md",
       "slug": "index",
-      "title": "Wiki Index — LLM wiki",
+      "title": "Wiki Index — LLM-WorkMem",
       "type": "wiki",
       "tags": [],
       "sources": [],
@@ -28071,7 +28071,7 @@
       "outbound_links": [
         "codebase-memory",
         "code-graph-querying",
-        "lwiki-cbmem-cheatsheet",
+        "lwm-cbmem-cheatsheet",
         "architecture-policy",
         "memory-governance"
       ]
@@ -28671,7 +28671,7 @@
         "integrations-2026-06-30",
         "tool-harvest-2026-06-24",
         "ai-product-code-iteration-memory",
-        "lwiki-cbmem-cheatsheet",
+        "lwm-cbmem-cheatsheet",
         "tool-harvest-2026-06-25",
         "knowledge-radar-2026-06-25",
         "tool-harvest-2026-07-01",
@@ -28723,7 +28723,7 @@
         "overview",
         "purpose",
         "review-queue-2026-05-22",
-        "lwiki-cbmem-cheatsheet",
+        "lwm-cbmem-cheatsheet",
         "obsidian-vault-memory-system",
         "tooling-stack-comparison"
       ]
@@ -28956,14 +28956,14 @@
       ]
     },
     {
-      "rel_path": "wiki/summaries/lwiki-cbmem-cheatsheet.md",
-      "slug": "lwiki-cbmem-cheatsheet",
-      "title": "lwiki cbmem Cheatsheet",
+      "rel_path": "wiki/summaries/lwm-cbmem-cheatsheet.md",
+      "slug": "lwm-cbmem-cheatsheet",
+      "title": "lwm cbmem Cheatsheet",
       "type": "summary",
       "tags": [
         "summary",
         "cbmem",
-        "lwiki-extension",
+        "lwm-extension",
         "cheatsheet",
         "reference"
       ],

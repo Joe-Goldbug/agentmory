@@ -2,10 +2,10 @@
 inclusion: always
 ---
 
-# 跨工具工作流与记忆体（融合自 llm-wiki）
+# 跨工具工作流与记忆体（融合自 llm-workmem）
 
-> 来源：llm-wiki 2026-06-07 harvest，综合 Codex / Claude Code / Trae Solo / OpenCode / Cursor / GitHub Copilot / Shell 的工作流经验。
-> 本文件是 Kiro 对 llm-wiki 全局记忆的本地投射，优先级低于 development-standards.md 中的"零说谎准则"。
+> 来源：llm-workmem 2026-06-07 harvest，综合 Codex / Claude Code / Trae Solo / OpenCode / Cursor / GitHub Copilot / Shell 的工作流经验。
+> 本文件是 Kiro 对 llm-workmem 全局记忆的本地投射，优先级低于 development-standards.md 中的"零说谎准则"。
 
 ---
 
@@ -101,11 +101,11 @@ inclusion: always
 
 ## 七、工具定位（Kiro 在生态中的角色）
 
-从 llm-wiki 的工具对比框架看，Kiro 的定位是：
+从 llm-workmem 的工具对比框架看，Kiro 的定位是：
 
 - **IDE 侧的结构化开发代理**：通过 specs/hooks/steering 形成强约束工作流
 - **记忆载体**：steering = 全局记忆投射，specs = 结构化需求，hooks = 自动化执行
-- **不是知识的最终归宿**：真正的知识体在 llm-wiki，Kiro 的 steering 只是本地投射
+- **不是知识的最终归宿**：真正的知识体在 llm-workmem，Kiro 的 steering 只是本地投射
 
 与其他工具的分工：
 - Codex：偏跨项目执行和 reasoning
@@ -124,9 +124,9 @@ inclusion: always
 
 ---
 
-## 九、llm-wiki 引用说明
+## 九、llm-workmem 引用说明
 
-本文件的内容从以下 llm-wiki 页面综合而来：
+本文件的内容从以下 llm-workmem 页面综合而来：
 - `wiki/concepts/workflow-policy.md` — EPEV 循环
 - `wiki/concepts/memory-policy.md` — 记忆分层
 - `wiki/concepts/memory-governance.md` — 晋升规则
@@ -136,4 +136,4 @@ inclusion: always
 - `wiki/insights/what-survives-promotion.md` — 晋升筛选
 - `raw/tool-snapshots/codex/2026-06-07/ad_hoc_notes/` — 计划/执行硬规则
 
-如需更新，运行 `lwiki harvest` 后对照最新 wiki 页面刷新本文件。
+如需更新，运行 `lwm harvest` 后对照最新 wiki 页面刷新本文件。

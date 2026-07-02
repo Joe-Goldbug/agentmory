@@ -8,7 +8,7 @@
 # - Works on macOS arm64 / x86_64. Linux/Windows users must adjust URL/arch.
 #
 # Usage:  bash automation/install-cbmem.sh
-# Verify: lwiki cbmem doctor
+# Verify: lwm cbmem doctor
 
 set -euo pipefail
 
@@ -48,4 +48,4 @@ if command -v codesign >/dev/null 2>&1; then
   echo "Ad-hoc signed ${BIN}"
 fi
 
-echo "OK. Verify with: lwiki cbmem doctor"
+echo "OK. Verify with: lwm cbmem doctor"

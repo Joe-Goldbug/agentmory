@@ -8,7 +8,7 @@ updated: 2026-07-01
 
 # Memory Governance
 
-This page defines the working memory lifecycle for the llm-wiki-first setup.
+This page defines the working memory lifecycle for the llm-workmem-first setup.
 
 ## Memory Layers
 

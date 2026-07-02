@@ -13,7 +13,7 @@ This node represents older source material that has been migrated into the wiki.
 ## Key Points
 
 - Historical material remains readable.
-- Current rules live in llm-wiki.
+- Current rules live in llm-workmem.
 - The vault is a source, not the active memory center.
 
 ## See Also

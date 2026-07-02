@@ -15,8 +15,8 @@
 
 ---
 
-## 2. 知识库与工作流关联 (llm-wiki)
-- **只读全局 Wiki**：`/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM wiki`
+## 2. 知识库与工作流关联 (llm-workmem)
+- **只读全局 Wiki**：`/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem`
   - 包含全局工作规范、思维模式、自动化 harvest snapshot。
 - **项目级 Memory**：保存在本项目根目录下的 `.memory/`，用于记录当前项目的“病历本”（Bug 修复、技术细节与局部决策）。
 

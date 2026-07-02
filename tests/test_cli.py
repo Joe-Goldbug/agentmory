@@ -4,7 +4,7 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
-from lwiki.cli import app
+from lwm.cli import app
 
 runner = CliRunner()
 
@@ -17,7 +17,7 @@ def _write(path: Path, content: str) -> None:
 def test_help() -> None:
     r = runner.invoke(app, ["--help"])
     assert r.exit_code == 0
-    assert "lwiki" in r.stdout.lower() or "LLM Wiki" in r.stdout
+    assert "lwm" in r.stdout.lower() or "LLM-WorkMem" in r.stdout
 
 
 def test_raw_status_help() -> None:
@@ -64,8 +64,8 @@ def test_structure_command() -> None:
     assert "CLAUDE.md" in r.stdout
     assert "purpose.md" in r.stdout
     assert "wiki/" in r.stdout
-    assert "lwiki init" in r.stdout
-    assert "lwiki dashboard" in r.stdout
+    assert "lwm init" in r.stdout
+    assert "lwm dashboard" in r.stdout
 
 
 def test_structure_personal_profile() -> None:
@@ -73,12 +73,12 @@ def test_structure_personal_profile() -> None:
     assert r.exit_code == 0
     assert "projects/" in r.stdout
     assert "decisions/" in r.stdout
-    assert "lwiki analyze" in r.stdout
+    assert "lwm analyze" in r.stdout
 
 
 def test_init_creates_all_subdirectories(tmp_path: Path) -> None:
-    """lwiki init must create assets/, raw/, and all wiki/ subdirectories."""
-    target = tmp_path / "fullwiki"
+    """lwm init must create assets/, raw/, and all wiki/ subdirectories."""
+    target = tmp_path / "fullwm"
     r = runner.invoke(app, ["init", str(target), "-d", "Test"])
     assert r.exit_code == 0, r.output
     assert (target / "assets").is_dir()
@@ -204,7 +204,7 @@ def test_dashboard_command_writes_snapshot(tmp_path: Path) -> None:
     assert pages_dir.is_dir()
     assert (pages_dir / "wiki__overview.html").is_file()
     content = out.read_text(encoding="utf-8")
-    assert "LLM Wiki Desktop" in content
+    assert "LLM-WorkMem Desktop" in content
     assert "Purpose" in content
     assert "Pages" in content
     assert "snapshot.pages/wiki__overview.html" in content
@@ -269,7 +269,7 @@ def test_harvest_command_refreshes_workbench(tmp_path: Path, monkeypatch) -> Non
 
     overview = (target / "wiki" / "overview.md").read_text(encoding="utf-8")
     assert "Automation Status" in overview
-    assert "lwiki harvest" in overview
+    assert "lwm harvest" in overview
 
 
 def test_watch_command_refreshes_only_on_drift(tmp_path: Path, monkeypatch) -> None:
@@ -310,8 +310,8 @@ def test_schedule_command_writes_launchd_bundle(tmp_path: Path, monkeypatch) -> 
 
     script = target / "automation" / "bin" / "run-harvest.sh"
     runner_script = target / "automation" / "bin" / "run-harvest.py"
-    plist = target / "automation" / "launchd" / "com.ethan.llmwiki.harvest.plist"
-    launch_agents_plist = home / "Library" / "LaunchAgents" / "com.ethan.llmwiki.harvest.plist"
+    plist = target / "automation" / "launchd" / "com.ethan.lwm.harvest.plist"
+    launch_agents_plist = home / "Library" / "LaunchAgents" / "com.ethan.lwm.harvest.plist"
     assert script.is_file()
     assert runner_script.is_file()
     assert plist.is_file()
@@ -324,7 +324,7 @@ def test_schedule_command_writes_launchd_bundle(tmp_path: Path, monkeypatch) -> 
     assert "<key>RunAtLoad</key>" in plist_content
     assert "<key>StartInterval</key>" in plist_content
     assert "<integer>43200</integer>" in plist_content
-    assert "Application Support/llm-wiki-runtime" in plist_content
+    assert "Application Support/llm-workmem-runtime" in plist_content
     assert (target / "raw").is_symlink()
     assert (target / "wiki").is_symlink()
     assert (target / "automation").is_symlink()
@@ -471,14 +471,14 @@ def test_adapters_command_writes_tool_entrypoints(tmp_path: Path) -> None:
     assert (target / "adapters" / "AGENTS.md").is_file()
     assert (target / "adapters" / "CLAUDE.md").is_file()
     assert (target / "adapters" / "copilot-instructions.md").is_file()
-    assert (target / "adapters" / "kiro-steering-llm-wiki.md").is_file()
+    assert (target / "adapters" / "kiro-steering-llm-workmem.md").is_file()
     assert (target / "adapters" / "traerules").is_file()
     assert (target / "adapters" / "antigravity-agents.md").is_file()
     assert (target / "adapters" / "antigravity-global.md").is_file()
     assert (target / "adapters" / "minimax-agent.md").is_file()
-    assert (target / "adapters" / "llm-wiki-shell-context.sh").is_file()
+    assert (target / "adapters" / "llm-workmem-shell-context.sh").is_file()
     assert "llms.txt" in (target / "adapters" / "AGENTS.md").read_text(encoding="utf-8")
-    shell_context = (target / "adapters" / "llm-wiki-shell-context.sh").read_text(encoding="utf-8")
+    shell_context = (target / "adapters" / "llm-workmem-shell-context.sh").read_text(encoding="utf-8")
     assert "printf '%s\\n'" in shell_context
 
 
@@ -497,9 +497,9 @@ def test_attach_command_installs_project_adapters(tmp_path: Path) -> None:
     assert (project / "AGENTS.md").is_file()
     assert (project / "CLAUDE.md").is_file()
     assert (project / ".github" / "copilot-instructions.md").is_file()
-    assert (project / ".kiro" / "steering" / "llm-wiki.md").is_file()
+    assert (project / ".kiro" / "steering" / "llm-workmem.md").is_file()
     assert (project / ".traerules").is_file()
-    assert (project / ".llm-wiki" / "shell-context.sh").is_file()
+    assert (project / ".llm-workmem" / "shell-context.sh").is_file()
     assert "LLM-WIKI:START" in (project / "AGENTS.md").read_text(encoding="utf-8")
 
 
@@ -519,11 +519,99 @@ def test_install_global_command_merges_user_adapters(tmp_path: Path, monkeypatch
     assert (home / ".codex" / "AGENTS.md").is_file()
     assert (home / "CLAUDE.md").is_file()
     assert (home / ".traerules").is_file()
-    assert (home / ".kiro" / "steering" / "llm-wiki.md").is_file()
+    assert (home / ".kiro" / "steering" / "llm-workmem.md").is_file()
     for name in ("coder", "general", "mavis", "verifier"):
         assert (home / ".minimax" / "agents" / name / "agent.md").is_file()
         assert "LLM-WIKI:START" in (home / ".minimax" / "agents" / name / "agent.md").read_text(encoding="utf-8")
-    assert (home / ".config" / "lwiki" / "context.json").is_file()
+    assert (home / ".config" / "lwm" / "context.json").is_file()
     zshrc = (home / ".zshrc").read_text(encoding="utf-8")
-    assert "llm-wiki-shell-context.sh" in zshrc
+    assert "llm-workmem-shell-context.sh" in zshrc
     assert "LLM-WIKI:START" in zshrc
+
+
+def test_install_command_help() -> None:
+    r = runner.invoke(app, ["install", "--help"])
+    assert r.exit_code == 0
+    assert "Install lwm" in r.stdout
+    assert "--check" in r.stdout
+    assert "--uninstall" in r.stdout
+    assert "--extras" in r.stdout
+
+
+def test_install_command_requires_pyproject(tmp_path: Path) -> None:
+    """`lwm install` from a non-project directory must exit 2 with a clear error."""
+    r = runner.invoke(app, ["install", str(tmp_path)])
+    assert r.exit_code == 2, r.output
+    assert "pyproject.toml" in r.output
+
+
+def test_install_check_runs_without_crash() -> None:
+    """`lwm install --check` should not crash with exit_code 2 (the pyproject guard)."""
+    r = runner.invoke(app, ["install", "--check"])
+    # PATH may or may not have lwm; either 0 (PATH has it) or 1 (PATH missing) is OK.
+    assert r.exit_code in (0, 1), r.output
+
+
+def test_install_uninstall_command_help() -> None:
+    r = runner.invoke(app, ["install", "--uninstall", "--help"])
+    # Even --uninstall should print --help because --help is handled by typer
+    # before action dispatch.
+    assert r.exit_code == 0
+    assert "Install lwm" in r.stdout
+
+
+def test_install_uses_uv_pip_uninstall_format() -> None:
+    """Regression: the legacy ``uv pip install ... uninstall -y X`` syntax is
+    broken (uv treats ``uninstall`` as a package name and rejects ``-y``).
+    Verify that ``lwm install`` produces a uv command line that uv accepts.
+    """
+    import subprocess
+    import sys
+
+    # Use the active Python so uv finds a real environment.
+    python = sys.executable
+    r = subprocess.run(
+        ["uv", "pip", "uninstall", "--python", python, "no-such-pkg"],
+        capture_output=True,
+        text=True,
+    )
+    # uv accepts the syntax (non-interactive, even when the package is missing,
+    # it exits 0 with "not installed" message).
+    assert r.returncode == 0, r.stderr
+    # The broken form should fail.
+    r2 = subprocess.run(
+        [
+            "uv",
+            "pip",
+            "install",
+            "--python",
+            python,
+            "uninstall",
+            "-y",
+            "no-such-pkg",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    assert r2.returncode != 0  # uv rejects the broken form
+
+
+def test_dashboard_command_help_has_serve_flag() -> None:
+    r = runner.invoke(app, ["dashboard", "--help"])
+    assert r.exit_code == 0
+    assert "--serve" in r.stdout
+    assert "--open" in r.stdout
+    assert "--out" in r.stdout
+
+
+def test_dashboard_writes_snapshot(tmp_path: Path) -> None:
+    target = tmp_path / "wiki"
+    runner.invoke(app, ["init", str(target), "-d", "DashTest"])
+    runner.invoke(app, ["export", str(target)])
+    out = tmp_path / "digest.html"
+    r = runner.invoke(app, ["dashboard", str(target), "--out", str(out)])
+    assert r.exit_code == 0, r.output
+    assert out.is_file()
+    html = out.read_text(encoding="utf-8")
+    assert "LLM-WorkMem" in html
+    assert "knowledge" in html.lower() or "wiki" in html.lower()

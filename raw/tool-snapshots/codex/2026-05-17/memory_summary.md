@@ -1,33 +1,33 @@
-# Task Group: llm-wiki knowledge-body migration, ObsidianVault consolidation, and tool-stack ontology
+# Task Group: llm-workmem knowledge-body migration, ObsidianVault consolidation, and tool-stack ontology
 
-scope: Building and extending the local `llm-wiki` repo as a personal knowledge body, migrating real Obsidian content into it, and encoding the user’s multi-tool operating model in wiki pages plus HTML.
-applies_to: cwd=/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM wiki; reuse_rule=safe inside the local llm-wiki repo and nearby knowledge-body migration work, but source vault paths, iCloud-backed permissions, and exact tool-note locations should be rechecked on other machines
+scope: Building and extending the local `llm-workmem` repo as a personal knowledge body, migrating real Obsidian content into it, and encoding the user’s multi-tool operating model in wiki pages plus HTML.
+applies_to: cwd=/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem; reuse_rule=safe inside the local llm-workmem repo and nearby knowledge-body migration work, but source vault paths, iCloud-backed permissions, and exact tool-note locations should be rechecked on other machines
 
-## Task 1: Extend llm-wiki into a personal knowledge-body base
+## Task 1: Extend llm-workmem into a personal knowledge-body base
 
 ### rollout_summary_files
 
-- rollout_summaries/2026-05-06T05-13-43-4xVW-llm_wiki_obisidian_migration_and_tool_stack_summary.md (cwd=/Users/ethan/Documents/Codex/2026-05-06/new-chat, rollout_path=/Users/ethan/.codex/sessions/2026/05/06/rollout-2026-05-06T13-13-43-019dfbb4-cd6c-7ce3-8b37-14a8c559976c.jsonl, updated_at=2026-05-14T13:16:53+00:00, thread_id=019dfbb4-cd6c-7ce3-8b37-14a8c559976c, personal profile, analyze command, and test/ruff verification)
+- rollout_summaries/2026-05-06T05-13-43-4xVW-lwm_obisidian_migration_and_tool_stack_summary.md (cwd=/Users/ethan/Documents/Codex/2026-05-06/new-chat, rollout_path=/Users/ethan/.codex/sessions/2026/05/06/rollout-2026-05-06T13-13-43-019dfbb4-cd6c-7ce3-8b37-14a8c559976c.jsonl, updated_at=2026-05-14T13:16:53+00:00, thread_id=019dfbb4-cd6c-7ce3-8b37-14a8c559976c, personal profile, analyze command, and test/ruff verification)
 
 ### keywords
 
-- llm-wiki, ObsidianVault, personal profile, lwiki analyze, knowledge-radar, YAML frontmatter, wikilinks, pytest, ruff, UV_CACHE_DIR, UV_PROJECT_ENVIRONMENT
+- llm-workmem, ObsidianVault, personal profile, lwm analyze, knowledge-radar, YAML frontmatter, wikilinks, pytest, ruff, UV_CACHE_DIR, UV_PROJECT_ENVIRONMENT
 
-## Task 2: Migrate real ObsidianVault rules into llm-wiki pages and HTML
+## Task 2: Migrate real ObsidianVault rules into llm-workmem pages and HTML
 
 ### rollout_summary_files
 
-- rollout_summaries/2026-05-06T05-13-43-4xVW-llm_wiki_obisidian_migration_and_tool_stack_summary.md (cwd=/Users/ethan/Documents/Codex/2026-05-06/new-chat, rollout_path=/Users/ethan/.codex/sessions/2026/05/06/rollout-2026-05-06T13-13-43-019dfbb4-cd6c-7ce3-8b37-14a8c559976c.jsonl, updated_at=2026-05-14T13:16:53+00:00, thread_id=019dfbb4-cd6c-7ce3-8b37-14a8c559976c, real vault migration plus HTML mirror)
+- rollout_summaries/2026-05-06T05-13-43-4xVW-lwm_obisidian_migration_and_tool_stack_summary.md (cwd=/Users/ethan/Documents/Codex/2026-05-06/new-chat, rollout_path=/Users/ethan/.codex/sessions/2026/05/06/rollout-2026-05-06T13-13-43-019dfbb4-cd6c-7ce3-8b37-14a8c559976c.jsonl, updated_at=2026-05-14T13:16:53+00:00, thread_id=019dfbb4-cd6c-7ce3-8b37-14a8c559976c, real vault migration plus HTML mirror)
 
 ### keywords
 
 - ObsidianVault, MASTER-记忆体.md, MASTER-工作流.md, AI-Hub-架构.md, IDE-CLI 统一集成指南.md, SCHEMA.md, broadcast_to_hub.sh, EPEV, knowledge-digest.html, machine-readable markdown, human-readable HTML
 
-## Task 3: Encode Codex, Claude Code, Trae Solo, and GitHub Copilot in llm-wiki form
+## Task 3: Encode Codex, Claude Code, Trae Solo, and GitHub Copilot in llm-workmem form
 
 ### rollout_summary_files
 
-- rollout_summaries/2026-05-06T05-13-43-4xVW-llm_wiki_obisidian_migration_and_tool_stack_summary.md (cwd=/Users/ethan/Documents/Codex/2026-05-06/new-chat, rollout_path=/Users/ethan/.codex/sessions/2026/05/06/rollout-2026-05-06T13-13-43-019dfbb4-cd6c-7ce3-8b37-14a8c559976c.jsonl, updated_at=2026-05-14T13:16:53+00:00, thread_id=019dfbb4-cd6c-7ce3-8b37-14a8c559976c, four-tool ontology and comparison pages)
+- rollout_summaries/2026-05-06T05-13-43-4xVW-lwm_obisidian_migration_and_tool_stack_summary.md (cwd=/Users/ethan/Documents/Codex/2026-05-06/new-chat, rollout_path=/Users/ethan/.codex/sessions/2026/05/06/rollout-2026-05-06T13-13-43-019dfbb4-cd6c-7ce3-8b37-14a8c559976c.jsonl, updated_at=2026-05-14T13:16:53+00:00, thread_id=019dfbb4-cd6c-7ce3-8b37-14a8c559976c, four-tool ontology and comparison pages)
 
 ### keywords
 
@@ -36,7 +36,7 @@ applies_to: cwd=/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downlo
 ## User preferences
 
 - when the user said "我不是要布丁，我是要自动化处理我项目和想法所有关系的内在联系和洞察" -> default to workflow/relationship automation, not a note-taking toy [Task 1]
-- when the user asked "你先整理完毕告诉我，什么阶段改 llmwiki 代码？llm wiki 有 UI 可以操作吗给我看看？" -> stage the work clearly before code edits and answer whether there is a UI, not only a CLI [Task 1]
+- when the user asked "你先整理完毕告诉我，什么阶段改 lwm 代码？llm wiki 有 UI 可以操作吗给我看看？" -> stage the work clearly before code edits and answer whether there is a UI, not only a CLI [Task 1]
 - when the user said "先去读取 obsidian，把真实的过迁移过来 llm wiki" and "融合两个不一样的obsidian 在一起，然后给 llm wiki 用" -> migrate real source content, not a theoretical summary [Task 2]
 - when the user said the HTML looked "苍白空洞，没什么我的关系" -> the display layer must carry the user’s concrete structure, projects, and tool evidence, not only abstract principles [Task 2][Task 3]
 - when the user asked for "llm wiki 里面 md 是你读取，HTML 是给我读取" -> keep markdown as machine/work-tool truth and HTML as the human-facing reading layer [Task 2]
@@ -44,8 +44,8 @@ applies_to: cwd=/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downlo
 
 ## Reusable knowledge
 
-- The local repo is a small Python CLI project centered on `lwiki/cli.py`, `lwiki/init_scaffold.py`, `lwiki/structure.py`, `lwiki/raw_tracker.py`, and `skills/llm-wiki/`; it was safe to extend directly as a local product layer [Task 1]
-- `lwiki analyze <wiki-root>` and `lwiki analyze <wiki-root> --write` are now the deterministic structure checks; they report hubs, orphans, broken links, missing sources, duplicate slugs, and connected components, and `--write` emits `wiki/insights/knowledge-radar-YYYY-MM-DD.md` [Task 1]
+- The local repo is a small Python CLI project centered on `lwm/cli.py`, `lwm/init_scaffold.py`, `lwm/structure.py`, `lwm/raw_tracker.py`, and `skills/llm-workmem/`; it was safe to extend directly as a local product layer [Task 1]
+- `lwm analyze <wiki-root>` and `lwm analyze <wiki-root> --write` are now the deterministic structure checks; they report hubs, orphans, broken links, missing sources, duplicate slugs, and connected components, and `--write` emits `wiki/insights/knowledge-radar-YYYY-MM-DD.md` [Task 1]
 - The `personal` profile scaffolds a more opinionated knowledge-body layout with projects, decisions, patterns, conflicts, questions, principles, and preferences instead of only generic wiki sections [Task 1]
 - The content-bearing source vault was `/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/ObsidianVault`, and the most useful documents were `MASTER-记忆体.md`, `MASTER-工作流.md`, `AI-Hub-架构.md`, `IDE-CLI 统一集成指南.md`, `SCHEMA.md`, and `06-Agent-Inbox/20260417-002325-claude-code-Memory-Draft.md` [Task 2]
 - The migration preserved a durable layered model: Obsidian = main memory / human brain; project `.memory/` = project facts; `broadcast_to_hub.sh` = read-only share to AI tools; `EPEV` = explore/plan/execute/verify; inbox/global-memory layers = promotion path [Task 2]
