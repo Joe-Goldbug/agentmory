@@ -15,4 +15,9 @@ Rules:
 - Prefer `wiki/` pages that passed audit over raw snapshots.
 - Keep local project facts local unless they should be promoted through review.
 - After meaningful work, update or generate evidence that `lwm harvest`, `lwm watch`, or `lwm audit` can consume.
+
+## Direct pointers (high-signal concepts to consult on demand)
+
+- When designing, auditing, or reasoning about an LLM system prompt — read `[[portable-llm-system-prompt]]` (cross-IDE design patterns, distilled from the 2026-07-01 Claude Fable 5 leak).
+- When in doubt about the global rules — read `[[tooling-policy]]`, `[[memory-policy]]`, `[[architecture-policy]]`.
 <!-- LLM-WIKI:END -->

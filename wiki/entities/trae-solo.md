@@ -2,8 +2,8 @@
 title: Trae Solo
 type: entity
 tags: [entity, tool, trae, ide]
-sources: [raw/tool-snapshots/trae-solo/2026-07-01/mcp.json, raw/tool-snapshots/trae-solo/2026-07-01/settings.json, raw/tool-snapshots/trae-solo/2026-07-01/traerules.md]
-updated: 2026-07-01
+sources: [raw/tool-snapshots/trae-solo/2026-07-06/mcp.json, raw/tool-snapshots/trae-solo/2026-07-06/settings.json, raw/tool-snapshots/trae-solo/2026-07-06/traerules.md]
+updated: 2026-07-06
 ---
 
 # Trae Solo
@@ -12,9 +12,9 @@ This page is kept fresh by `lwm harvest`.
 
 ## Source Set
 
-- `raw/tool-snapshots/trae-solo/2026-07-01/mcp.json`
-- `raw/tool-snapshots/trae-solo/2026-07-01/settings.json`
-- `raw/tool-snapshots/trae-solo/2026-07-01/traerules.md`
+- `raw/tool-snapshots/trae-solo/2026-07-06/mcp.json`
+- `raw/tool-snapshots/trae-solo/2026-07-06/settings.json`
+- `raw/tool-snapshots/trae-solo/2026-07-06/traerules.md`
 
 ## Notes
 

@@ -2,8 +2,8 @@
 title: Cursor
 type: entity
 tags: [entity, tool, cursor, ide]
-sources: [raw/tool-snapshots/cursor/2026-07-01/ide_state.json, raw/tool-snapshots/cursor/2026-07-01/memory-hook.json, raw/tool-snapshots/cursor/2026-07-01/memory.md]
-updated: 2026-07-01
+sources: [raw/tool-snapshots/cursor/2026-07-06/ide_state.json, raw/tool-snapshots/cursor/2026-07-06/memory-hook.json, raw/tool-snapshots/cursor/2026-07-06/memory.md]
+updated: 2026-07-06
 ---
 
 # Cursor
@@ -12,9 +12,9 @@ This page is kept fresh by `lwm harvest`.
 
 ## Source Set
 
-- `raw/tool-snapshots/cursor/2026-07-01/ide_state.json`
-- `raw/tool-snapshots/cursor/2026-07-01/memory-hook.json`
-- `raw/tool-snapshots/cursor/2026-07-01/memory.md`
+- `raw/tool-snapshots/cursor/2026-07-06/ide_state.json`
+- `raw/tool-snapshots/cursor/2026-07-06/memory-hook.json`
+- `raw/tool-snapshots/cursor/2026-07-06/memory.md`
 
 ## Notes
 

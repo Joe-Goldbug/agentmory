@@ -2,8 +2,8 @@
 title: VSCode
 type: entity
 tags: [entity, tool, vscode, ide]
-sources: [raw/tool-snapshots/vscode/2026-07-01/memory.md, raw/tool-snapshots/vscode/2026-07-01/settings.json]
-updated: 2026-07-01
+sources: [raw/tool-snapshots/vscode/2026-07-06/memory.md, raw/tool-snapshots/vscode/2026-07-06/settings.json]
+updated: 2026-07-06
 ---
 
 # VSCode
@@ -12,8 +12,8 @@ This page is kept fresh by `lwm harvest`.
 
 ## Source Set
 
-- `raw/tool-snapshots/vscode/2026-07-01/memory.md`
-- `raw/tool-snapshots/vscode/2026-07-01/settings.json`
+- `raw/tool-snapshots/vscode/2026-07-06/memory.md`
+- `raw/tool-snapshots/vscode/2026-07-06/settings.json`
 
 ## Notes
 

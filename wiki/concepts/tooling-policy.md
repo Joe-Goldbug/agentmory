@@ -20,4 +20,5 @@ Claude Code, Codex, VSCode, Trae, Cursor, and OpenCode are execution surfaces th
 
 - [[architecture-policy]]
 - [[memory-policy]]
+- [[portable-llm-system-prompt]] — cross-IDE system-prompt design patterns (2026-07-06)
 - [[claude-code]]

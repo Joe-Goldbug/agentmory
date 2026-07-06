@@ -2,8 +2,8 @@
 title: Shell
 type: entity
 tags: [entity, tool, shell, zsh]
-sources: [raw/tool-snapshots/shell/2026-07-01/zprofile.md, raw/tool-snapshots/shell/2026-07-01/zshrc.md]
-updated: 2026-07-01
+sources: [raw/tool-snapshots/shell/2026-07-06/zprofile.md, raw/tool-snapshots/shell/2026-07-06/zshrc.md]
+updated: 2026-07-06
 ---
 
 # Shell
@@ -12,8 +12,8 @@ This page is kept fresh by `lwm harvest`.
 
 ## Source Set
 
-- `raw/tool-snapshots/shell/2026-07-01/zprofile.md`
-- `raw/tool-snapshots/shell/2026-07-01/zshrc.md`
+- `raw/tool-snapshots/shell/2026-07-06/zprofile.md`
+- `raw/tool-snapshots/shell/2026-07-06/zshrc.md`
 
 ## Notes
 

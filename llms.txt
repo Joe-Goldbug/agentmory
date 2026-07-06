@@ -1,6 +1,6 @@
 # LLM-WorkMem Export — LLM-WorkMem
 
-Generated: 2026-07-01
+Generated: 2026-07-06
 
 ## Purpose
 
@@ -17,6 +17,7 @@ Generated: 2026-07-01
 - wiki/concepts/code-graph-querying.md | Code Graph Querying | concept | > Replacing file-by-file exploration (grep + read) with a queryable graph of
 - wiki/concepts/memory-governance.md | Memory Governance | concept | This page defines the working memory lifecycle for the llm-workmem-first setup.
 - wiki/concepts/memory-policy.md | Memory Policy | concept | The global layer holds durable working style, communication preferences, and cross-project rules.
+- wiki/concepts/portable-llm-system-prompt.md | Portable LLM System Prompt | concept | > A vendor-neutral, model-agnostic template for the system prompt of an LLM-based assistant. Distilled from analysis of a 2026 production prompt, with all br...
 - wiki/concepts/tooling-policy.md | Tooling Policy | concept | Claude Code, Codex, VSCode, Trae, Cursor, and OpenCode are execution surfaces that read the same wiki rules.
 - wiki/concepts/workflow-policy.md | Workflow Policy | concept | The default workflow is explore, plan, execute, verify.
 - wiki/entities/ai-hub-架构.md | AI Hub 架构 | entity | Canonical anchor for historical references to AI Hub architecture.
@@ -40,6 +41,7 @@ Generated: 2026-07-01
 - wiki/entities/vscode.md | VSCode | entity | This page is kept fresh by `lwm harvest`.
 - wiki/entities/workspace-memory.md | Workspace Memory | entity | Stable target for references to the consolidated workspace memory system.
 - wiki/index.md | Wiki Index — LLM-WorkMem | wiki | | Page | Summary | Updated |
+- wiki/insights/debug-no-guess-2026-07-02.md | "Debug No-Guess: 写代码前必须 curl/ssh 验证线上真实状态" | insight | 生产环境 debug 时，**不允许**只读本地镜像就把根因方案写完。
 - wiki/insights/integrations-2026-06-30.md | Integration Decisions 2026-06-30 | insight | > A single day of work produced two new tools and a hard rule. This page
 - wiki/insights/knowledge-radar-2026-05-17.md | Knowledge Radar | insight | - Pages: 20
 - wiki/insights/knowledge-radar-2026-05-18.md | Knowledge Radar | insight | - Pages: 22
@@ -49,6 +51,9 @@ Generated: 2026-07-01
 - wiki/insights/knowledge-radar-2026-06-24.md | Knowledge Radar | insight | - Pages: 44
 - wiki/insights/knowledge-radar-2026-06-25.md | Knowledge Radar | insight | - Pages: 45
 - wiki/insights/knowledge-radar-2026-07-01.md | Knowledge Radar | insight | - Pages: 51
+- wiki/insights/knowledge-radar-2026-07-06.md | Knowledge Radar | insight | - Pages: 57
+- wiki/insights/llm-prompt-leak-analysis-2026-07-06.md | LLM Prompt Leak Analysis — 2026-07-06 | insight | > A single day of work produced a sanitized research artifact, a portable prompt template, and a wiki promotion. This page records the **decisions and findin...
+- wiki/insights/rename-llmwiki-to-llm-workmem-2026-07-02.md | Rename llmwiki → LLM-WorkMem (2026-07-02) | insight | <!-- audit-exempt: rename report. Body intentionally references both old and
 - wiki/insights/tool-harvest-2026-05-17.md | Tool Harvest | insight | This snapshot is generated automatically from the active tool memory sources and working docs.
 - wiki/insights/tool-harvest-2026-05-18.md | Tool Harvest | insight | This snapshot is generated automatically from the active tool memory sources and working docs.
 - wiki/insights/tool-harvest-2026-05-22.md | Tool Harvest | insight | This snapshot is generated automatically from the active tool memory sources and working docs.
@@ -57,6 +62,7 @@ Generated: 2026-07-01
 - wiki/insights/tool-harvest-2026-06-24.md | Tool Harvest | insight | This snapshot is generated automatically from the active tool memory sources and working docs.
 - wiki/insights/tool-harvest-2026-06-25.md | Tool Harvest | insight | This snapshot is generated automatically from the active tool memory sources and working docs.
 - wiki/insights/tool-harvest-2026-07-01.md | Tool Harvest | insight | This snapshot is generated automatically from the active tool memory sources and working docs.
+- wiki/insights/tool-harvest-2026-07-06.md | Tool Harvest | insight | This snapshot is generated automatically from the active tool memory sources and working docs.
 - wiki/insights/what-survives-promotion.md | What Survives Promotion | insight | Only stable working style, communication preferences, and AI rules should move into the global layer.
 - wiki/overview.md | Overview | overview | > Evolving synthesis across all sources. Updated on each ingest or review.
 - wiki/purpose.md | Purpose | purpose | > Evolving synthesis across all sources.
