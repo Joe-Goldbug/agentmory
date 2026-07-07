@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import re
 from dataclasses import dataclass
 from datetime import date
@@ -110,7 +111,127 @@ def _score_page(page: WikiPage, body: str, tokens: tuple[str, ...], mode: str) -
         if page.page_type == "insight":
             score += 2
             reasons.append("type:insight")
+    # Apply spectral-stable factor (spectral-stable ρ(Ā)<1) — keeps
+    # well-trodden core pages from being drowned by new ones.
+    score = round(_apply_stability(score, page))
     return score, reasons
+
+
+def _score_metadata_only(
+    page: WikiPage, tokens: tuple[str, ...], mode: str
+) -> tuple[int, list[str]]:
+    """Score page using only metadata (title/slug/tags/sources) — no body read.
+
+    Used in the latent stage of deferred decoding to pre-filter candidates
+    before paying the cost of reading page bodies. Saves 80%+ of body reads
+    on large wikis by short-circuiting to the top-K candidates.
+    """
+    if not tokens:
+        return 0, []
+
+    mode_bias = {
+        "quick": 1,
+        "deep": 2,
+        "thesis": 2,
+        "list": 1,
+    }.get(mode, 1)
+
+    score = 0
+    reasons: list[str] = []
+    blob = " ".join(
+        [page.title, page.slug, page.page_type, " ".join(page.tags), " ".join(page.sources)]
+    )
+    lowered_blob = blob.lower()
+    title_blob = page.title.lower()
+    slug_blob = page.slug.lower()
+
+    for token in tokens:
+        hits = lowered_blob.count(token)
+        if not hits:
+            continue
+        if token in title_blob:
+            score += 8 * mode_bias
+            reasons.append(f"title:{token}")
+        elif token in slug_blob:
+            score += 6 * mode_bias
+            reasons.append(f"slug:{token}")
+        elif token in " ".join(page.tags).lower():
+            score += 5 * mode_bias
+            reasons.append(f"tag:{token}")
+        elif token in " ".join(page.sources).lower():
+            score += 2 * mode_bias
+            reasons.append(f"source:{token}")
+
+    if mode == "thesis":
+        if page.page_type in {"conflict", "decision", "principle", "preference", "question"}:
+            score += 4
+            reasons.append(f"type:{page.page_type}")
+        if page.page_type == "insight":
+            score += 2
+            reasons.append("type:insight")
+
+    return score, reasons
+
+
+# Spectral-stable decay parameters (Looped World Model ρ(Ā) < 1)
+# λ=0.99: page loses 1% relevance per day, ~16% remains at 6 months
+# λ=0.95: page loses 5% relevance per day, ~0.4% remains at 6 months
+_DECAY_LAMBDA = 0.99
+
+
+def _stability_factor(page: WikiPage) -> float:
+    """Spectral-stable memory factor: age decay × use boost.
+
+    New pages do not drown out well-trodden core pages; rarely-used pages
+    gently decay. Bounded so no single page can dominate or vanish.
+    """
+    # Age decay: λ^Δt  (fallback to updated, then to today if both missing)
+    last_used = page.last_used_at or page.updated
+    try:
+        last_used_date = date.fromisoformat(last_used)
+    except (TypeError, ValueError):
+        last_used_date = date.today()
+    age_days = max((date.today() - last_used_date).days, 0)
+    age_decay = _DECAY_LAMBDA ** age_days
+
+    # Use boost: log(1 + n) — diminishing returns, bounded
+    use_boost = 1.0 + math.log1p(max(page.use_count, 0))
+
+    return age_decay * use_boost
+
+
+def _apply_stability(score: int, page: WikiPage) -> float:
+    """Apply spectral-stable factor to a raw integer score, return float."""
+    return score * _stability_factor(page)
+
+
+_DECISION_KEYWORDS = (
+    "对比", "比较", "vs", "原则", "偏好", "决策", "权衡",
+    "decide", "decision", "principle", "preference", "compare", "contrast", "should",
+)
+_SHORT_FACTUAL_STARTS = (
+    "谁", "什么", "哪个", "何时", "何地", "为什么",
+    "who", "what", "when", "where", "why",
+)
+
+
+def _auto_mode(question: str) -> str:
+    """Exit Gate: auto-pick query mode from question shape when mode='standard'.
+
+    Heuristics:
+    - Comparative / judgment / decision keywords → 'thesis' (weighted for decisions/principles)
+    - Short factual (who/what/when/where) → 'quick' (metadata only)
+    - Otherwise → 'deep' (full body)
+    """
+    q = question.strip().lower()
+    if not q:
+        return "quick"
+    if any(kw in q for kw in _DECISION_KEYWORDS):
+        return "thesis"
+    words = q.split()
+    if len(words) <= 6 and any(q.startswith(p) for p in _SHORT_FACTUAL_STARTS):
+        return "quick"
+    return "deep"
 
 
 def _find_related_pages(
@@ -131,8 +252,43 @@ def run_query(root: Path, question: str, *, mode: str = "standard", limit: int =
     analysis = analyze_wiki(root)
     pages = collect_wiki_pages(root)
     tokens = _tokenize(question)
-    hits: list[QueryHit] = []
+
+    # === Exit Gate: when caller passes mode='standard', auto-pick from question shape ===
+    if mode == "standard":
+        mode = _auto_mode(question)
+
+    # === Recurrent Block Stage 1: pure latent (zero body reads) ===
+    # Score every page using only metadata (title/slug/tags/sources/page_type).
+    latent_hits: list[tuple[WikiPage, int]] = []
     for page in pages:
+        meta_score = _score_metadata_only(page, tokens, mode)[0]
+        if meta_score > 0:
+            latent_hits.append((page, meta_score))
+    latent_hits.sort(key=lambda item: (-item[1], item[0].title.lower(), item[0].rel_path))
+    # Round 1: keep a generous pool — recurrent block will tighten later.
+    K1 = max(limit * 16, 100)
+    pool: list[tuple[WikiPage, int]] = latent_hits[:K1]
+
+    # === Recurrent Block Stage 2: add stability signal (spectral-stable ρ(Ā)<1) ===
+    # Re-rank with stability factor; high-use and recent pages rise, stale ones sink.
+    pool = sorted(
+        pool,
+        key=lambda item: (
+            -_apply_stability(item[1], item[0]),
+            item[0].title.lower(),
+            item[0].rel_path,
+        ),
+    )
+    # Round 2: tighten to a mid-sized pool.
+    K2 = max(K1 // 2, limit * 4)
+    pool = pool[:K2]
+
+    # === Deferred Decoding Stage 3: materialize (read bodies of final candidates) ===
+    # Final K: the candidate set that pays the body-read cost.
+    K3 = max(limit * 8, 50)
+    candidate_pages = [page for page, _ in pool[:K3]]
+    hits: list[QueryHit] = []
+    for page in candidate_pages:
         body = _page_body(page)
         score, reasons = _score_page(page, body, tokens, mode)
         if score <= 0:

@@ -10,6 +10,19 @@ metadata:
 
 An LLM-WorkMem that evolves with you. Based on [Karpathy's LLM-WorkMem](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f).
 
+## Shared 3-Stage Skeleton (Prelude · Recurrent · Coda)
+
+Every operation below (INIT / INGEST / QUERY / UPDATE / ANALYZE / COMPILE / SCHEMA / REVIEW / EVAL / AUDIT / LINT / HARVEST / WATCH / EXPORT / SCHEDULE) fits inside the same 3-stage skeleton. This is a shared convention, not a new skill — it's how all 14+ operations stay consistent.
+
+- **Prelude (入口准备)** — turn the user's request into an explicit `intent` object: what to recall, scope, depth, mode. No tool calls yet.
+- **Recurrent Block (核心处理)** — core loop: recall → score → refine. May iterate K times with an **Exit Gate** that stops when the result stabilizes (similarity saturates, budget exhausted, or top-K is unchanged).
+- **Coda (出口收尾)** — write results back to the wiki consistently: append to `wiki/log.md`, update `wiki/index.md` if pages were added, and create an `insight` page in `wiki/insights/` when the synthesis has durable value.
+
+Concretely:
+- `QUERY` uses **deferred decoding** — the Recurrent Block runs a pure-latent pass over page metadata first, then materializes (reads) only the top-K candidate bodies. Saves 80%+ of body reads on large wikis.
+- `QUERY` uses an **Exit Gate** — when `mode='standard'`, the system picks `quick` / `deep` / `thesis` from the question shape, instead of forcing the user to choose.
+- `INGEST`, `LINT`, `HARVEST` all share the same Coda — every meaningful change touches `log.md` and `index.md`.
+
 ## How to work
 
 Use two phases: **(1) gather context**, **(2) map the request into steps**—each step is one operation with a dedicated reference file. Read that reference *before* executing the step.

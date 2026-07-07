@@ -24,6 +24,12 @@ class WikiPage:
     sources: tuple[str, ...]
     outbound_links: tuple[str, ...]
     tags: tuple[str, ...]
+    updated: str = ""
+    # Stability fields (Looped World Model ρ(Ā)<1): optional, fallback in scoring
+    # last_used_at: ISO date string of most recent successful query hit (frontmatter `last_used_at`)
+    # use_count: total times this page has been a query hit (frontmatter `use_count`)
+    last_used_at: str = ""
+    use_count: int = 0
 
 
 @dataclass(frozen=True)
@@ -48,6 +54,17 @@ def _split_csv_list(value: str) -> tuple[str, ...]:
     if not text:
         return ()
     return tuple(part.strip().strip("'\"") for part in text.split(",") if part.strip())
+
+
+def _parse_int(value: str) -> int:
+    """Parse a frontmatter integer; return 0 on empty/invalid (spectral-stable fallback)."""
+    text = value.strip()
+    if not text:
+        return 0
+    try:
+        return int(text)
+    except ValueError:
+        return 0
 
 
 def _parse_frontmatter(text: str) -> tuple[dict[str, str], str]:
@@ -110,6 +127,9 @@ def collect_wiki_pages(root: Path) -> tuple[WikiPage, ...]:
                 sources=sources,
                 outbound_links=links,
                 tags=tags,
+                updated=frontmatter.get("updated", ""),
+                last_used_at=frontmatter.get("last_used_at", ""),
+                use_count=_parse_int(frontmatter.get("use_count", "0")),
             )
         )
     return tuple(pages)
