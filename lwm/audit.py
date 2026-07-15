@@ -24,6 +24,16 @@ class AuditReport:
     cbmem_projects_total: int = 0
 
     @property
+    def sections(self) -> tuple["AuditSection", ...]:
+        """Read-only summary view used by :mod:`lwm.health`."""
+
+        return (
+            AuditSection(name="analyze", issues=self.analysis_errors),
+            AuditSection(name="schema", issues=self.schema_issues),
+            AuditSection(name="review", issues=self.review_items),
+        )
+
+    @property
     def ok(self) -> bool:
         eval_ok = self.eval_total == 0 or self.eval_pass == self.eval_total
         return (
@@ -32,6 +42,12 @@ class AuditReport:
             and self.review_items == 0
             and eval_ok
         )
+
+
+@dataclass(frozen=True)
+class AuditSection:
+    name: str
+    issues: int
 
 
 def _check_cbmem_indexed(root: Path) -> tuple[int, int]:

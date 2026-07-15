@@ -7,6 +7,7 @@
     "codex": "AGENTS.md",
     "claude-code": "CLAUDE.md",
     "github-copilot": "copilot-instructions.md",
+    "vscode": "~/.copilot/instructions/llm-workmem.instructions.md",
     "kiro": "kiro-steering-llm-workmem.md",
     "trae": "traerules",
     "antigravity": "antigravity-agents.md",
@@ -14,6 +15,7 @@
     "minimax": "minimax-agent.md",
     "cursor": "cursor-rules.mdc",
     "gemini-cli": "gemini-context.md",
+    "opencode": "~/.config/opencode/AGENTS.md",
     "shell": "llm-workmem-shell-context.sh"
   }
 }

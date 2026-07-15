@@ -1,0 +1,12 @@
+{
+  "userSettings": {
+    "browserJsExecutionPolicy": "BROWSER_JS_EXECUTION_POLICY_ALWAYS_ASK",
+    "customThemeSeedsLight": {
+      "background": "#F5F5F5",
+      "foregroundOverride": "#383A42",
+      "primary": "#4078F2"
+    },
+    "remoteControlHostname": "10-0-0-55-hidden-jet",
+    "themeMode": "THEME_MODE_LIGHT"
+  }
+}

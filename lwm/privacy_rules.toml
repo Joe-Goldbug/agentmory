@@ -1,0 +1,11 @@
+# Optional privacy filter extensions. All entries are appended to the built-in defaults.
+# Strings use double or single quotes. Comments start with #.
+# Leave the file empty (just this header) to use the defaults only.
+
+path_block_patterns = [
+  # "(^|/)your-org-secret(/|$)",
+]
+
+path_block_names = [
+  # "credentials-prod.json",
+]

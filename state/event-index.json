@@ -1,0 +1,272 @@
+{
+  "f9cecee8-d5d7-41bc-95ff-b14d015ea7ed": {
+    "key": "7e908b46f67ec18f2090840a8597c9221eeed34a",
+    "tool": "claude-code",
+    "project_id": "git-lwm",
+    "event_type": "session_summary",
+    "timestamp": "2026-07-11T21:44:52+08:00",
+    "bucket": "processed",
+    "file": "/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/raw/events/processed/2026-07-11/f9cecee8-d5d7-41bc-95ff-b14d015ea7ed.json"
+  },
+  "13561c88-5c8b-4772-b684-723726553d5f": {
+    "key": "6b122d96e3be5e4e27477d11a574055b8cd79070",
+    "tool": "codex",
+    "project_id": "git-lwm",
+    "event_type": "session_summary",
+    "timestamp": "2026-07-11T21:45:00+08:00",
+    "bucket": "processed",
+    "file": "/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/raw/events/processed/2026-07-11/13561c88-5c8b-4772-b684-723726553d5f.json"
+  },
+  "a76d0b8f-9e32-4a15-a85f-8ec6226b1cb3": {
+    "key": "77de0ddeaa238039fe22b249c59cefadc242ff44",
+    "tool": "trae",
+    "project_id": "git-lwm",
+    "event_type": "workflow_observation",
+    "timestamp": "2026-07-11T21:45:00+08:00",
+    "bucket": "processed",
+    "file": "/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/raw/events/processed/2026-07-11/a76d0b8f-9e32-4a15-a85f-8ec6226b1cb3.json"
+  },
+  "16c073d3-ee44-43fb-b9a8-4fb55118edbe": {
+    "key": "a359b6c369a34856ea5d4dd107ccab0dc8ab040b",
+    "tool": "shell",
+    "project_id": "git-9f1cb19971812dd3",
+    "event_type": "workflow_observation",
+    "timestamp": "2026-07-11T21:52:33+08:00",
+    "bucket": "processed",
+    "file": "/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/raw/events/processed/2026-07-11/16c073d3-ee44-43fb-b9a8-4fb55118edbe.json"
+  },
+  "132ac86c-e54c-49bf-a49e-713b232458d8": {
+    "key": "e9958043e82d545de0cb93915a7b93a80ffa3d51",
+    "tool": "codex",
+    "project_id": "git-9f1cb19971812dd3",
+    "event_type": "verification",
+    "timestamp": "2026-07-11T22:18:53+08:00",
+    "bucket": "processed",
+    "file": "/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/raw/events/processed/2026-07-11/132ac86c-e54c-49bf-a49e-713b232458d8.json"
+  },
+  "f617bd36-c02c-48de-9e3b-7275d14cc123": {
+    "key": "bc14bedabca530dad4964a65a3aacd5d1148a817",
+    "tool": "trae",
+    "project_id": "git-9f1cb19971812dd3",
+    "event_type": "verification",
+    "timestamp": "2026-07-11T22:18:53+08:00",
+    "bucket": "processed",
+    "file": "/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/raw/events/processed/2026-07-11/f617bd36-c02c-48de-9e3b-7275d14cc123.json"
+  },
+  "72b2a5b2-0d87-4098-abbb-7fc0bed5bc87": {
+    "key": "7ee71658f600e38da2127e8edc50248e087f8a3c",
+    "tool": "claude-code",
+    "project_id": "git-9f1cb19971812dd3",
+    "event_type": "verification",
+    "timestamp": "2026-07-11T23:46:40+08:00",
+    "bucket": "processed",
+    "file": "/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/raw/events/processed/2026-07-11/72b2a5b2-0d87-4098-abbb-7fc0bed5bc87.json"
+  },
+  "b282cff8-a488-414b-a700-737c1a169c3e": {
+    "key": "2ad2a0993ec857b58bde89377e098073c589e108",
+    "tool": "claude-code",
+    "project_id": "git-lwm",
+    "event_type": "workflow_observation",
+    "timestamp": "2026-07-11T23:28:47+08:00",
+    "bucket": "processed",
+    "file": "/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/raw/events/processed/2026-07-11/b282cff8-a488-414b-a700-737c1a169c3e.json"
+  },
+  "cea7de30-8194-44c8-9a6c-3bf41cba7fb7": {
+    "key": "269708f07ec6ff9231f5ad547ef26994815dd7ea",
+    "tool": "trae",
+    "project_id": "git-9f1cb19971812dd3",
+    "event_type": "verification",
+    "timestamp": "2026-07-11T23:46:41+08:00",
+    "bucket": "processed",
+    "file": "/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/raw/events/processed/2026-07-11/cea7de30-8194-44c8-9a6c-3bf41cba7fb7.json"
+  },
+  "ebae72e9-a112-4e79-a3f6-6af71d642d55": {
+    "key": "a94291f06da81221fb300e8d575a1470a376212b",
+    "tool": "codex",
+    "project_id": "git-9f1cb19971812dd3",
+    "event_type": "verification",
+    "timestamp": "2026-07-11T23:46:41+08:00",
+    "bucket": "processed",
+    "file": "/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/raw/events/processed/2026-07-11/ebae72e9-a112-4e79-a3f6-6af71d642d55.json"
+  },
+  "0006e0b7-7442-4279-90fb-6521059b6d89": {
+    "key": "cee583f908528d4b19d5a02c1ff8d607f29f586f",
+    "tool": "codex",
+    "project_id": "git-9f1cb19971812dd3",
+    "event_type": "workflow_observation",
+    "timestamp": "2026-07-11T23:57:09+08:00",
+    "bucket": "processed",
+    "file": "/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/raw/events/processed/2026-07-11/0006e0b7-7442-4279-90fb-6521059b6d89.json"
+  },
+  "03c104a7-ae04-494b-af6a-7a8b86657b3c": {
+    "key": "f3c0f1a000c0cd942561b12c8775ae3f7332a0be",
+    "tool": "codex",
+    "project_id": "git-9f1cb19971812dd3",
+    "event_type": "workflow_observation",
+    "timestamp": "2026-07-12T11:47:19+08:00",
+    "bucket": "processed",
+    "file": "/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/raw/events/processed/2026-07-12/03c104a7-ae04-494b-af6a-7a8b86657b3c.json"
+  },
+  "5fde6b82-5985-46f3-bc97-0879990b7a60": {
+    "key": "5df67b54793bd61a959a8b38975e6dda0ebab590",
+    "tool": "claude-code",
+    "project_id": "adhoc-8450de1cce500204",
+    "event_type": "session_start",
+    "timestamp": "2026-07-12T22:06:50+08:00",
+    "bucket": "processed",
+    "file": "/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/raw/events/processed/2026-07-12/5fde6b82-5985-46f3-bc97-0879990b7a60.json"
+  },
+  "558040e1-d6d3-4e68-a388-96b4bab57f53": {
+    "key": "37520edc964aad729790bcf067dde1d5f28d5b87",
+    "tool": "claude-code",
+    "project_id": "git-2e3809ec9a6ed4a1",
+    "event_type": "session_summary",
+    "timestamp": "2026-07-12T22:33:58+08:00",
+    "bucket": "processed",
+    "file": "/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/raw/events/processed/2026-07-12/558040e1-d6d3-4e68-a388-96b4bab57f53.json"
+  },
+  "8a533dbe-e38c-4f44-af6e-29b5317e6458": {
+    "key": "faf4590388e7eaaeb653640d2eef222aec953c7e",
+    "tool": "claude-code",
+    "project_id": "git-9f1cb19971812dd3",
+    "event_type": "session_summary",
+    "timestamp": "2026-07-12T22:26:17+08:00",
+    "bucket": "processed",
+    "file": "/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/raw/events/processed/2026-07-12/8a533dbe-e38c-4f44-af6e-29b5317e6458.json"
+  },
+  "00894d6a-9460-43d3-b93f-36110f7ae69f": {
+    "key": "5a60021fe60ff8b3bd849b01f1cc400aa87bd523",
+    "tool": "codex",
+    "project_id": "git-9f1cb19971812dd3",
+    "event_type": "workflow_observation",
+    "timestamp": "2026-07-13T00:02:54+08:00",
+    "bucket": "processed",
+    "file": "/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/raw/events/processed/2026-07-13/00894d6a-9460-43d3-b93f-36110f7ae69f.json"
+  },
+  "e36c08c8-cfae-4463-8a74-eef784df7ecd": {
+    "key": "317b4d8e46c6a506c4b88655d2bed95594a2534c",
+    "tool": "shell",
+    "project_id": "git-9f1cb19971812dd3",
+    "event_type": "workflow_observation",
+    "timestamp": "2026-07-13T00:08:09+08:00",
+    "bucket": "processed",
+    "file": "/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/raw/events/processed/2026-07-13/e36c08c8-cfae-4463-8a74-eef784df7ecd.json"
+  },
+  "96782ba3-b229-4c5e-b6b4-4aa3427c3587": {
+    "key": "d657084fd41e0f9293907715300a1a9b79f04aca",
+    "tool": "opencode",
+    "project_id": "git-9f1cb19971812dd3",
+    "event_type": "session_summary",
+    "timestamp": "2026-07-13T00:10:36+08:00",
+    "bucket": "processed",
+    "file": "/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/raw/events/processed/2026-07-13/96782ba3-b229-4c5e-b6b4-4aa3427c3587.json"
+  },
+  "a7922d10-718f-46a8-9cbe-26200dedef59": {
+    "key": "191165dcdf3c34634da868ed7d21614e83fc25ad",
+    "tool": "codex",
+    "project_id": "git-9f1cb19971812dd3",
+    "event_type": "verification",
+    "timestamp": "2026-07-13T12:51:48+08:00",
+    "bucket": "processed",
+    "file": "/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/raw/events/processed/2026-07-13/a7922d10-718f-46a8-9cbe-26200dedef59.json"
+  },
+  "dc7af3e5-c30b-4d2d-9501-02a6a937323b": {
+    "key": "d4cd55e565a2d1bc3dbdab401a1717fde33cf447",
+    "tool": "codex",
+    "project_id": "git-9f1cb19971812dd3",
+    "event_type": "session_summary",
+    "timestamp": "2026-07-13T13:06:29+08:00",
+    "bucket": "processed",
+    "file": "/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/raw/events/processed/2026-07-13/dc7af3e5-c30b-4d2d-9501-02a6a937323b.json"
+  },
+  "1c7ffdd1-ce16-4d80-9010-bceda91c51a3": {
+    "key": "1b86113e8ec00d4d6cdc4c8e0c73a466f57135c1",
+    "tool": "minimax",
+    "project_id": "git-9f1cb19971812dd3",
+    "event_type": "workflow_observation",
+    "timestamp": "2026-07-13T14:07:32+08:00",
+    "bucket": "processed",
+    "file": "/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/raw/events/processed/2026-07-13/1c7ffdd1-ce16-4d80-9010-bceda91c51a3.json"
+  },
+  "88b63cdf-6029-4278-9f16-cfd041091e9b": {
+    "key": "9888fc3cfa5eb32139b7c3bc87b9b6dd0272469b",
+    "tool": "codex",
+    "project_id": "git-04a225738903a395",
+    "event_type": "verification",
+    "timestamp": "2026-07-13T15:46:45+08:00",
+    "bucket": "processed",
+    "file": "/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/raw/events/processed/2026-07-13/88b63cdf-6029-4278-9f16-cfd041091e9b.json"
+  },
+  "9c420d93-6615-4aee-aba9-877544972835": {
+    "key": "ddd0277c9197f6d045a664b9b32c62ad0b5f91de",
+    "tool": "codex",
+    "project_id": "git-04a225738903a395",
+    "event_type": "workflow_observation",
+    "timestamp": "2026-07-13T16:08:28+08:00",
+    "bucket": "processed",
+    "file": "/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/raw/events/processed/2026-07-13/9c420d93-6615-4aee-aba9-877544972835.json"
+  },
+  "02fb8774-8231-45bb-904d-28fb617a1b06": {
+    "key": "e527ba17ddd0babfedf557a4fa85259d658e9e09",
+    "tool": "codex",
+    "project_id": "git-9f1cb19971812dd3",
+    "event_type": "workflow_observation",
+    "timestamp": "2026-07-14T20:17:40+08:00",
+    "bucket": "processed",
+    "file": "/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/raw/events/processed/2026-07-14/02fb8774-8231-45bb-904d-28fb617a1b06.json"
+  },
+  "4413daf1-87fe-419b-a117-5a2662969c18": {
+    "key": "7a85f34cfb41608ba19b702f6dd30da4df9ad129",
+    "tool": "codex",
+    "project_id": "git-9f1cb19971812dd3",
+    "event_type": "workflow_observation",
+    "timestamp": "2026-07-14T20:10:20+08:00",
+    "bucket": "processed",
+    "file": "/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/raw/events/processed/2026-07-14/4413daf1-87fe-419b-a117-5a2662969c18.json"
+  },
+  "fca1a08e-ddf9-4259-8b49-b7bb616e8fce": {
+    "key": "38a8c08d76c73a9ab2b7d6ca70500155438031af",
+    "tool": "claude-code",
+    "project_id": "adhoc-8450de1cce500204",
+    "event_type": "session_start",
+    "timestamp": "2026-07-14T11:48:13+08:00",
+    "bucket": "processed",
+    "file": "/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/raw/events/processed/2026-07-14/fca1a08e-ddf9-4259-8b49-b7bb616e8fce.json"
+  },
+  "7102ff61-28e2-4e1e-8486-b8db347e78e9": {
+    "key": "27e7ede29fe29be1b4e4dd197fc667c844d8df78",
+    "tool": "codex",
+    "project_id": "git-9f1cb19971812dd3",
+    "event_type": "verification",
+    "timestamp": "2026-07-14T20:23:42+08:00",
+    "bucket": "processed",
+    "file": "/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/raw/events/processed/2026-07-14/7102ff61-28e2-4e1e-8486-b8db347e78e9.json"
+  },
+  "00c14936-dad9-4bd2-9c40-c1e24b50d046": {
+    "key": "4357f0f133a78777101ad4984363198c2ac487d3",
+    "tool": "minimax",
+    "project_id": "git-9f1cb19971812dd3",
+    "event_type": "workflow_observation",
+    "timestamp": "2026-07-14T20:36:02+08:00",
+    "bucket": "processed",
+    "file": "/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/raw/events/processed/2026-07-14/00c14936-dad9-4bd2-9c40-c1e24b50d046.json"
+  },
+  "1e68e7a2-3703-4211-98ba-51a39a1f3f64": {
+    "key": "1fd38100a3b0bc811761ce1824c2a2f07ded7f60",
+    "tool": "codex",
+    "project_id": "git-9f1cb19971812dd3",
+    "event_type": "verification",
+    "timestamp": "2026-07-15T15:44:14+08:00",
+    "bucket": "processed",
+    "file": "/Users/ethan/Library/Application Support/llm-workmem-runtime/llm-workmem/raw/events/processed/2026-07-15/1e68e7a2-3703-4211-98ba-51a39a1f3f64.json"
+  },
+  "e561098a-a22b-4e3e-8d41-6c732f3909dd": {
+    "key": "d93b702e48fad5e89d41d3176d0bfcf2cd563cf7",
+    "tool": "codex",
+    "project_id": "git-9f1cb19971812dd3",
+    "event_type": "verification",
+    "timestamp": "2026-07-15T15:43:26+08:00",
+    "bucket": "processed",
+    "file": "/Users/ethan/Library/Application Support/llm-workmem-runtime/llm-workmem/raw/events/processed/2026-07-15/e561098a-a22b-4e3e-8d41-6c732f3909dd.json"
+  }
+}

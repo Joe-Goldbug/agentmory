@@ -10,7 +10,7 @@ Use when the user wants `llm-workmem` to run on a schedule and keep its working 
 
 Run `lwm schedule <wiki-root>` to write a launchd script under `automation/bin/` and a plist under `automation/launchd/`.
 
-The generated job runs at load and every 12 hours after that. It performs a source-drift watch first, then audits the current wiki state. If the machine sleeps or is powered off, launchd resumes on the next load/wake cycle and the next eligible interval.
+The generated job runs at load and every 3 hours after that. It performs a source-drift watch first, then audits the current wiki state. If the machine sleeps or is powered off, launchd resumes on the next load/wake cycle and the next eligible interval.
 
 ### 2. Hand off activation
 

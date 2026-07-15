@@ -12,6 +12,19 @@ from lwm.audit import AuditReport, render_audit_report, run_audit
 from lwm.harvest import configured_source_groups, harvest_sources
 
 
+_SKIP_DIR_NAMES = frozenset({
+    ".git",
+    ".venv",
+    "node_modules",
+    "__pycache__",
+    ".cache",
+    "Caches",
+    "cache",
+})
+_MAX_FINGERPRINT_FILES = 5000
+_MAX_FINGERPRINT_BYTES = 50 * 1024 * 1024
+
+
 @dataclass(frozen=True)
 class WatchState:
     generated_at: str
@@ -47,15 +60,23 @@ def _file_fingerprint(path: Path) -> str:
             return f"file:{_sha256_text(path.read_text(encoding='utf-8', errors='ignore'))}"
         if path.is_dir():
             entries: list[str] = []
+            total_bytes = 0
             for item in sorted(path.rglob("*")):
                 if not item.is_file():
                     continue
+                if any(part in _SKIP_DIR_NAMES for part in item.relative_to(path).parts):
+                    continue
                 try:
                     rel = item.relative_to(path).as_posix()
-                    digest = _sha256_text(item.read_text(encoding="utf-8", errors="ignore"))
+                    stat = item.stat()
+                    total_bytes += stat.st_size
+                    digest = f"{stat.st_size}:{stat.st_mtime_ns}"
                 except OSError:
                     continue
                 entries.append(f"{rel}:{digest}")
+                if len(entries) >= _MAX_FINGERPRINT_FILES or total_bytes >= _MAX_FINGERPRINT_BYTES:
+                    entries.append("<fingerprint-truncated>")
+                    break
             return "dir:" + _sha256_text("\n".join(entries))
         return "unknown"
     except OSError:

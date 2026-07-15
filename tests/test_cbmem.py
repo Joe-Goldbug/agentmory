@@ -136,14 +136,11 @@ def patched_run():
         yield pr, captured
 
 
-def test_doctor_calls_indexed_with_dot_path(stub_cbmem_binary: Path, patched_run) -> None:
+def test_doctor_calls_version(stub_cbmem_binary: Path, patched_run) -> None:
     pr, calls = patched_run
     cbmem.doctor()
     cmd = calls[0][0]
-    assert cmd[1:3] == ("cli", "indexed")
-    assert json.loads(cmd[3]) == {"path": "."}
-    # doctor MUST NOT send --json (per spec Task 8.1)
-    assert "--json" not in cmd
+    assert cmd[1:] == ("--version",)
 
 
 def test_index_project_uses_index_repository_tool(
@@ -154,7 +151,8 @@ def test_index_project_uses_index_repository_tool(
     cmd = calls[0][0]
     assert cmd[3] == "index_repository"
     payload = json.loads(cmd[4])
-    assert payload["path"] == str(tmp_path.resolve())
+    assert payload["repo_path"] == str(tmp_path.resolve())
+    assert payload["persistence"] is True
     assert payload["force"] is True
     assert calls[0][1]["cwd"] == str(tmp_path.resolve())
 
@@ -166,7 +164,7 @@ def test_index_status_passes_path_only(
     cbmem.index_status(tmp_path)
     cmd = calls[0][0]
     assert cmd[3] == "index_status"
-    assert json.loads(cmd[4]) == {"path": str(tmp_path.resolve())}
+    assert json.loads(cmd[4]) == {"project": str(tmp_path.resolve())}
 
 
 def test_search_rejects_empty_query(tmp_path: Path) -> None:
@@ -180,9 +178,9 @@ def test_search_passes_query_and_limit(
     pr, calls = patched_run
     cbmem.search(tmp_path, "foo", limit=7)
     cmd = calls[0][0]
-    assert cmd[3] == "search"
+    assert cmd[3] == "search_graph"
     payload = json.loads(cmd[4])
-    assert payload == {"path": str(tmp_path.resolve()), "query": "foo", "limit": 7}
+    assert payload == {"project": str(tmp_path.resolve()), "query": "foo", "limit": 7}
 
 
 def test_architecture_uses_get_architecture_tool(
@@ -192,7 +190,7 @@ def test_architecture_uses_get_architecture_tool(
     cbmem.architecture(tmp_path)
     cmd = calls[0][0]
     assert cmd[3] == "get_architecture"
-    assert json.loads(cmd[4]) == {"path": str(tmp_path.resolve())}
+    assert json.loads(cmd[4]) == {"project": str(tmp_path.resolve())}
 
 
 def test_trace_path_passes_symbol_and_depth(
@@ -203,7 +201,7 @@ def test_trace_path_passes_symbol_and_depth(
     cmd = calls[0][0]
     assert cmd[3] == "trace_path"
     assert json.loads(cmd[4]) == {
-        "path": str(tmp_path.resolve()),
+        "project": str(tmp_path.resolve()),
         "symbol": "run_query",
         "depth": 2,
     }
@@ -234,7 +232,7 @@ def test_dead_code_uses_dead_code_tool(
     cbmem.dead_code(tmp_path)
     cmd = calls[0][0]
     assert cmd[3] == "dead_code"
-    assert json.loads(cmd[4]) == {"path": str(tmp_path.resolve())}
+    assert json.loads(cmd[4]) == {"project": str(tmp_path.resolve())}
 
 
 def test_semantic_search_uses_semantic_query_tool(
@@ -243,10 +241,10 @@ def test_semantic_search_uses_semantic_query_tool(
     pr, calls = patched_run
     cbmem.semantic_search(tmp_path, "near-cache", limit=4)
     cmd = calls[0][0]
-    assert cmd[3] == "semantic_query"
+    assert cmd[3] == "search_graph"
     assert json.loads(cmd[4]) == {
-        "path": str(tmp_path.resolve()),
-        "query": "near-cache",
+        "project": str(tmp_path.resolve()),
+        "semantic_query": ["near-cache"],
         "limit": 4,
     }
 

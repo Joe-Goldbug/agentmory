@@ -11,7 +11,12 @@ from pathlib import Path
 from lwm.raw_tracker import scan_directory
 
 
-IGNORED_PREFIXES = ("tool-snapshots/",)
+IGNORED_PREFIXES = (
+    "tool-snapshots/",
+    # Event JSON is operational queue data. It is consumed by lwm ingest and
+    # must never become one generic wiki summary page per event.
+    "events/",
+)
 
 
 @dataclass(frozen=True)

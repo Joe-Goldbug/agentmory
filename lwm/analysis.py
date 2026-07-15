@@ -97,7 +97,11 @@ def _slug_for_path(path: Path) -> str:
 
 
 def _is_ignored_page(path: Path) -> bool:
-    return path.name in {"log.md"}
+    if path.name in {"log.md"}:
+        return True
+    # Legacy releases compiled raw/events JSON into summary pages. Keep those
+    # files as historical evidence, but exclude them from the live wiki graph.
+    return path.parent.name == "summaries" and path.name.startswith("source-events-")
 
 
 def collect_wiki_pages(root: Path) -> tuple[WikiPage, ...]:
@@ -165,6 +169,10 @@ def analyze_wiki(root: Path) -> WikiAnalysis:
 
     for page in pages:
         for link in page.outbound_links:
+            # Legacy event-summary links may remain in generated index/radar
+            # pages. Event JSON is operational data, not a wiki graph node.
+            if link.startswith("source-events-"):
+                continue
             targets = slug_map.get(link)
             if not targets:
                 broken_links.append((page.rel_path, link))
@@ -183,13 +191,19 @@ def analyze_wiki(root: Path) -> WikiAnalysis:
                 missing_sources.append((page.rel_path, source))
 
     ignored_orphans = {"wiki/index.md", "wiki/overview.md"}
+    # Auto-generated project memory pages legitimately live without being
+    # linked from other wiki pages; only the inherited index / overview are
+    # considered structural orphans by the same rules.
+    ignored_orphans.update(
+        {p.rel_path for p in pages if p.page_type == "project"}
+    )
     orphan_pages = tuple(
         sorted(
             page.rel_path
             for page in pages
             if page.rel_path not in ignored_orphans
             and inbound_counts.get(page.rel_path, 0) == 0
-            and page.page_type not in {"overview", "insight", "review"}
+            and page.page_type not in {"overview", "insight", "review", "project"}
         )
     )
 

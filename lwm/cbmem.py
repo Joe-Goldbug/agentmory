@@ -15,15 +15,14 @@ Install (one-time, on the user's machine):
     chmod +x ~/bin/codebase-memory-mcp
 
     # Verify
-    cbmem cli indexed '{}'   # returns 0 if binary works
+    cbmem --version
 
 Binary CLI contract (verified by inspecting the binary):
     Usage: codebase-memory-mcp cli [--progress] [--json] <tool_name> [json_args]
 
 Where ``<tool_name>`` is one of:
-    indexed, index_status, index_repository, search, search_code,
-    search_graph, search_mode, search_prepare, trace_path, trace_call_path,
-    get_architecture, detect_changes, dead_code, semantic_query, ...
+    index_status, index_repository, search_graph, search_code,
+    trace_path, get_architecture, detect_changes, dead_code, ...
 
 The ``[json_args]`` is a JSON-encoded object passed as a single argv.
 
@@ -173,16 +172,34 @@ def _run(
 
 
 def doctor(*, timeout: float = 15.0) -> CbmemResult:
-    """Check binary health by asking for the indexed-status of a fake project.
-
-    This works because ``indexed`` only needs a project path; we pass ``.``
-    and check whether the binary responds at all. We deliberately do not
-    pass ``--json`` here — the wrapper only needs ``result.ok``, and
-    emitting JSON forces the binary to round-trip the payload through its
-    encoder, which is wasted work for a liveness check.
-    """
+    """Check binary health without requiring an indexed project."""
     binary = resolve_binary()
-    return _run(binary, "indexed", {"path": "."}, timeout=timeout, as_json=False)
+    cmd = (binary, "--version")
+    try:
+        proc = subprocess.run(  # noqa: S603 — controlled binary, controlled args
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            check=False,
+        )
+    except FileNotFoundError as exc:
+        raise CbmemNotFoundError(f"Binary {binary!r} disappeared mid-run") from exc
+    except subprocess.TimeoutExpired as exc:
+        return CbmemResult(
+            ok=False,
+            command=cmd,
+            returncode=124,
+            stdout=exc.stdout or "",
+            stderr=(exc.stderr or "") + f"\n[cbmem] timeout after {timeout}s",
+        )
+    return CbmemResult(
+        ok=proc.returncode == 0,
+        command=cmd,
+        returncode=proc.returncode,
+        stdout=proc.stdout,
+        stderr=proc.stderr,
+    )
 
 
 def index_project(
@@ -194,7 +211,9 @@ def index_project(
     """Build or refresh the code graph for ``project_dir``."""
     binary = resolve_binary()
     project = project_dir.resolve()
-    payload = {"path": str(project), "force": force}
+    payload = {"repo_path": str(project), "persistence": True}
+    if force:
+        payload["force"] = True
     return _run(binary, "index_repository", payload, cwd=project, timeout=timeout)
 
 
@@ -203,7 +222,7 @@ def index_status(project_dir: Path, *, timeout: float = 15.0) -> CbmemResult:
     binary = resolve_binary()
     project = project_dir.resolve()
     return _run(
-        binary, "index_status", {"path": str(project)}, cwd=project, timeout=timeout
+        binary, "index_status", {"project": str(project)}, cwd=project, timeout=timeout
     )
 
 
@@ -221,8 +240,8 @@ def search(
     project = project_dir.resolve()
     return _run(
         binary,
-        "search",
-        {"path": str(project), "query": query, "limit": limit},
+        "search_graph",
+        {"project": str(project), "query": query, "limit": limit},
         cwd=project,
         timeout=timeout,
     )
@@ -233,7 +252,11 @@ def architecture(project_dir: Path, *, timeout: float = 30.0) -> CbmemResult:
     binary = resolve_binary()
     project = project_dir.resolve()
     return _run(
-        binary, "get_architecture", {"path": str(project)}, cwd=project, timeout=timeout
+        binary,
+        "get_architecture",
+        {"project": str(project)},
+        cwd=project,
+        timeout=timeout,
     )
 
 
@@ -250,7 +273,7 @@ def trace_path(
     return _run(
         binary,
         "trace_path",
-        {"path": str(project), "symbol": symbol, "depth": depth},
+        {"project": str(project), "symbol": symbol, "depth": depth},
         cwd=project,
         timeout=timeout,
     )
@@ -268,7 +291,7 @@ def detect_changes(
     return _run(
         binary,
         "detect_changes",
-        {"path": str(project), "base": base},
+        {"project": str(project), "base": base},
         cwd=project,
         timeout=timeout,
     )
@@ -279,7 +302,7 @@ def dead_code(project_dir: Path, *, timeout: float = 60.0) -> CbmemResult:
     binary = resolve_binary()
     project = project_dir.resolve()
     return _run(
-        binary, "dead_code", {"path": str(project)}, cwd=project, timeout=timeout
+        binary, "dead_code", {"project": str(project)}, cwd=project, timeout=timeout
     )
 
 
@@ -295,8 +318,8 @@ def semantic_search(
     project = project_dir.resolve()
     return _run(
         binary,
-        "semantic_query",
-        {"path": str(project), "query": query, "limit": limit},
+        "search_graph",
+        {"project": str(project), "semantic_query": query.split(), "limit": limit},
         cwd=project,
         timeout=timeout,
     )

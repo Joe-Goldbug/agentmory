@@ -1,0 +1,46 @@
+{
+  "id": "53b4e429-a73d-4183-a577-26f46c51dfb0",
+  "name": "Ather",
+  "projectResources": {
+    "resources": [
+      {
+        "gitFolder": {
+          "folderUri": "file:///Users/ethan/Library/Mobile%20Documents/com~apple~CloudDocs/Downloads/Ather",
+          "defaultBranch": "main"
+        }
+      }
+    ]
+  },
+  "permissionGrants": {
+    "permissionGrants": {
+      "allow": [
+        "command(npx)",
+        "write_file(/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/AntigravitySync/brain/2e5cebed-6298-412a-b694-fb5f5baec963/design_proposals_analysis.md)",
+        "write_file(/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/AntigravitySync/brain/2e5cebed-6298-412a-b694-fb5f5baec963/implementation_plan.md)",
+        "write_file(/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/AntigravitySync/brain/2e5cebed-6298-412a-b694-fb5f5baec963/task.md)",
+        "write_file(/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/AntigravitySync/brain/2e5cebed-6298-412a-b694-fb5f5baec963/walkthrough.md)",
+        "command(npm run)",
+        "write_file(/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/AntigravitySync/brain/2e5cebed-6298-412a-b694-fb5f5baec963/scratch/clean-css.js)",
+        "command(node /Users/ethan/\\.gemini/antigravity/brain/2e5cebed-6298-412a-b694-fb5f5baec963/scratch/clean-css\\.js)",
+        "read_file(/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/llms.txt)",
+        "read_file(/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/wiki/concepts/ai-product-code-iteration-memory.md)",
+        "read_file(/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/wiki/concepts/memory-governance.md)",
+        "read_file(/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem)",
+        "command(bun run)",
+        "command(rm -rf \\.next)",
+        "command(find)",
+        "command(rm apps/web/app/page\\.module\\.css)",
+        "command(cp)",
+        "command(grep)",
+        "command(cd)",
+        "command(bunx)"
+      ]
+    }
+  },
+  "settings": {
+    "fileAccessPolicy": "AGENT_SETTING_POLICY_ASK",
+    "internetPolicy": "AGENT_SETTING_POLICY_ASK",
+    "autoExecutionPolicy": "CASCADE_COMMANDS_AUTO_EXECUTION_OFF",
+    "artifactReviewMode": "ARTIFACT_REVIEW_MODE_ALWAYS"
+  }
+}

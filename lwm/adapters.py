@@ -8,6 +8,8 @@ from pathlib import Path
 
 MARKER_START = "<!-- LLM-WIKI:START -->"
 MARKER_END = "<!-- LLM-WIKI:END -->"
+SHELL_MARKER_START = "# LLM-WIKI:START"
+SHELL_MARKER_END = "# LLM-WIKI:END"
 
 
 @dataclass(frozen=True)
@@ -27,19 +29,23 @@ class AttachReport:
 def _context_block(root: Path, *, project: Path | None = None) -> str:
     root = root.resolve()
     project_line = f"\nProject: `{project}`" if project else ""
+    project_flag = f" --project {project}" if project else ""
+    context_cmd = f"lwm hub context --tool <your-tool-name>{project_flag} {root}"
     return f"""{MARKER_START}
 # LLM-WorkMem Context
 
 Use this llm-workmem as the shared workflow and memory source for this tool.{project_line}
 
 Read order:
-1. `{root / 'llms.txt'}` for compact context.
+0. **On session start**, run `{context_cmd}` to get the latest dynamic context (project memory, recent decisions, open questions). This is always fresher than the static files below.
+1. `{root / 'llms.txt'}` for compact context (fallback if step 0 is unavailable).
 2. `{root / 'wiki' / 'purpose.md'}` for scope and guardrails.
 3. `{root / 'wiki' / 'overview.md'}` for the current synthesis.
 4. `{root / 'llms-full.txt'}` only when deeper context is needed.
 5. `{root / 'llms.json'}` for programmatic page metadata.
 
-Rules:
+Write-back:
+- After meaningful work, emit events via `lwm hub record` so the hub stays current.
 - Treat `raw/` as source evidence, not polished memory.
 - Prefer `wiki/` pages that passed audit over raw snapshots.
 - Keep local project facts local unless they should be promoted through review.
@@ -151,9 +157,13 @@ def _write(path: Path, text: str) -> Path:
 def _merge_marked_block(path: Path, block: str) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     existing = path.read_text(encoding="utf-8") if path.is_file() else ""
-    if MARKER_START in existing and MARKER_END in existing:
-        before = existing.split(MARKER_START, 1)[0].rstrip()
-        after = existing.split(MARKER_END, 1)[1].lstrip()
+    # Detect either HTML markers or shell (# comment) markers.
+    marker_start, marker_end = MARKER_START, MARKER_END
+    if SHELL_MARKER_START in existing and SHELL_MARKER_END in existing and MARKER_START not in existing:
+        marker_start, marker_end = SHELL_MARKER_START, SHELL_MARKER_END
+    if marker_start in existing and marker_end in existing:
+        before = existing.split(marker_start, 1)[0].rstrip()
+        after = existing.split(marker_end, 1)[1].lstrip()
         content = "\n\n".join(part for part in (before, block.rstrip(), after.rstrip()) if part)
     elif existing.strip():
         content = existing.rstrip() + "\n\n" + block.rstrip()
@@ -179,6 +189,26 @@ def _cursor_global_paths(home: Path) -> tuple[Path, ...]:
 
 def _gemini_global_paths(home: Path) -> tuple[Path, ...]:
     return (home / ".gemini" / "GEMINI.md",)
+
+
+def _vscode_global_path(home: Path) -> Path:
+    return home / ".copilot" / "instructions" / "llm-workmem.instructions.md"
+
+
+def _vscode_instruction_block(root: Path) -> str:
+    """VS Code/Copilot user instruction with an explicit global match rule."""
+    return f'''---
+name: llm-workmem
+description: Shared workflow and memory source for all VS Code agent sessions
+applyTo: "**"
+---
+
+{_context_block(root).strip()}
+'''
+
+
+def _opencode_global_path(home: Path) -> Path:
+    return home / ".config" / "opencode" / "AGENTS.md"
 
 
 def _write_gemini_append(path: Path, body: str) -> Path:
@@ -279,6 +309,7 @@ def write_global_adapters(root: Path) -> AdapterReport:
                         "codex": "AGENTS.md",
                         "claude-code": "CLAUDE.md",
                         "github-copilot": "copilot-instructions.md",
+                        "vscode": "~/.copilot/instructions/llm-workmem.instructions.md",
                         "kiro": "kiro-steering-llm-workmem.md",
                         "trae": "traerules",
                         "antigravity": "antigravity-agents.md",
@@ -286,6 +317,7 @@ def write_global_adapters(root: Path) -> AdapterReport:
                         "minimax": "minimax-agent.md",
                         "cursor": "cursor-rules.mdc",
                         "gemini-cli": "gemini-context.md",
+                        "opencode": "~/.config/opencode/AGENTS.md",
                         "shell": "llm-workmem-shell-context.sh",
                     },
                 },
@@ -340,23 +372,32 @@ def install_global_adapters(root: Path, *, home: Path | None = None) -> AttachRe
     block = _context_block(root)
     cursor_block = _cursor_rules_block(root)
     gemini_block = _gemini_block(root)
-    shell_source = f"""{MARKER_START}
+    vscode_block = _vscode_instruction_block(root)
+    shell_source = f"""{SHELL_MARKER_START}
 # LLM-WorkMem shell context
 if [ -f {str(root / 'adapters' / 'llm-workmem-shell-context.sh')!r} ]; then
   source {str(root / 'adapters' / 'llm-workmem-shell-context.sh')!r}
 fi
-{MARKER_END}
+if [ -f {str(home / '.minimax' / 'lwm-shell.sh')!r} ]; then
+  source {str(home / '.minimax' / 'lwm-shell.sh')!r}
+fi
+{SHELL_MARKER_END}
 """
     written = [
         *(_merge_marked_block(path, block) for path in _antigravity_global_paths(home)),
         *(_merge_marked_block(path, block) for path in _minimax_agent_paths(home)),
         _merge_marked_block(home / ".codex" / "AGENTS.md", block),
+        # Claude Code's documented user-scope memory is ~/.claude/CLAUDE.md.
+        # Keep ~/CLAUDE.md as a compatibility entrypoint for older setups.
+        _merge_marked_block(home / ".claude" / "CLAUDE.md", block),
         _merge_marked_block(home / "CLAUDE.md", block),
         _merge_marked_block(home / ".traerules", block),
         _merge_marked_block(home / ".kiro" / "steering" / "llm-workmem.md", block),
         _merge_marked_block(home / ".zshrc", shell_source),
         *(_write_cursor_rule(path, cursor_block) for path in _cursor_global_paths(home)),
         *(_write_gemini_append(path, gemini_block) for path in _gemini_global_paths(home)),
+        _write(_vscode_global_path(home), vscode_block),
+        _merge_marked_block(_opencode_global_path(home), block),
         _write(home / ".config" / "lwm" / "context.json", json.dumps(
             {
                 "wiki_root": str(root),

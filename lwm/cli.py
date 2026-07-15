@@ -38,6 +38,8 @@ from lwm.adapters import (
     render_attach_report,
     write_global_adapters,
 )
+from lwm.central_cli import register as register_central
+
 
 app = typer.Typer(
     name="lwm",
@@ -50,6 +52,7 @@ cbmem_app = typer.Typer(help="Query the codebase-memory graph for any indexed pr
 app.add_typer(raw_app, name="raw")
 app.add_typer(sources_app, name="sources")
 app.add_typer(cbmem_app, name="cbmem")
+register_central(app)
 
 
 def _version_callback(value: bool) -> None:
@@ -91,11 +94,30 @@ def install_global_cmd(
         help="Wiki root directory to install global adapters from",
         exists=False,
     ),
+    home: Path | None = typer.Option(
+        None,
+        "--home",
+        help="Override $HOME (used by tests). Defaults to Path.home().",
+    ),
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        help="Report what would be touched without writing anything.",
+    ),
 ) -> None:
     """Install global Codex/Claude/Trae/Kiro/Antigravity/MiniMax/Cursor/Gemini/shell entrypoints for this user."""
     root = root.resolve()
     write_global_adapters(root)
-    report = install_global_adapters(root)
+    if dry_run:
+        typer.secho("dry-run: skipping install", fg=typer.colors.YELLOW)
+        typer.echo(f"would install adapters from {root} under {home or Path.home()}")
+        raise typer.Exit(0)
+    if home is None:
+        report = install_global_adapters(root)
+    else:
+        from lwm.adapters import install_global_adapters as _install
+
+        report = _install(root, home=home)
     typer.echo(render_attach_report(report).rstrip())
     raise typer.Exit(0)
 
@@ -150,7 +172,7 @@ def cbmem_doctor_cmd() -> None:
             "  tar -xzf /tmp/cbmem.tar.gz -C ~/bin/\n"
             "  rm /tmp/cbmem.tar.gz && chmod +x ~/bin/codebase-memory-mcp\n"
             "  ln -sf ~/bin/codebase-memory-mcp ~/bin/cbmem\n"
-            "Then retry: lwm cbmem doctor",
+            "Then retry: `lwm cbmem doctor`",
             err=True,
             fg=typer.colors.YELLOW,
         )

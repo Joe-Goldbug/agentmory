@@ -9,6 +9,7 @@ from pathlib import Path
 
 LOG_FILENAME = "files.log"
 IGNORED = frozenset({LOG_FILENAME, ".gitkeep", ".DS_Store"})
+IGNORED_PREFIXES = ("events/",)
 
 
 def sha256_of_file(filepath: Path) -> str:
@@ -31,6 +32,8 @@ def scan_directory(raw_dir: Path, _base: Path | None = None) -> dict[str, str]:
             continue
         if item.is_file():
             rel = item.relative_to(_base).as_posix()
+            if any(rel.startswith(prefix) for prefix in IGNORED_PREFIXES):
+                continue
             files[rel] = sha256_of_file(item)
         elif item.is_dir():
             files.update(scan_directory(item, _base))

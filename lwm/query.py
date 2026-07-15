@@ -20,6 +20,14 @@ class QueryHit:
 
 
 @dataclass(frozen=True)
+class RecallPlan:
+    """Explain which evidence dimensions a question needs."""
+
+    dimensions: tuple[str, ...]
+    checks: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class QueryReport:
     root: Path
     query: str
@@ -27,10 +35,45 @@ class QueryReport:
     hits: tuple[QueryHit, ...]
     related: tuple[str, ...]
     notes: tuple[str, ...]
+    plan: RecallPlan | None = None
 
 
 def _tokenize(text: str) -> tuple[str, ...]:
-    return tuple(token for token in re.findall(r"[a-z0-9]+", text.lower()) if token)
+    """Tokenize English, numbers, and Chinese n-grams.
+
+    The previous English-only tokenizer made Chinese questions silently empty.
+    Short Chinese n-grams preserve useful matches without requiring an
+    embedding service or changing the wiki storage format.
+    """
+    lowered = text.lower()
+    tokens: list[str] = list(re.findall(r"[a-z0-9]+", lowered))
+    for run in re.findall(r"[\u4e00-\u9fff]+", lowered):
+        if len(run) <= 4:
+            tokens.append(run)
+        for width in (2, 3, 4):
+            if len(run) >= width:
+                tokens.extend(run[i : i + width] for i in range(len(run) - width + 1))
+    return tuple(dict.fromkeys(token for token in tokens if token))
+
+
+def _recall_plan(question: str) -> RecallPlan:
+    """Choose evidence dimensions before retrieval, inspired by HMS."""
+    q = question.lower()
+    dimensions: list[str] = ["semantic"]
+    checks: list[str] = ["source-backed evidence", "deduplicate repeated matches"]
+    if any(word in q for word in ("何时", "什么时候", "日期", "昨天", "上周", "when", "date")):
+        dimensions.append("time")
+        checks.append("anchor relative dates to an exact timestamp")
+    if any(word in q for word in ("现在", "当前", "最新", "现行", "current", "latest")):
+        dimensions.append("current_state")
+        checks.append("prefer the latest verified state over historical notes")
+    if any(word in q for word in ("冲突", "矛盾", "为什么改", "conflict", "why changed")):
+        dimensions.append("conflict")
+        checks.append("surface competing decisions and their sources")
+    if any(word in q for word in ("项目", "跨项目", "project", "across")):
+        dimensions.append("project")
+        checks.append("separate project-local facts from global rules")
+    return RecallPlan(dimensions=tuple(dict.fromkeys(dimensions)), checks=tuple(checks))
 
 
 def _strip_frontmatter(text: str) -> str:
@@ -252,6 +295,7 @@ def run_query(root: Path, question: str, *, mode: str = "standard", limit: int =
     analysis = analyze_wiki(root)
     pages = collect_wiki_pages(root)
     tokens = _tokenize(question)
+    plan = _recall_plan(question)
 
     # === Exit Gate: when caller passes mode='standard', auto-pick from question shape ===
     if mode == "standard":
@@ -305,7 +349,15 @@ def run_query(root: Path, question: str, *, mode: str = "standard", limit: int =
     trimmed_hits = tuple(hits[:limit])
     related = _find_related_pages(analysis, trimmed_hits) if mode in {"deep", "thesis"} else ()
     notes = _build_notes(question, mode, trimmed_hits, related, analysis)
-    return QueryReport(root=root, query=question, mode=mode, hits=trimmed_hits, related=related, notes=notes)
+    return QueryReport(
+        root=root,
+        query=question,
+        mode=mode,
+        hits=trimmed_hits,
+        related=related,
+        notes=notes,
+        plan=plan,
+    )
 
 
 def _build_notes(
@@ -343,6 +395,12 @@ def render_query_report(report: QueryReport) -> str:
     lines.append("")
     lines.append(f"**Question**: {report.query}")
     lines.append("")
+    if report.plan:
+        lines.append("## Recall Plan")
+        lines.append(f"- Dimensions: {', '.join(report.plan.dimensions)}")
+        for check in report.plan.checks:
+            lines.append(f"- Check: {check}")
+        lines.append("")
     lines.append("## Best Matches")
     if report.hits:
         lines.append("| Page | Type | Score | Why | Excerpt |")

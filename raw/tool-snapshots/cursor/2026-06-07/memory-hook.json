@@ -1,8 +1,0 @@
-{
-  "hooks": {
-    "sessionEnd": {
-      "enabled": false,
-      "description": "Cursor 会话结束"
-    }
-  }
-}

@@ -1,0 +1,20 @@
+{
+  "id": "0351748f-0bde-4b5a-893e-e471a0e9c205",
+  "name": "iDream-new-120.55.71.237",
+  "projectResources": {
+    "resources": [
+      {
+        "gitFolder": {
+          "folderUri": "file:///Users/ethan/Library/Mobile%20Documents/com~apple~CloudDocs/Downloads/iDream-new-120.55.71.237",
+          "defaultBranch": "main"
+        }
+      }
+    ]
+  },
+  "settings": {
+    "fileAccessPolicy": "AGENT_SETTING_POLICY_ASK",
+    "internetPolicy": "AGENT_SETTING_POLICY_ASK",
+    "autoExecutionPolicy": "CASCADE_COMMANDS_AUTO_EXECUTION_OFF",
+    "artifactReviewMode": "ARTIFACT_REVIEW_MODE_ALWAYS"
+  }
+}

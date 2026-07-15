@@ -165,7 +165,10 @@ def default_source_groups() -> tuple[SourceGroupSpec, ...]:
             target_page="wiki/entities/claude-code.md",
             tags=("entity", "tool", "claude-code", "cli"),
             sources=(
-                SourceFileSpec(home / "CLAUDE.md", "global-CLAUDE.md"),
+                SourceFileSpec(home / ".claude" / "CLAUDE.md", "global-CLAUDE.md"),
+                SourceFileSpec(home / ".claude" / "settings.json", "settings.json"),
+                SourceFileSpec(home / ".claude" / "history.jsonl", "history.jsonl"),
+                SourceFileSpec(home / ".claude" / "projects", "session-projects"),
                 SourceFileSpec(documents / "claude-code-config" / "memory" / "MEMORY.md", "MEMORY.md"),
                 SourceFileSpec(documents / "claude-code-config" / "memory", "claude-memory-folder"),
             ),
@@ -627,6 +630,11 @@ def _launch_runner_path(label: str, root: Path) -> Path:
     return root / "automation" / "launchd" / label / "run-harvest.py"
 
 
+def _installed_lwm_path() -> Path:
+    """Return the one runtime used by launchd and all generated schedules."""
+    return Path.home() / "Library" / "Application Support" / "llm-workmem-runtime" / "app" / "venv" / "bin" / "lwm"
+
+
 def _render_launchd_plist(
     label: str,
     root: Path,
@@ -634,7 +642,6 @@ def _render_launchd_plist(
     *,
     launch_runner_path: Path,
 ) -> str:
-    resolved_runner = launch_runner_path.resolve()
     stdout_path = (root / "automation" / "logs" / "harvest.out.log").resolve()
     stderr_path = (root / "automation" / "logs" / "harvest.err.log").resolve()
     return f"""<?xml version="1.0" encoding="UTF-8"?>
@@ -645,8 +652,10 @@ def _render_launchd_plist(
   <string>{label}</string>
   <key>ProgramArguments</key>
   <array>
-    <string>/usr/bin/python3</string>
-    <string>{resolved_runner}</string>
+    <string>{_installed_lwm_path()}</string>
+    <string>hub</string>
+    <string>run-cycle</string>
+    <string>{root.resolve()}</string>
   </array>
   <key>RunAtLoad</key>
   <true/>
@@ -661,7 +670,7 @@ def _render_launchd_plist(
 """
 
 
-def _render_schedule_runner(runtime_root: Path, *, label: str) -> str:
+def _render_schedule_runner(runtime_root: Path, *, label: str, source_root: Path) -> str:
     eval_suite = runtime_root / "wiki" / "eval-suite.txt"
     launch_base = _launch_runner_path(label, runtime_root).parent
     return f'''"""12-hour llm-workmem harvest runner.
@@ -677,8 +686,10 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+SOURCE_ROOT = Path({str(source_root)!r})
 ROOT = Path({str(runtime_root)!r})
 LAUNCH_BASE = Path({str(launch_base)!r})
+sys.path.insert(0, str(SOURCE_ROOT))
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(LAUNCH_BASE))
 
@@ -708,7 +719,7 @@ def write_schedule_bundle(
     runtime_root = materialize_runtime_layout(root)
     script_path = root / "automation" / "bin" / "run-harvest.sh"
     runner_path = root / "automation" / "bin" / "run-harvest.py"
-    launch_runner_path = _launch_runner_path(label, root)
+    launch_runner_path = _launch_runner_path(label, runtime_root)
     launch_base = launch_runner_path.resolve().parent
     plist_path = root / "automation" / "launchd" / f"{label}.plist"
     launch_agents_plist_path = _home() / "Library" / "LaunchAgents" / f"{label}.plist"
@@ -722,13 +733,12 @@ def write_schedule_bundle(
     script_path.write_text(
         f"""#!/bin/zsh
 set -euo pipefail
-cd {shlex.quote(str(runtime_root))}
-/usr/bin/python3 {shlex.quote(str(runner_path))}
+{shlex.quote(str(_installed_lwm_path()))} hub run-cycle {shlex.quote(str(runtime_root))}
 """,
         encoding="utf-8",
     )
     script_path.chmod(0o755)
-    runner_text = _render_schedule_runner(runtime_root, label=label)
+    runner_text = _render_schedule_runner(runtime_root, label=label, source_root=root)
     runner_path.write_text(runner_text, encoding="utf-8")
     runner_path.chmod(0o755)
     launch_runner_path.write_text(runner_text, encoding="utf-8")
@@ -736,7 +746,7 @@ cd {shlex.quote(str(runtime_root))}
     plist_path.write_text(
         _render_launchd_plist(
             label,
-            root,
+            runtime_root,
             interval_seconds,
             launch_runner_path=launch_runner_path,
         ),

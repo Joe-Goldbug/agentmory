@@ -1,0 +1,30 @@
+{
+  "id": "ddfd77a2-9cc5-487d-b4ee-8f689318667c",
+  "name": "GameJam 快乐三人组",
+  "projectResources": {
+    "resources": [
+      {
+        "folderUri": "file:///Users/ethan/Downloads/GameJam%20%E5%BF%AB%E4%B9%90%E4%B8%89%E4%BA%BA%E7%BB%84"
+      }
+    ]
+  },
+  "permissionGrants": {
+    "permissionGrants": {
+      "allow": [
+        "command(mkdir)",
+        "command(cp)",
+        "command(echo)",
+        "command(which)",
+        "command(python3 -c \"from fpdf import FPDF; print\\('FPDF imported successfully'\\)\")",
+        "command(ls)",
+        "command(rm test\\.pdf)"
+      ]
+    }
+  },
+  "settings": {
+    "fileAccessPolicy": "AGENT_SETTING_POLICY_ASK",
+    "internetPolicy": "AGENT_SETTING_POLICY_ASK",
+    "autoExecutionPolicy": "CASCADE_COMMANDS_AUTO_EXECUTION_OFF",
+    "artifactReviewMode": "ARTIFACT_REVIEW_MODE_ALWAYS"
+  }
+}

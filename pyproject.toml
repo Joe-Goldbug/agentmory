@@ -42,7 +42,7 @@ Changelog = "https://github.com/EthanLau1/LLM-WorkMem/blob/main/CHANGELOG.md"
 lwm = "lwm.cli:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["lwm"]
+packages = ["lwm", "adapters"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

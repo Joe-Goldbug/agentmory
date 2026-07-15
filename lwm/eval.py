@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+import fnmatch
 
 from lwm.query import run_query
 
@@ -36,6 +37,11 @@ class EvalReport:
         return len(self.results)
 
 
+def matches_expected_slug(actual: str, expected: str) -> bool:
+    """Match exact slugs and stable glob contracts such as ``tool-harvest-*``."""
+    return fnmatch.fnmatchcase(actual, expected)
+
+
 def parse_eval_suite(path: Path) -> tuple[EvalCase, ...]:
     cases: list[EvalCase] = []
     for raw in path.read_text(encoding="utf-8").splitlines():
@@ -57,11 +63,14 @@ def run_eval(root: Path, suite_path: Path, *, mode: str = "standard", limit: int
     for case in suite:
         report = run_query(root, case.question, mode=mode, limit=limit)
         top_slug = report.hits[0].page.slug if report.hits else ""
+        # Generated pages commonly include a date suffix. Allow eval suites
+        # to express that contract without expiring every morning.
+        passed = matches_expected_slug(top_slug, case.expected_slug)
         results.append(
             EvalResult(
                 case=case,
                 top_slug=top_slug,
-                passed=top_slug == case.expected_slug,
+                passed=passed,
             )
         )
     return EvalReport(root=root, mode=mode, results=tuple(results))

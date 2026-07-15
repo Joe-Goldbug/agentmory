@@ -1,0 +1,30 @@
+{
+  "id": "cad16735-7e3b-4d81-88aa-7e4ef85be56b",
+  "name": "🌙光路Phōtódos",
+  "projectResources": {
+    "resources": [
+      {
+        "gitFolder": {
+          "folderUri": "file:///Users/ethan/Desktop/%F0%9F%8C%99%E5%85%89%E8%B7%AFPho%CC%84to%CC%81dos",
+          "defaultBranch": "main"
+        }
+      }
+    ]
+  },
+  "permissionGrants": {
+    "permissionGrants": {
+      "allow": [
+        "command(git status)",
+        "command(python3 /Users/ethan/\\.gemini/antigravity/brain/d2a9d97a-5636-497c-a68e-1f64d54631bf/scratch/edit_logo\\.py)",
+        "command(python /Users/ethan/\\.gemini/antigravity/brain/d2a9d97a-5636-497c-a68e-1f64d54631bf/scratch/edit_logo_pil\\.py)",
+        "command(python3 -c \"import numpy; import PIL\")"
+      ]
+    }
+  },
+  "settings": {
+    "fileAccessPolicy": "AGENT_SETTING_POLICY_ALLOW",
+    "internetPolicy": "AGENT_SETTING_POLICY_ASK",
+    "autoExecutionPolicy": "CASCADE_COMMANDS_AUTO_EXECUTION_OFF",
+    "artifactReviewMode": "ARTIFACT_REVIEW_MODE_ALWAYS"
+  }
+}

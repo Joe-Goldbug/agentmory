@@ -1,0 +1,56 @@
+{
+  "id": "924c2e43-e3b6-4b67-878a-972e7a660144",
+  "name": "antigravity",
+  "projectResources": {
+    "resources": [
+      {
+        "folderUri": "file:///Users/ethan/Documents/antigravity"
+      }
+    ]
+  },
+  "permissionGrants": {
+    "permissionGrants": {
+      "allow": [
+        "command(mkdir)",
+        "command(cp)",
+        "command(mv)",
+        "command(ln)",
+        "write_file(/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/AntigravitySync/brain/25ca866e-b8a3-4261-a8b1-e4e799f220c0/implementation_plan.md)",
+        "read_url(mp.weixin.qq.com)",
+        "read_file(/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/AntigravitySync/brain/25ca866e-b8a3-4261-a8b1-e4e799f220c0/.system_generated/steps/114/content.md)",
+        "write_file(/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/AntigravitySync/brain/25ca866e-b8a3-4261-a8b1-e4e799f220c0/scratch/fetch_wechat.py)",
+        "command(python3 \"/Users/ethan/\\.gemini/antigravity/brain/25ca866e-b8a3-4261-a8b1-e4e799f220c0/scratch/fetch_wechat\\.py\")",
+        "write_file(/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/AntigravitySync/brain/25ca866e-b8a3-4261-a8b1-e4e799f220c0/scratch/parse_wechat.py)",
+        "command(python3 \"/Users/ethan/\\.gemini/antigravity/brain/25ca866e-b8a3-4261-a8b1-e4e799f220c0/scratch/parse_wechat\\.py\")",
+        "read_file(/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/AntigravitySync/brain/25ca866e-b8a3-4261-a8b1-e4e799f220c0/scratch/wechat_raw.html)",
+        "read_file(/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/AntigravitySync/brain/25ca866e-b8a3-4261-a8b1-e4e799f220c0/scratch/wechat_content.md)",
+        "read_file(/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem)",
+        "command(ls)",
+        "write_file(/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/AntigravitySync/brain/25ca866e-b8a3-4261-a8b1-e4e799f220c0/task.md)",
+        "write_file(/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/projects/antigravity/.agents/AGENTS.md)",
+        "write_file(/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/projects/antigravity/.memory/session.md)",
+        "write_file(/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/projects/antigravity/.memory/STATE.md)",
+        "write_file(/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/AntigravitySync/brain/25ca866e-b8a3-4261-a8b1-e4e799f220c0/walkthrough.md)",
+        "command(cd)",
+        "command(rm \\.agents \\.memory)",
+        "command(rm -rf antigravity)",
+        "command(lwm)",
+        "command(\"/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/\\.venv/bin/lwm\")",
+        "command(launchctl list)",
+        "command(grep)",
+        "read_file(/Users/ethan/Library/LaunchAgents/com.ethan.lwm.harvest.plist)",
+        "command(launchctl load)",
+        "command(/usr/bin/python3 \"/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/automation/launchd/com\\.ethan\\.lwm\\.harvest/run-harvest\\.py\")",
+        "command(\"/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/\\.venv/bin/python3\" \"/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/automation/launchd/com\\.ethan\\.lwm\\.harvest/run-harvest\\.py\")",
+        "read_file(/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/AntigravitySync/brain/cce6676a-7607-4c7a-849e-aad0b3f51e8e/.system_generated/tasks/task-104.log)",
+        "command(find)"
+      ]
+    }
+  },
+  "settings": {
+    "fileAccessPolicy": "AGENT_SETTING_POLICY_ASK",
+    "internetPolicy": "AGENT_SETTING_POLICY_ASK",
+    "autoExecutionPolicy": "CASCADE_COMMANDS_AUTO_EXECUTION_OFF",
+    "artifactReviewMode": "ARTIFACT_REVIEW_MODE_ALWAYS"
+  }
+}

@@ -1,0 +1,295 @@
+{
+  "approved": [
+    {
+      "title": "Recurring tag `claude-code` across 4 projects",
+      "approved": true,
+      "reasons": [],
+      "target": "/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/wiki/global/recurring-tag-claude-code-across-4-projects.md",
+      "at": "2026-07-14T20:21:04+08:00"
+    }
+  ],
+  "rejected": [
+    {
+      "title": "Recurring tag `claude-code` across 2 projects",
+      "approved": false,
+      "reasons": [
+        "needs at least one verification across supporting events"
+      ],
+      "target": null,
+      "at": "2026-07-12T22:07:59+08:00"
+    },
+    {
+      "title": "Recurring tag `claude-code` across 4 projects",
+      "approved": false,
+      "reasons": [
+        "needs at least one verification across supporting events"
+      ],
+      "target": null,
+      "at": "2026-07-12T23:50:58+08:00"
+    },
+    {
+      "title": "Recurring tag `claude-code` across 4 projects",
+      "approved": false,
+      "reasons": [
+        "needs at least one verification across supporting events"
+      ],
+      "target": null,
+      "at": "2026-07-12T23:53:39+08:00"
+    },
+    {
+      "title": "Recurring tag `claude-code` across 4 projects",
+      "approved": false,
+      "reasons": [
+        "needs at least one verification across supporting events"
+      ],
+      "target": null,
+      "at": "2026-07-12T23:54:07+08:00"
+    },
+    {
+      "title": "Recurring tag `claude-code` across 4 projects",
+      "approved": false,
+      "reasons": [
+        "needs at least one verification across supporting events"
+      ],
+      "target": null,
+      "at": "2026-07-13T00:03:06+08:00"
+    },
+    {
+      "title": "Workflow `codex` repeatedly records `(no user prompt)` (3×)",
+      "approved": false,
+      "reasons": [
+        "needs >=2 distinct project_ids",
+        "needs at least one verification across supporting events"
+      ],
+      "target": null,
+      "at": "2026-07-13T00:03:06+08:00"
+    },
+    {
+      "title": "Recurring tag `claude-code` across 4 projects",
+      "approved": false,
+      "reasons": [
+        "needs at least one verification across supporting events"
+      ],
+      "target": null,
+      "at": "2026-07-13T10:34:59+08:00"
+    },
+    {
+      "title": "Workflow `codex` repeatedly records `(no user prompt)` (3×)",
+      "approved": false,
+      "reasons": [
+        "needs >=2 distinct project_ids",
+        "needs at least one verification across supporting events"
+      ],
+      "target": null,
+      "at": "2026-07-13T10:34:59+08:00"
+    },
+    {
+      "title": "Recurring tag `claude-code` across 4 projects",
+      "approved": false,
+      "reasons": [
+        "needs at least one verification across supporting events"
+      ],
+      "target": null,
+      "at": "2026-07-13T12:51:48+08:00"
+    },
+    {
+      "title": "Workflow `codex` repeatedly records `(no user prompt)` (3×)",
+      "approved": false,
+      "reasons": [
+        "needs >=2 distinct project_ids",
+        "needs at least one verification across supporting events"
+      ],
+      "target": null,
+      "at": "2026-07-13T12:51:48+08:00"
+    },
+    {
+      "title": "Recurring tag `claude-code` across 4 projects",
+      "approved": false,
+      "reasons": [
+        "needs at least one verification across supporting events"
+      ],
+      "target": null,
+      "at": "2026-07-13T13:06:29+08:00"
+    },
+    {
+      "title": "Workflow `codex` repeatedly records `(no user prompt)` (3×)",
+      "approved": false,
+      "reasons": [
+        "needs >=2 distinct project_ids",
+        "needs at least one verification across supporting events"
+      ],
+      "target": null,
+      "at": "2026-07-13T13:06:29+08:00"
+    },
+    {
+      "title": "Recurring tag `claude-code` across 4 projects",
+      "approved": false,
+      "reasons": [
+        "needs at least one verification across supporting events"
+      ],
+      "target": null,
+      "at": "2026-07-13T14:07:33+08:00"
+    },
+    {
+      "title": "Workflow `codex` repeatedly records `(no user prompt)` (3×)",
+      "approved": false,
+      "reasons": [
+        "needs >=2 distinct project_ids",
+        "needs at least one verification across supporting events"
+      ],
+      "target": null,
+      "at": "2026-07-13T14:07:33+08:00"
+    },
+    {
+      "title": "Recurring tag `claude-code` across 4 projects",
+      "approved": false,
+      "reasons": [
+        "needs at least one verification across supporting events"
+      ],
+      "target": null,
+      "at": "2026-07-13T17:09:00+08:00"
+    },
+    {
+      "title": "Workflow `codex` repeatedly records `(no user prompt)` (3×)",
+      "approved": false,
+      "reasons": [
+        "needs >=2 distinct project_ids",
+        "needs at least one verification across supporting events"
+      ],
+      "target": null,
+      "at": "2026-07-13T17:09:00+08:00"
+    },
+    {
+      "title": "Recurring tag `claude-code` across 4 projects",
+      "approved": false,
+      "reasons": [
+        "needs at least one verification across supporting events"
+      ],
+      "target": null,
+      "at": "2026-07-14T20:17:51+08:00"
+    },
+    {
+      "title": "Workflow `codex` repeatedly records `(no user prompt)` (4×)",
+      "approved": false,
+      "reasons": [
+        "needs >=2 distinct project_ids",
+        "needs at least one verification across supporting events"
+      ],
+      "target": null,
+      "at": "2026-07-14T20:17:51+08:00"
+    },
+    {
+      "title": "Workflow `codex` repeatedly records `(no user prompt)` (4×)",
+      "approved": false,
+      "reasons": [
+        "needs >=2 distinct project_ids",
+        "needs at least one verification across supporting events"
+      ],
+      "target": null,
+      "at": "2026-07-14T20:21:04+08:00"
+    },
+    {
+      "title": "Recurring tag `claude-code` across 4 projects",
+      "approved": false,
+      "reasons": [
+        "needs at least one verification across supporting events"
+      ],
+      "target": null,
+      "at": "2026-07-14T20:23:55+08:00"
+    },
+    {
+      "title": "Workflow `codex` repeatedly records `(no user prompt)` (4×)",
+      "approved": false,
+      "reasons": [
+        "needs >=2 distinct project_ids",
+        "needs at least one verification across supporting events"
+      ],
+      "target": null,
+      "at": "2026-07-14T20:23:55+08:00"
+    },
+    {
+      "title": "Recurring tag `claude-code` across 4 projects",
+      "approved": false,
+      "reasons": [
+        "needs at least one verification across supporting events"
+      ],
+      "target": null,
+      "at": "2026-07-14T20:36:03+08:00"
+    },
+    {
+      "title": "Workflow `codex` repeatedly records `(no user prompt)` (4×)",
+      "approved": false,
+      "reasons": [
+        "needs >=2 distinct project_ids",
+        "needs at least one verification across supporting events"
+      ],
+      "target": null,
+      "at": "2026-07-14T20:36:03+08:00"
+    },
+    {
+      "title": "Recurring tag `codex` across 2 projects",
+      "approved": false,
+      "reasons": [
+        "needs at least one verification across supporting events"
+      ],
+      "target": null,
+      "at": "2026-07-15T15:44:29+08:00"
+    },
+    {
+      "title": "Recurring tag `session-summary` across 2 projects",
+      "approved": false,
+      "reasons": [
+        "needs at least one verification across supporting events"
+      ],
+      "target": null,
+      "at": "2026-07-15T15:44:29+08:00"
+    },
+    {
+      "title": "Recurring tag `claude-code` across 4 projects",
+      "approved": false,
+      "reasons": [
+        "needs at least one verification across supporting events"
+      ],
+      "target": null,
+      "at": "2026-07-15T15:44:29+08:00"
+    },
+    {
+      "title": "Recurring tag `minimax` across 2 projects",
+      "approved": false,
+      "reasons": [
+        "title already exists in wiki/global/"
+      ],
+      "target": null,
+      "at": "2026-07-15T15:44:29+08:00"
+    },
+    {
+      "title": "Recurring tag `agent-rules` across 2 projects",
+      "approved": false,
+      "reasons": [
+        "needs at least one verification across supporting events"
+      ],
+      "target": null,
+      "at": "2026-07-15T15:44:29+08:00"
+    },
+    {
+      "title": "Workflow `codex` repeatedly records `(no user prompt)` (5×)",
+      "approved": false,
+      "reasons": [
+        "needs >=2 distinct project_ids",
+        "needs at least one verification across supporting events"
+      ],
+      "target": null,
+      "at": "2026-07-15T15:44:29+08:00"
+    },
+    {
+      "title": "Workflow `minimax` repeatedly records `<!-- LLM-WIKI:START -->\n# LLM-WorkMem Context` (3×)",
+      "approved": false,
+      "reasons": [
+        "needs >=2 distinct project_ids",
+        "needs at least one verification across supporting events"
+      ],
+      "target": null,
+      "at": "2026-07-15T15:44:29+08:00"
+    }
+  ]
+}

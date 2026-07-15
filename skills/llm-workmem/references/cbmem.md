@@ -50,7 +50,7 @@ Every subcommand except `doctor`, `index`, and `index-status` requires the proje
 
 ## How cbmem fits into lwm's automation
 
-cbmem is **not** a manual tool. Every launchd cycle (every 12 hours), `lwm watch` calls `harvest_cbmem(root)` which reads `lwm-sources.json::cbmem.projects` and writes dated snapshots under `raw/cbmem-snapshots/<YYYY-MM-DD>/<project>/`. So cbmem output lands in the wiki's raw pipeline automatically — no agent action required once you've listed a project in the config.
+cbmem is **not** a manual tool. Every launchd cycle (every 3 hours), `lwm watch` calls `harvest_cbmem(root)` which reads `lwm-sources.json::cbmem.projects` and writes dated snapshots under `raw/cbmem-snapshots/<YYYY-MM-DD>/<project>/`. So cbmem output lands in the wiki's raw pipeline automatically — no agent action required once you've listed a project in the config.
 
 To add a project to the auto-harvest, edit `lwm-sources.json`:
 
