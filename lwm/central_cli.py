@@ -19,6 +19,7 @@ import json
 import os
 import sys
 import uuid
+from dataclasses import replace
 from pathlib import Path
 from typing import Optional
 
@@ -259,13 +260,19 @@ def context_cmd(
         format=format,
         limit=limit,
     )
-    lwm_capabilities.record(
+    receipt = lwm_capabilities.record(
         root.resolve(),
         tool=tool,
         direction="read",
         project_id=report.project_id,
         source="cli-context",
     )
+    if receipt.get("status") != "verified":
+        warnings = list(report.data.get("warnings") or [])
+        warnings.append(f"Read receipt unavailable: {receipt.get('error', 'unknown error')}")
+        data = {**report.data, "warnings": warnings}
+        markdown = report.markdown.rstrip() + f"\n\nWarning: {warnings[-1]}\n"
+        report = replace(report, markdown=markdown, data=data)
     typer.echo(report.markdown)
 
 

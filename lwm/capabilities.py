@@ -53,8 +53,7 @@ def record(
     if direction not in {"read", "write"}:
         raise ValueError("direction must be read or write")
     key = f"{tool}:{direction}"
-    payload = load(root)
-    payload[key] = {
+    entry = {
         "tool": tool,
         "direction": direction,
         "project_id": project_id,
@@ -63,10 +62,17 @@ def record(
         "status": "verified",
         "recorded_at": _now(),
     }
-    path = _path(root)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    return payload[key]
+    try:
+        payload = load(root)
+        payload[key] = entry
+        path = _path(root)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+        )
+    except (OSError, TypeError, ValueError) as exc:
+        return {**entry, "status": "unavailable", "error": str(exc)}
+    return entry
 
 
 def summary(root: Path) -> dict[str, dict[str, Any]]:
@@ -78,7 +84,9 @@ def summary(root: Path) -> dict[str, dict[str, Any]]:
         out[tool] = {
             "read": reads if isinstance(reads, dict) else {"status": "unverified"},
             "write": writes if isinstance(writes, dict) else {"status": "unverified"},
-            "bidirectional": bool(reads and writes),
+            "bidirectional": bool(
+                reads and writes and reads.get("status") == "verified" and writes.get("status") == "verified"
+            ),
         }
     return out
 
