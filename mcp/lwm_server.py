@@ -1,6 +1,6 @@
 """Minimal MCP-compatible stdio server for the LLM-WorkMem hub.
 
-The server speaks the JSON-RPC 2.0 protocol used by MCP and exposes four
+The server speaks the JSON-RPC 2.0 protocol used by MCP and exposes shared
 tools that read from / write to the same wiki tree used by the CLI:
 
 * ``query_context`` — returns the markdown context for a tool + project.

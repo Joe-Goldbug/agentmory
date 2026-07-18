@@ -13,14 +13,6 @@ from lwm.project_id import ProjectIdResolution
 FIXED_NOW = datetime.fromisoformat("2026-07-19T12:00:00+08:00")
 
 
-def _map_project(root: Path, project_path: Path, project_id: str) -> None:
-    state = root / "state"
-    state.mkdir(parents=True, exist_ok=True)
-    (state / "project-map.json").write_text(
-        json.dumps({str(project_path.resolve()): project_id}), encoding="utf-8"
-    )
-
-
 def _seed_event(
     root: Path,
     project_path: Path,

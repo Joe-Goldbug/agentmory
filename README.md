@@ -18,6 +18,20 @@ This repo ships two things:
 
 For a more opinionated personal knowledge body, use `lwm init --profile personal` and `lwm analyze` to inspect hubs, orphans, broken links, and missing sources. Use `lwm query` for quick/deep/thesis synthesis, `lwm dashboard` for a desktop-style snapshot, `lwm serve` for the live local workspace, `lwm harvest` to snapshot tool memories into the wiki, `lwm watch` to refresh only when source drift changes, `lwm export` to write `llms.txt`/`llms-full.txt`/`llms.json`, `lwm adapters`/`lwm attach` to let IDEs and shells consume the wiki, and `lwm schedule` to generate a recurring launchd bundle.
 
+## Evidence Recall B2
+
+`lwm hub recall` returns a project-scoped evidence packet instead of only page hits:
+
+```bash
+lwm hub recall "What was verified in this project recently?" \
+  --project "/path/to/project" \
+  "/path/to/LLM-WorkMem"
+```
+
+The packet includes the project identity, retrieval plan, evidence sources, current/historical/conflicted state, missing dimensions, and a `coverage` result. `compact` is the default; use `--mode deep --format markdown` when a deeper audit is needed. If a project cannot be resolved, the result is explicitly `global-only` rather than being presented as project memory.
+
+This layer organizes evidence for IDEs and shells; it does not generate their final answer. Reads remain available when receipts or CBMEM are unavailable, while the degraded state is surfaced in warnings and health checks.
+
 ## Quick Start
 
 You can do the manual installation without needing `uv` or `act-cli`.
