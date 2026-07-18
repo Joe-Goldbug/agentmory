@@ -16,6 +16,20 @@
 
 如果你要做更偏“个人知识体”的版本，可以直接用 `lwm init --profile personal`，再用 `lwm analyze` 看图谱里的枢纽、孤立页、断链和缺失来源。`lwm query` 支持 quick / deep / thesis 分层查询，`lwm dashboard` 会生成桌面式 HTML 总览，`lwm serve` 可以启动本地工作台，`lwm harvest` 会把工具记忆体快照进 wiki，`lwm watch` 会在源文件真的变化时才刷新，`lwm export` 会输出 `llms.txt` / `llms-full.txt` / `llms.json`，`lwm adapters` / `lwm attach` 会让 IDE 和 shell 读取这套 wiki，`lwm schedule` 会生成定时运行的 launchd 包。
 
+## Evidence Recall B2
+
+`lwm hub recall` 现在返回项目范围的证据包，而不是只返回页面命中：
+
+```bash
+lwm hub recall "当前项目最近完成了什么验证？" \
+  --project "/path/to/project" \
+  "/path/to/LLM-WorkMem"
+```
+
+返回内容会包含 `project_id`、检索计划、证据来源、当前/历史/冲突状态、缺失项和 `coverage`。默认 `compact` 只返回精简证据；明确需要深入查证时使用 `--mode deep --format markdown`。项目无法识别时会明确返回 `global-only`，不会假装是项目记忆。
+
+这个层只组织证据，不替当前 IDE 或 Shell Agent 生成最终答案。回执或 CBMEM 暂时不可用时，读取仍然继续，并在 warning/health 中报告降级状态。
+
 > **模型建议：** 由于 wiki 的构建和维护会产生大量 token 消耗，建议使用按计划订阅的服务（如 Claude Max、Cursor 等），或自行部署模型（如 [MiniMax](https://www.minimaxi.com/)、[GLM](https://open.bigmodel.cn/) 等），以避免按量计费带来的高额成本。
 
 ## 快速开始

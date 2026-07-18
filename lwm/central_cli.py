@@ -37,6 +37,7 @@ from lwm import project_memory as lwm_project_memory
 from lwm import shell_hook as lwm_shell_hook
 from lwm import capabilities as lwm_capabilities
 from lwm import memory_api as lwm_memory_api
+from lwm.recall import render_recall_packet
 from lwm import registry as lwm_registry
 from lwm.events import validate_event
 from lwm.project_id import record_project
@@ -417,11 +418,60 @@ def recall_cmd(
     question: str = typer.Argument(...),
     project: str | None = typer.Option(None, "--project"),
     limit: int = typer.Option(6, "--limit", min=1, max=20),
+    mode: str = typer.Option("compact", "--mode", help="compact | deep"),
+    format: str = typer.Option("json", "--format", help="json | markdown"),
     root: Path = typer.Argument(Path("."), help="Wiki root.", exists=False),
 ) -> None:
     """Recall source-backed memory with progressive deterministic retrieval."""
 
-    typer.echo(json.dumps(lwm_memory_api.recall(root.resolve(), question, project_path=project, limit=limit), ensure_ascii=False, indent=2))
+    if format not in {"json", "markdown"}:
+        typer.secho("--format must be json or markdown", err=True, fg=typer.colors.RED)
+        raise typer.Exit(2)
+    result = lwm_memory_api.recall(
+        root.resolve(), question, project_path=project, limit=limit, mode=mode
+    )
+    if format == "markdown":
+        packet = result["packet"]
+        from lwm.recall import RecallPacket, RecallPlan
+        from lwm.evidence import EvidenceItem
+
+        plan_data = packet["plan"]
+        plan = RecallPlan(
+            dimensions=tuple(plan_data["dimensions"]),
+            checks=tuple(plan_data["checks"]),
+            time_window=tuple(plan_data["time_window"]) if plan_data.get("time_window") else None,
+            now=plan_data.get("now", ""),
+        )
+        evidence = tuple(
+            EvidenceItem(
+                **{
+                    **item,
+                    "source_event_ids": tuple(item.get("source_event_ids", [])),
+                    "source_paths": tuple(item.get("source_paths", [])),
+                    "verification": tuple(item.get("verification", [])),
+                    "retrieval_reasons": tuple(item.get("retrieval_reasons", [])),
+                }
+            )
+            for item in packet["evidence"]
+        )
+        packet_obj = RecallPacket(
+            question=packet["question"],
+            project_id=packet.get("project_id"),
+            project_path=packet.get("project_path"),
+            scope=packet["scope"],
+            plan=plan,
+            summary=packet["summary"],
+            evidence=evidence,
+            conflicts=(),
+            missing=tuple(packet.get("missing", [])),
+            coverage=packet["coverage"],
+            warnings=tuple(packet.get("warnings", [])),
+            trace_id=packet["trace_id"],
+            token_estimate=packet["token_estimate"],
+        )
+        typer.echo(render_recall_packet(packet_obj).rstrip())
+        return
+    typer.echo(json.dumps(result, ensure_ascii=False, indent=2))
 
 
 @hub_app.command("reflect")

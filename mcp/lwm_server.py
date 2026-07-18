@@ -72,7 +72,13 @@ TOOLS = {
     },
     "recall": {
         "description": "Progressively recall source-backed shared memory.",
-        "properties": {"root": {"type": "string"}, "question": {"type": "string"}, "limit": {"type": "integer", "default": 6}},
+        "properties": {
+            "root": {"type": "string"},
+            "question": {"type": "string"},
+            "project": {"type": "string"},
+            "limit": {"type": "integer", "default": 6},
+            "mode": {"type": "string", "enum": ["compact", "deep"], "default": "compact"},
+        },
         "required": ["root", "question"],
     },
     "record_receipt": {
@@ -193,7 +199,13 @@ def _call_tool(name: str, arguments: dict) -> dict:
         return {"content": page.read_text(encoding="utf-8"), "path": str(page)}
     if name == "recall":
         root = Path(arguments["root"]).resolve()
-        return memory_api.recall(root, str(arguments["question"]), limit=int(arguments.get("limit", 6)))
+        return memory_api.recall(
+            root,
+            str(arguments["question"]),
+            project_path=str(arguments["project"]) if arguments.get("project") else None,
+            limit=int(arguments.get("limit", 6)),
+            mode=str(arguments.get("mode", "compact")),
+        )
     if name == "record_receipt":
         root = Path(arguments["root"]).resolve()
         return capabilities.record(

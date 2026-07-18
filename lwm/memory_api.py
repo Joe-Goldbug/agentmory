@@ -58,13 +58,22 @@ def retain(
     }
 
 
-def recall(root: Path, question: str, *, project_path: str | None = None, limit: int = 6) -> dict[str, Any]:
+def recall(
+    root: Path,
+    question: str,
+    *,
+    project_path: str | None = None,
+    limit: int = 6,
+    mode: str = "compact",
+) -> dict[str, Any]:
+    if mode not in {"compact", "deep"}:
+        raise ValueError("mode must be compact or deep")
     packet = build_recall_packet(
         root,
         question,
         project_path=project_path,
         limit=limit,
-        mode="compact",
+        mode=mode,
     )
     hits = [
         {
@@ -79,7 +88,7 @@ def recall(root: Path, question: str, *, project_path: str | None = None, limit:
     return {
         "question": question,
         "project_path": project_path,
-        "mode": "compact",
+        "mode": mode,
         "project_id": packet.project_id,
         "scope": packet.scope,
         "coverage": packet.coverage,

@@ -204,6 +204,53 @@ def test_query_context_returns_markdown(tmp_path: Path) -> None:
     assert "mcp context" in out["markdown"]
 
 
+def test_recall_via_mcp_returns_evidence_packet(tmp_path: Path) -> None:
+    project = tmp_path / "project"
+    project.mkdir()
+    from lwm.project_id import record_project
+
+    project_id = record_project(tmp_path, project).project_id
+    event_dir = tmp_path / "raw" / "events" / "processed" / "2026-07-18"
+    event_dir.mkdir(parents=True)
+    (event_dir / "event.json").write_text(
+        json.dumps(
+            {
+                "event_id": "event-mcp-recall",
+                "timestamp": "2026-07-18T12:00:00+08:00",
+                "tool": "shell",
+                "project_path": str(project),
+                "project_id": project_id,
+                "event_type": "decision",
+                "importance": "project",
+                "privacy": "sanitized",
+                "task": "mcp evidence packet",
+                "decisions": ["mcp evidence packet"],
+                "verification": ["mcp test"],
+            }
+        ),
+        encoding="utf-8",
+    )
+    out = _drive(
+        tmp_path,
+        [
+            _rpc(
+                "tools/call",
+                params={
+                    "name": "recall",
+                    "arguments": {
+                        "root": str(tmp_path),
+                        "question": "mcp evidence packet",
+                        "project": str(project),
+                    },
+                },
+                id_=7,
+            )
+        ],
+    )[0]["result"]["content"][0]["data"]
+    assert out["packet"]["evidence"][0]["fact_id"] == "event-mcp-recall"
+    assert out["scope"] == "project"
+
+
 def test_parse_error_is_returned(tmp_path: Path) -> None:
     """Bad JSON should surface a -32700 parse error response."""
 
