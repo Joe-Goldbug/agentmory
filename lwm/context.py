@@ -96,6 +96,16 @@ def _resolve_id_for_context(root: Path, project_path: str) -> str:
     return project_id.resolve_project_id(project_path).project_id
 
 
+def _discover_project_path(root: Path) -> str | None:
+    """Use cwd only when the hub already knows that path as a project."""
+
+    current = str(Path.cwd().resolve())
+    cache = project_id.load_project_map(root)
+    if current in cache:
+        return current
+    return None
+
+
 def build(
     root: Path,
     *,
@@ -105,6 +115,7 @@ def build(
     limit: int = 6,
 ) -> ContextReport:
     root = root.resolve()
+    project_path = project_path or _discover_project_path(root)
     project_text: str | None = None
     resolved_id: str | None = None
     if project_path:
@@ -128,6 +139,8 @@ def build(
         "tool": tool,
         "project_path": project_path,
         "project_id": resolved_id,
+        "scope": "project" if resolved_id else "global-only",
+        "warnings": [],
         "global_rules": [],
         "project": None,
         "open_questions": [],
@@ -158,6 +171,10 @@ def build(
             "open_questions": sections.get("open_questions", []),
         }
         data["open_questions"] = sections.get("open_questions", [])
+    elif resolved_id:
+        data["warnings"].append("Project is registered but its STATE page is not materialized yet.")
+    else:
+        data["warnings"].append("Project could not be resolved; context is global-only.")
 
     review_dir = root / "wiki" / "review"
     if review_dir.is_dir():
@@ -187,6 +204,11 @@ def build(
     if project_path:
         lines.append(f"Project: `{project_path}` (id={resolved_id})")
         lines.append("")
+    lines.append(f"Scope: {data['scope']}")
+    if data["warnings"]:
+        for warning in data["warnings"]:
+            lines.append(f"Warning: {warning}")
+    lines.append("")
 
     lines.append("## Global Memory")
     if data["global_rules"]:
@@ -217,7 +239,7 @@ def build(
                 lines.append(f"- {line}")
             lines.append("")
     else:
-        lines.append("- (no project memory yet — run `lwm ingest`)")
+        lines.append("- (project memory is not available in this context)")
         lines.append("")
 
     if data["open_questions"]:

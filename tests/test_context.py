@@ -43,7 +43,8 @@ def test_context_markdown_sections(tmp_path: Path) -> None:
     )
     assert "Global Memory" in report.markdown
     assert "Project Memory" in report.markdown
-    assert "## Open Questions" in report.markdown or "(no project memory yet" in report.markdown
+    assert "Scope: project" in report.markdown
+    assert "bootstrap" in report.markdown
 
 
 def test_context_json_mode(tmp_path: Path) -> None:

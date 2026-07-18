@@ -10,7 +10,7 @@ from typing import Any
 from lwm import inbox
 from lwm.events import make_event
 from lwm.project_id import record_project
-from lwm.query import run_query
+from lwm.recall import build_recall_packet
 
 
 def retain(
@@ -45,16 +45,37 @@ def retain(
 
 
 def recall(root: Path, question: str, *, project_path: str | None = None, limit: int = 6) -> dict[str, Any]:
-    report = run_query(root, question, mode="standard", limit=limit)
+    packet = build_recall_packet(
+        root,
+        question,
+        project_path=project_path,
+        limit=limit,
+        mode="compact",
+    )
+    hits = [
+        {
+            "path": item.source_paths[0] if item.source_paths else "",
+            "score": round(item.confidence * 100),
+            "excerpt": item.statement[:220],
+            "fact_id": item.fact_id,
+            "state": item.state,
+        }
+        for item in packet.evidence
+    ]
     return {
         "question": question,
         "project_path": project_path,
-        "mode": report.mode,
-        "hits": [
-            {"path": hit.page.rel_path, "score": hit.score, "excerpt": hit.excerpt}
-            for hit in report.hits
+        "mode": "compact",
+        "project_id": packet.project_id,
+        "scope": packet.scope,
+        "coverage": packet.coverage,
+        "packet": packet.as_dict(),
+        "hits": hits,
+        "notes": [
+            f"Coverage: {packet.coverage}",
+            *packet.warnings,
+            *(f"Missing: {missing}" for missing in packet.missing),
         ],
-        "notes": list(report.notes),
     }
 
 
