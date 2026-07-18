@@ -669,7 +669,7 @@ def schedule_cmd(
         help="Install and load the LaunchAgent immediately after writing it",
     ),
 ) -> None:
-    """Write a launchd bundle that runs watch+audit at load and every 12 hours."""
+    """Write a launchd supervisor that checks every 15 minutes and runs the full cycle every 12 hours."""
     root = root.resolve()
     bundle = write_schedule_bundle(root, label=label)
     typer.secho(f"Wrote schedule script to {bundle.script_path}", fg=typer.colors.GREEN)

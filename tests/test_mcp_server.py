@@ -48,7 +48,7 @@ def test_initialize_responds_with_capabilities(tmp_path: Path) -> None:
 def test_tools_list_includes_all_four(tmp_path: Path) -> None:
     responses = _drive(tmp_path, [_rpc("tools/list", id_=2)])
     names = {tool["name"] for tool in responses[0]["result"]["tools"]}
-    assert names == {"query_context", "record_event", "search_memory", "get_project_memory"}
+    assert {"query_context", "record_event", "search_memory", "get_project_memory"} <= names
 
 
 def test_record_event_via_mcp(tmp_path: Path) -> None:

@@ -26,6 +26,7 @@ import sys
 from pathlib import Path
 
 from lwm import context, inbox as lwm_inbox
+from lwm import capabilities, health as lwm_health, memory_api
 from lwm import project_memory
 from lwm.events import validate_event
 from lwm.project_id import record_project
@@ -67,6 +68,21 @@ TOOLS = {
             "project_id": {"type": "string"},
             "project_path": {"type": "string"},
         },
+        "required": ["root"],
+    },
+    "recall": {
+        "description": "Progressively recall source-backed shared memory.",
+        "properties": {"root": {"type": "string"}, "question": {"type": "string"}, "limit": {"type": "integer", "default": 6}},
+        "required": ["root", "question"],
+    },
+    "record_receipt": {
+        "description": "Record a verified tool read/write receipt.",
+        "properties": {"root": {"type": "string"}, "tool": {"type": "string"}, "direction": {"type": "string"}, "project_id": {"type": "string"}},
+        "required": ["root", "tool", "direction"],
+    },
+    "health": {
+        "description": "Return strict shared-memory health data.",
+        "properties": {"root": {"type": "string"}},
         "required": ["root"],
     },
 }
@@ -122,6 +138,7 @@ def _call_tool(name: str, arguments: dict) -> dict:
             project_path=str(arguments["project"]),
             limit=int(arguments.get("limit", 6)),
         )
+        capabilities.record(root, tool=str(arguments["tool"]), direction="read", project_id=report.project_id, source="mcp")
         return {
             "format": "markdown",
             "markdown": report.markdown,
@@ -156,6 +173,7 @@ def _call_tool(name: str, arguments: dict) -> dict:
         if not report.ok:
             raise ValueError("; ".join(issue.message for issue in report.issues))
         rel = lwm_inbox.submit_event(root, incoming)
+        capabilities.record(root, tool=str(incoming.get("tool", "unknown")), direction="write", project_id=str(incoming.get("project_id") or ""), source="mcp")
         return {"ingested": True, "path": str(rel), "event_id": incoming["event_id"]}
     if name == "search_memory":
         root = Path(arguments["root"]).resolve()
@@ -173,6 +191,22 @@ def _call_tool(name: str, arguments: dict) -> dict:
         if not page.is_file():
             return {"content": None, "path": str(page)}
         return {"content": page.read_text(encoding="utf-8"), "path": str(page)}
+    if name == "recall":
+        root = Path(arguments["root"]).resolve()
+        return memory_api.recall(root, str(arguments["question"]), limit=int(arguments.get("limit", 6)))
+    if name == "record_receipt":
+        root = Path(arguments["root"]).resolve()
+        return capabilities.record(
+            root,
+            tool=str(arguments["tool"]),
+            direction=str(arguments["direction"]),
+            project_id=str(arguments.get("project_id") or "") or None,
+            source="mcp",
+        )
+    if name == "health":
+        root = Path(arguments["root"]).resolve()
+        snapshot = lwm_health.collect_and_write(root, strict=True)
+        return {"status": snapshot.status, "cycle": snapshot.cycle, "capabilities": snapshot.capabilities, "quality": snapshot.quality}
     raise KeyError(name)
 
 

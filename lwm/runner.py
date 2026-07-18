@@ -10,6 +10,7 @@ from pathlib import Path
 from lwm.adapters import write_global_adapters
 from lwm.ingest import run as ingest_run
 from lwm.watch import render_watch_report, run_watch
+from lwm.cbmem_bridge import sync_registered_projects
 
 
 ADAPTER_MODULES: tuple[tuple[str, str, tuple[str, ...]], ...] = (
@@ -75,6 +76,11 @@ def run_cycle(root: Path) -> int:
         print(detail)
         rc |= adapter_rc
     rc |= _sweep_shell_events(root)
+
+    cbmem_report = sync_registered_projects(root)
+    print(f"cbmem: {cbmem_report.get('status')} projects={len(cbmem_report.get('projects', {}))}")
+    if cbmem_report.get("projects") and cbmem_report.get("status") in {"failed", "unavailable", "degraded"}:
+        rc |= 1
 
     ingest = ingest_run(root, with_lock=True)
     print(ingest.render())

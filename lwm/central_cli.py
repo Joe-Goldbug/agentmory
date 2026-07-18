@@ -34,6 +34,9 @@ from lwm import ingest as lwm_ingest
 from lwm import promote as lwm_promote
 from lwm import project_memory as lwm_project_memory
 from lwm import shell_hook as lwm_shell_hook
+from lwm import capabilities as lwm_capabilities
+from lwm import memory_api as lwm_memory_api
+from lwm import registry as lwm_registry
 from lwm.events import validate_event
 from lwm.project_id import record_project
 
@@ -185,6 +188,13 @@ def record_cmd(
         raise typer.Exit(2)
 
     target = lwm_inbox.submit_event(root, parsed)
+    lwm_capabilities.record(
+        root,
+        tool=str(parsed["tool"]),
+        direction="write",
+        project_id=str(parsed.get("project_id") or "") or None,
+        source="cli-record",
+    )
     # ``raw/`` may be a symlink into the launchd runtime workspace. Resolve
     # both paths for storage, but do not assume the target remains below the
     # user-facing wiki root when rendering the report.
@@ -249,6 +259,13 @@ def context_cmd(
         format=format,
         limit=limit,
     )
+    lwm_capabilities.record(
+        root.resolve(),
+        tool=tool,
+        direction="read",
+        project_id=report.project_id,
+        source="cli-context",
+    )
     typer.echo(report.markdown)
 
 
@@ -311,16 +328,19 @@ def insights_cmd(
 def health_cmd(
     root: Path = typer.Argument(Path("."), help="Wiki root.", exists=False),
     json_output: bool = typer.Option(False, "--json", help="Emit JSON only."),
+    strict: bool = typer.Option(True, "--strict/--no-strict", help="Require a fresh successful full cycle."),
 ) -> None:
     """Health snapshot: infrastructure, data flow, quality."""
 
-    snapshot = lwm_health.collect_and_write(root.resolve())
+    snapshot = lwm_health.collect_and_write(root.resolve(), strict=strict)
     if json_output:
         payload = {
             "status": snapshot.status,
             "checked_at": snapshot.checked_at,
             "infrastructure": snapshot.infrastructure,
             "data_flow": snapshot.data_flow,
+            "cycle": snapshot.cycle,
+            "capabilities": snapshot.capabilities,
             "inbox_counts": snapshot.inbox_counts,
             "quality": snapshot.quality,
             "tools": [
@@ -352,6 +372,81 @@ def run_cycle_cmd(
     from lwm.runner import run_cycle
 
     raise typer.Exit(run_cycle(root.resolve()))
+
+
+@hub_app.command("receipt")
+def receipt_cmd(
+    tool: str = typer.Option(..., "--tool"),
+    direction: str = typer.Option(..., "--direction", help="read or write"),
+    project_id: str | None = typer.Option(None, "--project-id"),
+    source: str = typer.Option("cli", "--source"),
+    detail: str = typer.Option("", "--detail"),
+    root: Path = typer.Argument(Path("."), help="Wiki root.", exists=False),
+) -> None:
+    """Record a verified tool read/write receipt."""
+
+    result = lwm_capabilities.record(
+        root.resolve(), tool=tool, direction=direction, project_id=project_id, source=source, detail=detail
+    )
+    typer.echo(json.dumps(result, ensure_ascii=False))
+
+
+@hub_app.command("retain")
+def retain_cmd(
+    task: str = typer.Option(..., "--task"),
+    project: str = typer.Option(..., "--project"),
+    tool: str = typer.Option("shell", "--tool"),
+    event_type: str = typer.Option("workflow_observation", "--type"),
+    root: Path = typer.Argument(Path("."), help="Wiki root.", exists=False),
+) -> None:
+    """Retain one structured work observation for later ingest."""
+
+    result = lwm_memory_api.retain(root.resolve(), tool=tool, project_path=project, task=task, event_type=event_type)
+    typer.echo(json.dumps({"path": result["path"], "project_id": result["project_id"]}, ensure_ascii=False))
+
+
+@hub_app.command("recall")
+def recall_cmd(
+    question: str = typer.Argument(...),
+    project: str | None = typer.Option(None, "--project"),
+    limit: int = typer.Option(6, "--limit", min=1, max=20),
+    root: Path = typer.Argument(Path("."), help="Wiki root.", exists=False),
+) -> None:
+    """Recall source-backed memory with progressive deterministic retrieval."""
+
+    typer.echo(json.dumps(lwm_memory_api.recall(root.resolve(), question, project_path=project, limit=limit), ensure_ascii=False, indent=2))
+
+
+@hub_app.command("reflect")
+def reflect_cmd(
+    project_id: str = typer.Argument(...),
+    root: Path = typer.Argument(Path("."), help="Wiki root.", exists=False),
+) -> None:
+    """Reflect processed evidence into one project STATE.md."""
+
+    typer.echo(lwm_memory_api.reflect_project(root.resolve(), project_id))
+
+
+@hub_app.command("register-project")
+def register_project_cmd(
+    project: Path = typer.Argument(...),
+    root: Path = typer.Argument(Path("."), help="Wiki root.", exists=False),
+) -> None:
+    """Register one canonical project for shared memory and CBMEM."""
+
+    typer.echo(json.dumps(lwm_registry.register(root.resolve(), project), ensure_ascii=False, indent=2))
+
+
+@hub_app.command("run-supervisor")
+def run_supervisor_cmd(
+    root: Path = typer.Argument(Path("."), help="Wiki root.", exists=False),
+    force: bool = typer.Option(False, "--force", help="Run a full cycle now, regardless of the 12-hour due check."),
+) -> None:
+    """Run the 15-minute supervisor; execute the full cycle only when due."""
+
+    from lwm.supervisor import run_supervisor
+
+    raise typer.Exit(run_supervisor(root.resolve(), force=force))
 
 
 @hub_app.command("install-shell-hook")

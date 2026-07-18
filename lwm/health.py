@@ -22,7 +22,9 @@ from pathlib import Path
 from typing import Any
 
 from lwm import dedup, inbox
+from lwm import capabilities
 from lwm.audit import run_audit
+from lwm.cycle_state import is_due, read_receipt
 
 
 STATUS_HEALTHY = "healthy"
@@ -55,6 +57,8 @@ class HealthSnapshot:
     checked_at: str
     infrastructure: dict[str, Any]
     data_flow: dict[str, Any]
+    cycle: dict[str, Any]
+    capabilities: dict[str, dict[str, Any]]
     quality: dict[str, Any]
     tools: tuple[ToolSync, ...]
     inbox_counts: dict[str, int]
@@ -76,6 +80,7 @@ class HealthSnapshot:
         )
         if self.data_flow.get("last_processed_at"):
             lines.append(f"- last_processed_at: {self.data_flow['last_processed_at']}")
+        lines.append(f"- cycle: {self.cycle}")
         for line in self.tools:
             lines.append(f"- {line.render()}")
         lines.append("")
@@ -207,6 +212,23 @@ def _llms_txt_state(root: Path) -> dict[str, Any]:
     return {"exists": True, "size_bytes": stat.st_size, "mtime": mtime}
 
 
+def _cbmem_state(root: Path) -> dict[str, Any]:
+    path = root / "state" / "cbmem-health.json"
+    if not path.is_file():
+        return {"status": "unverified"}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {"status": "invalid"}
+    if not isinstance(payload, dict):
+        return {"status": "invalid"}
+    return {
+        "status": payload.get("status", "unknown"),
+        "projects": len(payload.get("projects", {})) if isinstance(payload.get("projects"), dict) else 0,
+        "checked_at": payload.get("checked_at"),
+    }
+
+
 def _privacy_rejection_rate(inbox_counts: dict[str, int]) -> float:
     total_seen = inbox_counts["processed"] + inbox_counts["rejected"] + inbox_counts["failed"]
     if total_seen == 0:
@@ -214,12 +236,49 @@ def _privacy_rejection_rate(inbox_counts: dict[str, int]) -> float:
     return inbox_counts["rejected"] / total_seen
 
 
-def _classify(snapshot: dict[str, Any]) -> str:
+def _rejection_breakdown(root: Path) -> dict[str, int]:
+    """Count quarantine reasons instead of treating every rejection as privacy."""
+
+    counts: dict[str, int] = {}
+    rejected = inbox.events_root(root) / "rejected"
+    if not rejected.is_dir():
+        return counts
+    for reason_file in rejected.rglob("*.json.reason"):
+        try:
+            reason = reason_file.read_text(encoding="utf-8").strip()
+        except OSError:
+            continue
+        if reason.startswith("privacy:"):
+            key = "privacy_blocked"
+        elif reason.startswith("duplicate:"):
+            key = "duplicate"
+        elif reason.startswith("invalid") or "." in reason.split(":", 1)[0]:
+            key = "invalid"
+        else:
+            key = "other"
+        counts[key] = counts.get(key, 0) + 1
+    return counts
+
+
+def _privacy_rate_from_breakdown(breakdown: dict[str, int], counts: dict[str, int]) -> float:
+    total = counts["processed"] + counts["rejected"] + counts["failed"]
+    return (breakdown.get("privacy_blocked", 0) / total) if total else 0.0
+
+
+def _classify(snapshot: dict[str, Any], *, strict: bool = False) -> str:
     infra = snapshot["infrastructure"]
     data = snapshot["data_flow"]
     quality = snapshot["quality"]
     if infra.get("audit", {}).get("error") or not quality.get("audit_ok"):
         return STATUS_FAILED
+    cycle = snapshot.get("cycle", {})
+    if strict:
+        if cycle.get("last_status") == "failed":
+            return STATUS_FAILED
+        if cycle.get("due") or not cycle.get("last_success_at"):
+            return STATUS_DEGRADED
+        if quality.get("cbmem", {}).get("status") not in {"healthy", "not_configured"}:
+            return STATUS_DEGRADED
     if inbox_counts(snapshot)["inbox"] > 100:
         return STATUS_DEGRADED
     if data.get("last_processed_at") is None and inbox_counts(snapshot)["inbox"] > 0:
@@ -247,7 +306,7 @@ def _last_processed_at(events_root_path: Path) -> str | None:
     return candidates[0][0]
 
 
-def collect(root: Path) -> HealthSnapshot:
+def collect(root: Path, *, strict: bool = False) -> HealthSnapshot:
     root = root.resolve()
     status_inbox = inbox.inbox_status(root)
     counts = {
@@ -258,6 +317,15 @@ def collect(root: Path) -> HealthSnapshot:
     }
     index = dedup.load_event_index(root)
     tools = _tool_sync(index)
+    receipt = read_receipt(root)
+    rejection_breakdown = _rejection_breakdown(root)
+    cycle = {
+        "due": is_due(root),
+        "last_status": receipt.get("status") if receipt else None,
+        "last_success_at": receipt.get("finished_at") if receipt and receipt.get("status") == "success" else None,
+        "last_receipt_id": receipt.get("receipt_id") if receipt else None,
+        "last_reason": receipt.get("reason") if receipt else None,
+    }
     last_processed = _last_processed_at(inbox.events_root(root))
     health_path = root / "state" / "health.json"
     last_health_mtime = (
@@ -276,11 +344,14 @@ def collect(root: Path) -> HealthSnapshot:
             "last_processed_at": last_processed,
             "event_index_entries": len(index),
         },
+        "cycle": cycle,
         "inbox_counts": counts,
         "quality": {
             **_audit_summary(root),
             "llms_txt": _llms_txt_state(root),
-            "privacy_rejection_rate": _privacy_rejection_rate(counts),
+            "privacy_rejection_rate": _privacy_rate_from_breakdown(rejection_breakdown, counts),
+            "rejection_breakdown": rejection_breakdown,
+            "cbmem": _cbmem_state(root),
         },
         "tools": [
             {
@@ -292,13 +363,16 @@ def collect(root: Path) -> HealthSnapshot:
             }
             for t in tools
         ],
+        "capabilities": capabilities.summary(root),
     }
-    status = _classify(snapshot_dict)
+    status = _classify(snapshot_dict, strict=strict)
     return HealthSnapshot(
         status=status,
         checked_at=snapshot_dict["checked_at"],
         infrastructure=snapshot_dict["infrastructure"],
         data_flow=snapshot_dict["data_flow"],
+        cycle=cycle,
+        capabilities=snapshot_dict["capabilities"],
         quality=snapshot_dict["quality"],
         tools=tools,
         inbox_counts=counts,
@@ -315,6 +389,8 @@ def write_snapshot(snapshot: HealthSnapshot) -> Path:
         "checked_at": snapshot.checked_at,
         "infrastructure": snapshot.infrastructure,
         "data_flow": snapshot.data_flow,
+        "cycle": snapshot.cycle,
+        "capabilities": snapshot.capabilities,
         "inbox_counts": snapshot.inbox_counts,
         "quality": snapshot.quality,
         "tools": [
@@ -332,7 +408,7 @@ def write_snapshot(snapshot: HealthSnapshot) -> Path:
     return target
 
 
-def collect_and_write(root: Path, *, now: datetime | None = None) -> HealthSnapshot:
+def collect_and_write(root: Path, *, now: datetime | None = None, strict: bool = False) -> HealthSnapshot:
     """Snapshot the system and persist ``state/health.json`` + side files."""
 
     # Always keep ``state/promotion-state.json`` present so consumers can
@@ -346,13 +422,15 @@ def collect_and_write(root: Path, *, now: datetime | None = None) -> HealthSnaps
         _promote.save_promotion_state(
             root, {"approved": [], "rejected": []}
         )
-    snapshot = collect(root)
+    snapshot = collect(root, strict=strict)
     health_path = root / "state" / "health.json"
     payload = {
         "status": snapshot.status,
         "checked_at": snapshot.checked_at,
         "infrastructure": snapshot.infrastructure,
         "data_flow": snapshot.data_flow,
+        "cycle": snapshot.cycle,
+        "capabilities": snapshot.capabilities,
         "inbox_counts": snapshot.inbox_counts,
         "quality": snapshot.quality,
         "tools": [
@@ -377,6 +455,8 @@ def collect_and_write(root: Path, *, now: datetime | None = None) -> HealthSnaps
         checked_at=snapshot.checked_at,
         infrastructure={**snapshot.infrastructure, "root_dir": str(root)},
         data_flow=snapshot.data_flow,
+        cycle=snapshot.cycle,
+        capabilities=snapshot.capabilities,
         quality=snapshot.quality,
         tools=snapshot.tools,
         inbox_counts=snapshot.inbox_counts,
