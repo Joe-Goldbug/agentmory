@@ -25,12 +25,17 @@ ALLOWED_EVENT_TYPES: frozenset[str] = frozenset(
     {
         "session_start",
         "session_summary",
+        "session_end",
+        "checkpoint",
         "decision",
         "bugfix",
         "verification",
         "project_status",
         "workflow_observation",
         "insight_candidate",
+        "reflection",
+        "fact_superseded",
+        "adapter_probe",
     }
 )
 

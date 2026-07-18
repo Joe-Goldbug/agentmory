@@ -188,11 +188,39 @@ def evaluate(
     return DedupDecision(duplicate=False, key=key)
 
 
+def find_duplicate(root: Path, event: dict[str, Any]) -> DedupDecision:
+    """Check the index and live inbox before a producer creates a file."""
+
+    decision = evaluate(root, event)
+    if decision.duplicate:
+        return decision
+    from lwm.inbox import list_events
+
+    incoming_key = dedup_key(event)
+    for bucket in ("inbox", "processed"):
+        for path in list_events(root, bucket):
+            try:
+                payload = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+            if not isinstance(payload, dict) or payload.get("event_id") == event.get("event_id"):
+                continue
+            if dedup_key(payload) == incoming_key:
+                return DedupDecision(
+                    duplicate=True,
+                    key=incoming_key,
+                    reason="dedup_key",
+                    existing_event_id=str(payload.get("event_id") or path.stem),
+                )
+    return decision
+
+
 __all__ = [
     "DedupDecision",
     "INDEX_FILENAME",
     "dedup_key",
     "evaluate",
+    "find_duplicate",
     "index_path",
     "load_event_index",
     "record_event",

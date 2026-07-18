@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from lwm import inbox
+from lwm import dedup, inbox
 from lwm.events import make_event
 from lwm.project_id import record_project
 from lwm.recall import build_recall_packet
@@ -40,8 +40,22 @@ def retain(
         session_id=session_id,
         source={"kind": "retain"},
     )
+    duplicate = dedup.find_duplicate(root, event)
+    if duplicate.duplicate:
+        return {
+            "event": event,
+            "path": "",
+            "project_id": resolution.project_id,
+            "duplicate": True,
+            "existing_event_id": duplicate.existing_event_id,
+        }
     target = inbox.submit_event(root, event)
-    return {"event": event, "path": str(target), "project_id": resolution.project_id}
+    return {
+        "event": event,
+        "path": str(target),
+        "project_id": resolution.project_id,
+        "duplicate": False,
+    }
 
 
 def recall(root: Path, question: str, *, project_path: str | None = None, limit: int = 6) -> dict[str, Any]:
