@@ -21,6 +21,19 @@ KNOWN_TOOLS = (
     "minimax",
 )
 
+TOOL_TARGETS = {
+    "codex": (".codex/AGENTS.md",),
+    "claude-code": (".claude/CLAUDE.md",),
+    "opencode": (".config/opencode/AGENTS.md",),
+    "shell": (".zshrc",),
+    "vscode": (".copilot/instructions/llm-workmem.instructions.md",),
+    "kiro": (".kiro/steering/llm-workmem.md",),
+    "antigravity": (".agents/AGENTS.md", ".agents/GLOBAL.md"),
+    "trae": (".traerules",),
+    "trae-solo": (".traerules",),
+    "minimax": (".minimax/agents/coder/agent.md",),
+}
+
 
 def _path(root: Path) -> Path:
     return root / "state" / "capability-receipts.json"
@@ -77,11 +90,15 @@ def record(
 
 def summary(root: Path) -> dict[str, dict[str, Any]]:
     payload = load(root)
+    installed = probe(root)
     out: dict[str, dict[str, Any]] = {}
     for tool in KNOWN_TOOLS:
         reads = payload.get(f"{tool}:read")
         writes = payload.get(f"{tool}:write")
         out[tool] = {
+            "configuration": installed[tool]["status"],
+            "installed": installed[tool]["installed"],
+            "targets": installed[tool]["targets"],
             "read": reads if isinstance(reads, dict) else {"status": "unverified"},
             "write": writes if isinstance(writes, dict) else {"status": "unverified"},
             "bidirectional": bool(
@@ -91,4 +108,40 @@ def summary(root: Path) -> dict[str, dict[str, Any]]:
     return out
 
 
-__all__ = ["KNOWN_TOOLS", "load", "record", "summary"]
+def probe(root: Path, *, home: Path | None = None) -> dict[str, dict[str, Any]]:
+    """Check configuration separately from real read/write receipts.
+
+    A present instruction file proves only that an adapter is installed. A
+    verified receipt is required before claiming that a tool actually read or
+    wrote the hub.
+    """
+    home = (home or Path.home()).expanduser().resolve()
+    receipts = load(root)
+    out: dict[str, dict[str, Any]] = {}
+    for tool in KNOWN_TOOLS:
+        targets = [home / relative for relative in TOOL_TARGETS.get(tool, ())]
+        installed = bool(targets) and all(path.is_file() for path in targets)
+        readable = installed and all(path.stat().st_size > 0 for path in targets)
+        read_receipt = receipts.get(f"{tool}:read")
+        write_receipt = receipts.get(f"{tool}:write")
+        read_verified = isinstance(read_receipt, dict) and read_receipt.get("status") == "verified"
+        write_verified = isinstance(write_receipt, dict) and write_receipt.get("status") == "verified"
+        if read_verified and write_verified:
+            status = "verified_bidirectional"
+        elif read_verified:
+            status = "verified_read_only"
+        elif installed and readable:
+            status = "configured_unverified"
+        else:
+            status = "not_configured"
+        out[tool] = {
+            "status": status,
+            "installed": installed,
+            "targets": [str(path) for path in targets],
+            "read_receipt": read_receipt if isinstance(read_receipt, dict) else None,
+            "write_receipt": write_receipt if isinstance(write_receipt, dict) else None,
+        }
+    return out
+
+
+__all__ = ["KNOWN_TOOLS", "TOOL_TARGETS", "load", "record", "probe", "summary"]

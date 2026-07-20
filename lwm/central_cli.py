@@ -401,6 +401,22 @@ def closure_cmd(
         raise typer.Exit(1)
 
 
+@hub_app.command("capabilities")
+def capabilities_cmd(
+    root: Path = typer.Argument(Path("."), help="Wiki root.", exists=False),
+    json_output: bool = typer.Option(False, "--json", help="Emit JSON only."),
+) -> None:
+    """Probe installed adapters and verified tool read/write receipts."""
+
+    payload = lwm_capabilities.probe(root.resolve())
+    if json_output:
+        typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+        return
+    typer.echo("# LLM-WorkMem Tool Capabilities")
+    for tool, result in payload.items():
+        typer.echo(f"- {tool}: {result['status']}")
+
+
 @hub_app.command("run-cycle")
 def run_cycle_cmd(
     root: Path = typer.Argument(Path("."), help="Wiki root.", exists=False),
