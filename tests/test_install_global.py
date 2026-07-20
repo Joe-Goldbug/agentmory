@@ -62,13 +62,13 @@ def test_install_global_writes_all_adapters(tmp_path: Path) -> None:
         fake_home / ".cursor" / "rules" / "llm-workmem.mdc",
         fake_home / ".cursor" / ".cursorrules",
         fake_home / ".gemini" / "GEMINI.md",
-        fake_home / ".copilot" / "instructions" / "llm-workmem.instructions.md",
+        fake_home / "Library" / "Application Support" / "Code" / "User" / "prompts" / "llm-workmem.instructions.md",
         fake_home / ".config" / "opencode" / "AGENTS.md",
         fake_home / ".config" / "lwm" / "context.json",
     ]
     for path in expected:
         assert path.is_file(), f"missing {path}"
-    vscode = (fake_home / ".copilot" / "instructions" / "llm-workmem.instructions.md").read_text(encoding="utf-8")
+    vscode = (fake_home / "Library" / "Application Support" / "Code" / "User" / "prompts" / "llm-workmem.instructions.md").read_text(encoding="utf-8")
     assert 'applyTo: "**"' in vscode
     assert "lwm hub context" in vscode
 

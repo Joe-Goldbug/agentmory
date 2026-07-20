@@ -26,7 +26,9 @@ TOOL_TARGETS = {
     "claude-code": (".claude/CLAUDE.md",),
     "opencode": (".config/opencode/AGENTS.md",),
     "shell": (".zshrc",),
-    "vscode": (".copilot/instructions/llm-workmem.instructions.md",),
+    "vscode": (
+        "Library/Application Support/Code/User/prompts/llm-workmem.instructions.md",
+    ),
     "kiro": (".kiro/steering/llm-workmem.md",),
     "antigravity": (".agents/AGENTS.md", ".agents/GLOBAL.md"),
     "trae": (".traerules",),

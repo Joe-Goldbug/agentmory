@@ -194,7 +194,15 @@ def _gemini_global_paths(home: Path) -> tuple[Path, ...]:
 
 
 def _vscode_global_path(home: Path) -> Path:
-    return home / ".copilot" / "instructions" / "llm-workmem.instructions.md"
+    return (
+        home
+        / "Library"
+        / "Application Support"
+        / "Code"
+        / "User"
+        / "prompts"
+        / "llm-workmem.instructions.md"
+    )
 
 
 def _vscode_instruction_block(root: Path) -> str:
@@ -311,7 +319,7 @@ def write_global_adapters(root: Path) -> AdapterReport:
                         "codex": "AGENTS.md",
                         "claude-code": "CLAUDE.md",
                         "github-copilot": "copilot-instructions.md",
-                        "vscode": "~/.copilot/instructions/llm-workmem.instructions.md",
+                        "vscode": "~/Library/Application Support/Code/User/prompts/llm-workmem.instructions.md",
                         "kiro": "kiro-steering-llm-workmem.md",
                         "trae": "traerules",
                         "antigravity": "antigravity-agents.md",
