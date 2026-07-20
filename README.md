@@ -270,6 +270,18 @@ Each wiki is fully independent with its own `AGENTS.md` schema. Agent loads the 
 - `lwm export` writes agent-consumable `llms.txt`, `llms-full.txt`, and `llms.json`
 - `lwm schedule` writes a launchd bundle for recurring watch + audit runs
 
+### Loop Engineering control state
+
+Scheduled work runs as one bounded loop: observe, define, decompose, execute,
+evaluate, and update. Each loop stores its expected result, actual evidence,
+next action, and exit state in `state/active-loop.json` or
+`state/last-loop.json`. `completed_verified` requires external evidence; a
+configured adapter or launchd plist alone is not completion proof.
+
+Run `lwm hub closure <root>` to inspect the closure gate. It checks loop state,
+evidence, source/runtime readability, exports, receipts, strict health, and
+launchd. Missing proof is reported as `degraded` or `blocked`.
+
 ## Codebase Memory (`lwm cbmem`)
 
 `lwm cbmem` wraps [DeusData/codebase-memory-mcp](https://github.com/DeusData/codebase-memory-mcp) so the wiki can answer code-structure questions about any project directory. The wrapper is in `lwm/cbmem.py`; the decision record is in [wiki/insights/integrations-2026-06-30.md](wiki/insights/integrations-2026-06-30.md); the cheatsheet is in [wiki/summaries/lwm-cbmem-cheatsheet.md](wiki/summaries/lwm-cbmem-cheatsheet.md).

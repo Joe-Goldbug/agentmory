@@ -118,6 +118,7 @@ Expected: all loop-state tests pass.
 from pathlib import Path
 
 import lwm.runner as runner
+import lwm.health as health
 from lwm.loop_state import read_last
 
 
@@ -129,7 +130,7 @@ def test_runner_records_verified_completion_when_cycle_and_audit_succeed(tmp_pat
     monkeypatch.setattr(runner, "run_watch", lambda *args, **kwargs: type("W", (), {"audit": type("A", (), {"ok": True})()})())
     monkeypatch.setattr(runner, "render_watch_report", lambda watch: "watch ok")
     monkeypatch.setattr(runner, "write_global_adapters", lambda root: None)
-    monkeypatch.setattr(runner, "collect_and_write", lambda root: type("H", (), {"status": "healthy", "render": lambda self: "healthy"})())
+    monkeypatch.setattr(health, "collect_and_write", lambda root: type("H", (), {"status": "healthy", "render": lambda self: "healthy"})())
 
     assert runner.run_cycle(tmp_path) == 0
     state = read_last(tmp_path)
@@ -146,7 +147,7 @@ def test_runner_records_human_gate_when_execution_has_no_external_proof(tmp_path
     monkeypatch.setattr(runner, "run_watch", lambda *args, **kwargs: type("W", (), {"audit": type("A", (), {"ok": True})()})())
     monkeypatch.setattr(runner, "render_watch_report", lambda watch: "watch ok")
     monkeypatch.setattr(runner, "write_global_adapters", lambda root: None)
-    monkeypatch.setattr(runner, "collect_and_write", lambda root: type("H", (), {"status": "unknown", "render": lambda self: "unknown"})())
+    monkeypatch.setattr(health, "collect_and_write", lambda root: type("H", (), {"status": "unknown", "render": lambda self: "unknown"})())
 
     assert runner.run_cycle(tmp_path) != 0
     state = read_last(tmp_path)
@@ -188,7 +189,7 @@ from pathlib import Path
 
 from lwm.cycle_state import finish, begin, write_receipt
 from lwm.health import collect
-from lwm.loop_state import read_last
+from lwm.loop_state import read_active
 from lwm import supervisor
 
 
@@ -196,11 +197,11 @@ def test_not_due_supervisor_preserves_last_full_evidence_and_records_loop(tmp_pa
     previous = finish(begin("full", "due"), status="success")
     write_receipt(tmp_path, previous)
     assert supervisor.run_supervisor(tmp_path) == 0
-    state = read_last(tmp_path)
+    state = read_active(tmp_path)
     assert state is not None
     assert state.exit_state == "continue"
     assert state.next_action == "wait for the next due window"
-    assert read_last(tmp_path).loop_id != previous.receipt_id
+    assert read_receipt(tmp_path)["receipt_id"] == previous.receipt_id
 
 
 def test_health_reports_loop_exit_and_fails_strictly_for_unclosed_loop(tmp_path: Path) -> None:
@@ -238,30 +239,39 @@ Expected: all pass.
 - Consumes: source/runtime/export paths, loop state, receipts, health, and launchd status.
 - Produces: deterministic closure checklist with `pass`, `degraded`, or `blocked` per condition.
 
+`check_closure()` accepts optional `health_required` and `launchd_required` flags
+for deterministic unit tests; the real CLI leaves both enabled. A not-due
+supervisor loop remains in `state/active-loop.json` because it is a continuing
+loop, while a terminal loop is written to `state/last-loop.json`.
+
 - [ ] **Step 1: Write failing closure tests**
 
 ```python
 from pathlib import Path
 
-from lwm.loop_state import begin_loop, close_loop, write_state
+from lwm.cycle_state import begin, finish, write_receipt
+from lwm.loop_state import begin_loop, close_loop, record_evaluation, write_state
 from lwm.closure import check_closure
 
 
 def test_closure_blocks_when_loop_is_not_verified(tmp_path: Path) -> None:
     state = close_loop(begin_loop("refresh"), exit_state="human_required", human_gate=True)
     write_state(tmp_path, state)
-    report = check_closure(tmp_path, source_root=tmp_path, runtime_root=tmp_path)
+    report = check_closure(tmp_path, source_root=tmp_path, runtime_root=tmp_path, health_required=False, launchd_required=False)
     assert report.status == "blocked"
     assert "loop" in report.failed_checks
 
 
 def test_closure_accepts_verified_loop_with_fresh_local_evidence(tmp_path: Path) -> None:
+    (tmp_path / "lwm").mkdir()
+    (tmp_path / "lwm" / "__init__.py").write_text("", encoding="utf-8")
     (tmp_path / "llms.txt").write_text("# context\n", encoding="utf-8")
+    write_receipt(tmp_path, finish(begin("full", "due"), status="success"))
     state = begin_loop("refresh", success_criteria=("evidence exists",))
-    state = state.__class__(**{**state.__dict__, "evidence": ("llms.txt",), "actual_outcome": "fresh"})
+    state = record_evaluation(state, actual_observation="local evidence exists", actual_outcome="fresh", evidence=("llms.txt",), criteria_met=True, next_action="")
     state = close_loop(state, exit_state="completed_verified", human_gate=False)
     write_state(tmp_path, state)
-    report = check_closure(tmp_path, source_root=tmp_path, runtime_root=tmp_path)
+    report = check_closure(tmp_path, source_root=tmp_path, runtime_root=tmp_path, health_required=False, launchd_required=False)
     assert report.status == "pass"
 ```
 

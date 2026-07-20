@@ -26,6 +26,7 @@ from typing import Optional
 import typer
 
 from lwm import context as lwm_context
+from lwm import closure as lwm_closure
 from lwm import forget as lwm_forget
 from lwm import health as lwm_health
 from lwm import hooks_gen as lwm_hooks_gen
@@ -368,6 +369,35 @@ def health_cmd(
     if snapshot.status == lwm_health.STATUS_FAILED:
         raise typer.Exit(2)
     if snapshot.status == lwm_health.STATUS_DEGRADED:
+        raise typer.Exit(1)
+
+
+@hub_app.command("closure")
+def closure_cmd(
+    root: Path = typer.Argument(Path("."), help="Wiki root.", exists=False),
+    source_root: Path | None = typer.Option(None, "--source-root", help="Source package root."),
+    runtime_root: Path | None = typer.Option(None, "--runtime-root", help="Runtime package root."),
+    json_output: bool = typer.Option(False, "--json", help="Emit JSON only."),
+) -> None:
+    """Check whether the latest loop has enough evidence to close."""
+
+    report = lwm_closure.check_closure(
+        root.resolve(),
+        source_root=source_root.resolve() if source_root else None,
+        runtime_root=runtime_root.resolve() if runtime_root else None,
+    )
+    if json_output:
+        payload = {"status": report.status, "checks": report.checks, "failed_checks": report.failed_checks}
+        typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+    else:
+        typer.echo(f"# LLM-WorkMem Closure - {report.status}")
+        for name, status in report.checks.items():
+            typer.echo(f"- {name}: {status}")
+        if report.failed_checks:
+            typer.echo(f"- failed_checks: {', '.join(report.failed_checks)}")
+    if report.status == "blocked":
+        raise typer.Exit(2)
+    if report.status == "degraded":
         raise typer.Exit(1)
 
 

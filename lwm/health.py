@@ -25,6 +25,7 @@ from lwm import dedup, inbox
 from lwm import capabilities
 from lwm.audit import run_audit
 from lwm.cycle_state import is_due, read_receipt
+from lwm.loop_state import read_active, read_last
 
 
 STATUS_HEALTHY = "healthy"
@@ -277,6 +278,8 @@ def _classify(snapshot: dict[str, Any], *, strict: bool = False) -> str:
             return STATUS_FAILED
         if cycle.get("due") or not cycle.get("last_success_at"):
             return STATUS_DEGRADED
+        if cycle.get("loop_exit_state") in {None, "human_required", "blocked"}:
+            return STATUS_DEGRADED
         if quality.get("cbmem", {}).get("status") not in {"healthy", "not_configured"}:
             return STATUS_DEGRADED
     if inbox_counts(snapshot)["inbox"] > 100:
@@ -318,6 +321,7 @@ def collect(root: Path, *, strict: bool = False) -> HealthSnapshot:
     index = dedup.load_event_index(root)
     tools = _tool_sync(index)
     receipt = read_receipt(root)
+    loop_state = read_active(root) or read_last(root)
     rejection_breakdown = _rejection_breakdown(root)
     cycle = {
         "due": is_due(root),
@@ -325,6 +329,13 @@ def collect(root: Path, *, strict: bool = False) -> HealthSnapshot:
         "last_success_at": receipt.get("finished_at") if receipt and receipt.get("status") == "success" else None,
         "last_receipt_id": receipt.get("receipt_id") if receipt else None,
         "last_reason": receipt.get("reason") if receipt else None,
+        "loop_id": loop_state.loop_id if loop_state else None,
+        "loop_phase": loop_state.phase if loop_state else None,
+        "loop_exit_state": loop_state.exit_state if loop_state else None,
+        "loop_objective": loop_state.objective if loop_state else None,
+        "loop_next_action": loop_state.next_action if loop_state else None,
+        "loop_evidence_count": len(loop_state.evidence) if loop_state else 0,
+        "loop_human_gate": loop_state.human_gate if loop_state else False,
     }
     last_processed = _last_processed_at(inbox.events_root(root))
     health_path = root / "state" / "health.json"

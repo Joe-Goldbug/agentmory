@@ -7,6 +7,7 @@ from typing import Any
 
 from lwm import inbox
 from lwm.cycle_state import begin, finish, is_due, write_receipt
+from lwm.loop_state import begin_loop, close_loop, record_evaluation, write_state
 
 
 FULL_INTERVAL_SECONDS = 43200
@@ -30,7 +31,25 @@ def run_supervisor(root: Path, *, interval_seconds: int = FULL_INTERVAL_SECONDS,
     root = root.resolve()
     supervisor = begin("supervisor", "scheduled")
     if not force and not is_due(root, interval_seconds=interval_seconds):
+        loop = begin_loop(
+            "scheduled memory refresh",
+            success_criteria=("full cycle runs when due",),
+            expected_observation="the previous successful cycle is still within its interval",
+            expected_outcome="wait without overwriting the previous full-cycle evidence",
+        )
+        loop = record_evaluation(
+            loop,
+            actual_observation="full cycle not due",
+            actual_outcome="previous full-cycle evidence remains current",
+            evidence=("state/last-cycle.json",),
+            criteria_met=True,
+            next_action="wait for the next due window",
+        )
+        write_state(root, close_loop(loop, exit_state="continue", human_gate=False))
         write_receipt(root, finish(supervisor, status="success", reason="not_due"))
+        from lwm.health import collect_and_write
+
+        collect_and_write(root, strict=True)
         return 0
 
     write_receipt(root, finish(supervisor, status="success", reason="full_cycle_due"))

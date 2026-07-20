@@ -6,11 +6,13 @@ import json
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any
 
 from lwm.adapters import write_global_adapters
 from lwm.ingest import run as ingest_run
 from lwm.watch import render_watch_report, run_watch
 from lwm.cbmem_bridge import sync_registered_projects
+from lwm.loop_state import begin_loop, close_loop, record_evaluation, write_state
 
 
 ADAPTER_MODULES: tuple[tuple[str, str, tuple[str, ...]], ...] = (
@@ -68,7 +70,7 @@ def _sweep_shell_events(root: Path) -> int:
     return rc
 
 
-def run_cycle(root: Path) -> int:
+def _run_cycle_stages(root: Path) -> int:
     root = root.resolve()
     rc = 0
     for name, module, extra in ADAPTER_MODULES:
@@ -100,3 +102,68 @@ def run_cycle(root: Path) -> int:
     if health.status == "failed":
         rc |= 1
     return rc
+
+
+def _health_payload(root: Path) -> dict[str, Any]:
+    path = root / "state" / "health.json"
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _loop_evidence(root: Path) -> tuple[str, ...]:
+    candidates = (root / "state" / "health.json", root / "llms.txt", root / "llms.json")
+    return tuple(str(path.relative_to(root)) for path in candidates if path.is_file())
+
+
+def run_cycle(root: Path) -> int:
+    """Run one bounded collection cycle and persist prediction/evaluation state."""
+
+    root = root.resolve()
+    loop = begin_loop(
+        "scheduled memory refresh",
+        constraints=("one bounded cycle", "preserve source evidence"),
+        success_criteria=("audit passes", "health is healthy", "external evidence exists"),
+        expected_observation="configured sources and runtime inputs are readable",
+        expected_outcome="ingest, audit, export, and health leave fresh evidence",
+    )
+    write_state(root, loop)
+    try:
+        code = _run_cycle_stages(root)
+    except Exception as exc:  # noqa: BLE001
+        evaluated = record_evaluation(
+            loop,
+            actual_observation=f"exception={exc}",
+            actual_outcome="cycle interrupted before external verification",
+            evidence=_loop_evidence(root),
+            criteria_met=False,
+            next_action="inspect the recorded exception and rerun the bounded cycle",
+        )
+        write_state(root, close_loop(evaluated, exit_state="human_required", human_gate=True))
+        raise
+
+    payload = _health_payload(root)
+    quality = payload.get("quality") if isinstance(payload.get("quality"), dict) else {}
+    audit_ok = bool(quality.get("audit_ok"))
+    health_status = str(payload.get("status") or "unknown")
+    evidence = _loop_evidence(root)
+    criteria_met = code == 0 and audit_ok and health_status == "healthy" and bool(evidence)
+    actual = f"exit={code}; audit_ok={audit_ok}; health={health_status}; evidence={len(evidence)}"
+    evaluated = record_evaluation(
+        loop,
+        actual_observation=actual,
+        actual_outcome="verified scheduled refresh" if criteria_met else "verification incomplete",
+        evidence=evidence,
+        criteria_met=criteria_met,
+        next_action="" if criteria_met else "inspect health, audit, and source/runtime evidence",
+    )
+    if criteria_met:
+        exit_state = "completed_verified"
+    elif not evidence or health_status == "unknown":
+        exit_state = "human_required"
+    else:
+        exit_state = "continue"
+    write_state(root, close_loop(evaluated, exit_state=exit_state, human_gate=exit_state == "human_required"))
+    return code if exit_state == "completed_verified" else max(code, 1)

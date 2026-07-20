@@ -271,6 +271,17 @@ vault/wiki/
 - `lwm export` 会输出可供其他 agent 直接消费的 `llms.txt`、`llms-full.txt` 和 `llms.json`
 - `lwm schedule` 会生成定时 watch + audit 的 launchd 包
 
+### Loop Engineering 控制状态
+
+定时工作按一个有边界的循环运行：感知、定义、分解、执行、评估、更新。
+每轮都会把预期结果、实际证据、下一动作和退出状态写入
+`state/active-loop.json` 或 `state/last-loop.json`。只有存在外部证据时，
+才能进入 `completed_verified`；仅有适配器文件或 launchd plist 不代表完成。
+
+运行 `lwm hub closure <root>` 查看收口门。它会检查循环状态、证据文件、
+源代码与运行副本可读性、导出文件、回执、严格健康状态和 launchd。缺少
+证据会明确报告为 `degraded` 或 `blocked`。
+
 ## 代码库记忆（`lwm cbmem`）
 
 `lwm cbmem` 封装了 [DeusData/codebase-memory-mcp](https://github.com/DeusData/codebase-memory-mcp)，让 wiki 能对任意项目目录回答代码结构问题。封装在 `lwm/cbmem.py`；决策记录在 [wiki/insights/integrations-2026-06-30.md](wiki/insights/integrations-2026-06-30.md)；速查表在 [wiki/summaries/lwm-cbmem-cheatsheet.md](wiki/summaries/lwm-cbmem-cheatsheet.md)。
