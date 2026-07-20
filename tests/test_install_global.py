@@ -65,12 +65,15 @@ def test_install_global_writes_all_adapters(tmp_path: Path) -> None:
         fake_home / "Library" / "Application Support" / "Code" / "User" / "prompts" / "llm-workmem.instructions.md",
         fake_home / ".config" / "opencode" / "AGENTS.md",
         fake_home / ".config" / "lwm" / "context.json",
+        fake_home / ".local" / "bin" / "lwm",
     ]
     for path in expected:
         assert path.is_file(), f"missing {path}"
     vscode = (fake_home / "Library" / "Application Support" / "Code" / "User" / "prompts" / "llm-workmem.instructions.md").read_text(encoding="utf-8")
     assert 'applyTo: "**"' in vscode
     assert "lwm hub context" in vscode
+    launcher = (fake_home / ".local" / "bin" / "lwm").read_text(encoding="utf-8")
+    assert "-m lwm.cli" in launcher
 
 
 def test_install_global_is_idempotent(tmp_path: Path) -> None:
