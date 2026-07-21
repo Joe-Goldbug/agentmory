@@ -12,7 +12,6 @@ _sys.path.insert(0, str(_Path(__file__).resolve().parent.parent.parent))
 
 import json
 import os
-import subprocess
 import sys
 from pathlib import Path
 
@@ -22,33 +21,6 @@ ROOT_HINT = Path(
 )
 
 
-def _render_context(project_path: str) -> str:
-    try:
-        result = subprocess.run(
-            [
-                sys.executable,
-                "-m",
-                "lwm.cli",
-                "hub",
-                "context",
-                "--tool",
-                "claude-code",
-                "--project",
-                project_path,
-                "--limit",
-                "6",
-                str(ROOT_HINT),
-            ],
-            capture_output=True,
-            text=True,
-            timeout=15,
-            check=False,
-        )
-    except (OSError, subprocess.TimeoutExpired):
-        return ""
-    return result.stdout.strip() if result.returncode == 0 else ""
-
-
 def main() -> int:
     try:
         hook_input = json.loads(sys.stdin.read() or "{}")
@@ -56,23 +28,20 @@ def main() -> int:
         hook_input = {}
     project_path = str(hook_input.get("cwd") or hook_input.get("project_path") or ".")
     session_id = str(hook_input.get("session_id") or hook_input.get("sessionId") or "unknown")
-    event = {
-        "tool": "claude-code",
-        "project_path": project_path,
-        "session_id": session_id,
-        "event_type": "session_start",
-        "importance": "scratch",
-        "privacy": "sanitized",
-        "source": {"kind": "hook", "path": "claude-code/session-start"},
-        "tags": ["claude-code", "session-start"],
-    }
     try:
-        from adapters.hooks._common import emit
+        from lwm.lifecycle import start
 
-        emit(ROOT_HINT, event)
+        result = start(
+            ROOT_HINT,
+            tool="claude-code",
+            project_path=project_path,
+            session_id=session_id,
+            source="native-hook",
+        )
+        context = result.context_markdown
     except Exception as exc:  # noqa: BLE001
         sys.stderr.write(f"claude_code_session_start hook failed: {exc}\n")
-    context = _render_context(project_path)
+        context = ""
     if context:
         # Claude Code consumes this standard SessionStart hook response and
         # appends it to the model context for the newly opened session.

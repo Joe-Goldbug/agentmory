@@ -18,6 +18,7 @@ The CLI surface is ``lwm hub install-ide-hooks``.
 from __future__ import annotations
 
 import json
+import shlex
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -29,46 +30,14 @@ class HookInstall:
     detail: str
 
 
-CLAUDE_HOOK_TEMPLATE = {
-    "hooks": {
-        "SessionStart": [
-            {
-                "matcher": "*",
-                "hooks": [
-                    {
-                        "type": "command",
-                        "command": "lwm hub record --tool=claude-code --project=$PROJECT_PATH --type=session_start --task=$SESSION_TASK --importance=project",
-                        "timeout": 5,
-                    }
-                ],
-            }
-        ],
-        "PostToolUse": [
-            {
-                "matcher": "*",
-                "hooks": [
-                    {
-                        "type": "command",
-                        "command": "lwm hub record --tool=claude-code --project=$PROJECT_PATH --type=workflow_observation --task=$TOOL_TASK --importance=project",
-                        "timeout": 5,
-                    }
-                ],
-            }
-        ],
-        "Stop": [
-            {
-                "matcher": "*",
-                "hooks": [
-                    {
-                        "type": "command",
-                        "command": "lwm hub record --tool=claude-code --project=$PROJECT_PATH --type=session_summary --task=$SESSION_TASK --importance=project",
-                        "timeout": 10,
-                    }
-                ],
-            }
-        ],
+def _claude_hook_template(root: Path) -> dict:
+    start = root / "adapters" / "hooks" / "claude_code_session_start.py"
+    stop = root / "adapters" / "hooks" / "claude_code_stop.py"
+    prefix = f"LWM_ROOT={shlex.quote(str(root))} \"$HOME/Library/Application Support/llm-workmem-runtime/app/venv/bin/python\""
+    return {
+        "SessionStart": [{"matcher": "", "hooks": [{"type": "command", "command": f"{prefix} {shlex.quote(str(start))}", "timeout": 15}]}],
+        "Stop": [{"matcher": "", "hooks": [{"type": "command", "command": f"{prefix} {shlex.quote(str(stop))}", "timeout": 15}]}],
     }
-}
 
 
 CODEX_TEMPLATE_HOOK = "# BEGIN LWM hook\n[hook]\nname = lwm-record\non = session_start\ncommand = lwm hub record --tool=codex --project={cwd} --type=session_start --task={task} --importance=project\n# END LWM hook\n"
@@ -159,6 +128,30 @@ PY
 """
 
 
+def _opencode_plugin(root: Path) -> str:
+    quoted_root = json.dumps(str(root.resolve()))
+    return f'''import type {{ Plugin }} from "@opencode-ai/plugin";
+
+const root = {quoted_root};
+
+export const LlmWorkMemPlugin: Plugin = async ({{ directory, $ }}) => {{
+  const invoke = async (phase: "start" | "stop", event: unknown) => {{
+    const data = event as {{ properties?: {{ info?: {{ id?: string }} }} }};
+    const sessionId = String(data.properties?.info?.id ?? "");
+    await $`lwm hub lifecycle ${{phase}} --tool opencode --project ${{directory}} --session-id ${{sessionId}} --root ${{root}} --source native-hook`.quiet();
+  }};
+  return {{
+    event: async ({{ event }}) => {{
+      if (event.type === "session.created") await invoke("start", event);
+      if (event.type === "session.idle" || event.type === "session.deleted") await invoke("stop", event);
+    }},
+  }};
+}};
+
+export default LlmWorkMemPlugin;
+'''
+
+
 def _safe_replace(path: Path, body: str | bytes) -> bool:
     """Write *body* to *path*; return True if anything changed."""
 
@@ -175,12 +168,38 @@ def _write_json(path: Path, body: dict) -> bool:
     return _safe_replace(path, json.dumps(body, ensure_ascii=False, indent=2))
 
 
-def install_claude_code(home: Path) -> HookInstall:
-    target = home / ".claude" / "hooks.json"
+def _load_json_object(path: Path) -> dict:
+    try:
+        loaded = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
+    except (OSError, json.JSONDecodeError):
+        loaded = {}
+    return loaded if isinstance(loaded, dict) else {}
+
+
+def _is_lwm_hook(entry: object) -> bool:
+    if not isinstance(entry, dict):
+        return False
+    hooks = entry.get("hooks")
+    if not isinstance(hooks, list):
+        return False
+    return any(isinstance(item, dict) and "claude_code_" in str(item.get("command", "")) for item in hooks)
+
+
+def install_claude_code(home: Path, *, root: Path | None = None) -> HookInstall:
+    """Merge LWM lifecycle hooks into the real Claude settings file."""
+
+    target = home / ".claude" / "settings.json"
+    body = _load_json_object(target)
+    hooks = body.get("hooks") if isinstance(body.get("hooks"), dict) else {}
+    hooks = dict(hooks)
+    for event, entries in _claude_hook_template((root or Path.cwd()).resolve()).items():
+        current = hooks.get(event) if isinstance(hooks.get(event), list) else []
+        hooks[event] = [entry for entry in current if not _is_lwm_hook(entry)] + entries
+    body["hooks"] = hooks
     return HookInstall(
         tool="claude-code",
         config_path=target,
-        detail=_render_status(_write_json(target, CLAUDE_HOOK_TEMPLATE), "hooks"),
+        detail=_render_status(_write_json(target, body), "settings hooks"),
     )
 
 
@@ -195,9 +214,11 @@ def install_codex(home: Path) -> HookInstall:
 
 def install_kiro(home: Path) -> HookInstall:
     settings = home / ".kiro" / "settings.json"
-    settings_payload = {"hooks": {"on": "session_start", "command": "lwm hub record --tool=kiro --project=$PROJECT_PATH --type=session_start --task=$TASK --importance=project"}}
     steering_path = home / ".kiro" / "steering" / "lwm.md"
-    detail_settings = _render_status(_write_json(settings, settings_payload), "settings")
+    # Kiro's documented hooks are tool-use guards, not session lifecycle
+    # hooks. Preserve the user's settings and let the local session observer
+    # supply evidence rather than writing an invented setting schema.
+    detail_settings = "steering: preserved settings; session observer enabled"
     _safe_replace(steering_path, KIRO_STEERING)
     return HookInstall(
         tool="kiro",
@@ -226,6 +247,21 @@ def install_minimax(home: Path) -> HookInstall:
     )
 
 
+def install_opencode(home: Path, *, root: Path) -> HookInstall:
+    """Install OpenCode's documented local plugin without replacing config."""
+
+    target = home / ".config" / "opencode" / "plugins" / "llm-workmem.ts"
+    changed = _safe_replace(target, _opencode_plugin(root))
+    config_path = home / ".config" / "opencode" / "opencode.json"
+    config = _load_json_object(config_path)
+    plugins = config.get("plugin") if isinstance(config.get("plugin"), list) else []
+    marker = str(target)
+    if marker not in plugins:
+        config["plugin"] = [*plugins, marker]
+        changed = _write_json(config_path, config) or changed
+    return HookInstall("opencode", target, _render_status(changed, "lifecycle-plugin"))
+
+
 def _render_status(changed: bool, kind: str) -> str:
     return f"{kind}: {'updated' if changed else 'already current'}"
 
@@ -233,12 +269,14 @@ def _render_status(changed: bool, kind: str) -> str:
 def install_ide_hooks(
     home: Path,
     *,
-    tools: tuple[str, ...] = ("claude-code", "codex", "kiro", "trae", "minimax"),
+    root: Path | None = None,
+    tools: tuple[str, ...] = ("claude-code", "codex", "kiro", "opencode", "trae", "minimax"),
 ) -> list[HookInstall]:
     installers = {
-        "claude-code": install_claude_code,
+        "claude-code": lambda target_home: install_claude_code(target_home, root=(root or Path.cwd())),
         "codex": install_codex,
         "kiro": install_kiro,
+        "opencode": lambda target_home: install_opencode(target_home, root=(root or Path.cwd())),
         "trae": install_trae,
         "minimax": install_minimax,
     }
@@ -258,5 +296,6 @@ __all__ = [
     "install_ide_hooks",
     "install_kiro",
     "install_minimax",
+    "install_opencode",
     "install_trae",
 ]

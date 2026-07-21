@@ -86,29 +86,18 @@ def main() -> int:
     )
     session_id = str(hook_input.get("session_id") or hook_input.get("sessionId") or "unknown")
     last_user = _last_user_text(hook_input)[:600]
-    decisions = list(hook_input.get("decisions") or [])
-    changes = list(hook_input.get("changes") or [])
-    verification = list(hook_input.get("verification") or [])
-
-    event = {
-        "tool": "claude-code",
-        "tool_version": str(hook_input.get("claude_code_version") or ""),
-        "project_path": str(project_path),
-        "session_id": session_id,
-        "event_type": "session_summary",
-        "task": last_user or "(no user text)",
-        "decisions": decisions,
-        "changes": changes,
-        "verification": verification,
-        "importance": "project",
-        "privacy": "sanitized",
-        "source": {"kind": "hook", "path": "claude-code/stop"},
-        "tags": ["claude-code"],
-    }
     try:
-        from adapters.hooks._common import emit
+        from lwm.lifecycle import stop
 
-        return emit(ROOT_HINT, event)
+        stop(
+            ROOT_HINT,
+            tool="claude-code",
+            project_path=str(project_path),
+            session_id=session_id,
+            task=last_user or "(no user text)",
+            source="native-hook",
+        )
+        return 0
     except Exception as exc:  # noqa: BLE001
         sys.stderr.write(f"claude_code_stop hook failed: {exc}\n")
         return 0

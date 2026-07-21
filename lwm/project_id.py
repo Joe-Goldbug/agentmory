@@ -74,7 +74,7 @@ def _run_git(cwd: Path, args: list[str]) -> str | None:
 def resolve_project_id(path: str | Path) -> ProjectIdResolution:
     """Resolve a project id without consulting the cache."""
 
-    target = Path(path).expanduser().resolve()
+    target = resolve_project_root(path)
     if not target.exists():
         # Even non-existent paths still get a stable id (offline-safe).
         digest = _hash_hex(str(target))
@@ -101,6 +101,23 @@ def resolve_project_id(path: str | Path) -> ProjectIdResolution:
     return ProjectIdResolution(
         project_id=f"adhoc-{digest}", kind="adhoc", toplevel=str(target)
     )
+
+
+def resolve_project_root(path: str | Path) -> Path:
+    """Return the Git worktree root for *path*, or its resolved directory.
+
+    Lifecycle adapters receive whatever directory their host reports.  This
+    normalizes nested folders and worktree children before either a context
+    lookup or an event is written, preventing one repository from splitting
+    into several path identities.
+    """
+
+    target = Path(path).expanduser().resolve()
+    if not target.exists():
+        return target
+    candidate = target if target.is_dir() else target.parent
+    toplevel = _run_git(candidate, ["rev-parse", "--show-toplevel"])
+    return Path(toplevel).resolve() if toplevel else candidate
 
 
 def _cache_path(root: Path) -> Path:
@@ -135,9 +152,10 @@ def save_project_map(root: Path, mapping: dict[str, str]) -> Path:
 def record_project(root: Path, path: str | Path) -> ProjectIdResolution:
     """Resolve + persist a project id for ``path``."""
 
-    resolution = resolve_project_id(path)
+    project_root = resolve_project_root(path)
+    resolution = resolve_project_id(project_root)
     cache = load_project_map(root)
-    key = str(Path(path).expanduser().resolve())
+    key = str(project_root)
     if cache.get(key) != resolution.project_id:
         cache[key] = resolution.project_id
         save_project_map(root, cache)
@@ -182,5 +200,6 @@ __all__ = [
     "load_project_map",
     "record_project",
     "resolve_project_id",
+    "resolve_project_root",
     "save_project_map",
 ]

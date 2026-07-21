@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -23,8 +23,8 @@ KNOWN_TOOLS = (
 
 TOOL_TARGETS = {
     "codex": (".codex/AGENTS.md",),
-    "claude-code": (".claude/CLAUDE.md",),
-    "opencode": (".config/opencode/AGENTS.md",),
+    "claude-code": (".claude/settings.json",),
+    "opencode": (".config/opencode/AGENTS.md", ".config/opencode/plugins/llm-workmem.ts"),
     "shell": (".zshrc",),
     "vscode": (
         "Library/Application Support/Code/User/prompts/llm-workmem.instructions.md",
@@ -110,7 +110,26 @@ def summary(root: Path) -> dict[str, dict[str, Any]]:
     return out
 
 
-def probe(root: Path, *, home: Path | None = None) -> dict[str, dict[str, Any]]:
+def _is_fresh_native(receipt: Any, expected_project_id: str | None) -> bool:
+    if not isinstance(receipt, dict) or receipt.get("status") != "verified":
+        return False
+    if receipt.get("source") not in {"native-hook", "lifecycle-hook"}:
+        return False
+    if expected_project_id and receipt.get("project_id") != expected_project_id:
+        return False
+    try:
+        recorded = datetime.fromisoformat(str(receipt["recorded_at"]).replace("Z", "+00:00"))
+    except (KeyError, TypeError, ValueError):
+        return False
+    return recorded >= datetime.now(timezone.utc) - timedelta(days=14)
+
+
+def probe(
+    root: Path,
+    *,
+    home: Path | None = None,
+    project_path: str | Path | None = None,
+) -> dict[str, dict[str, Any]]:
     """Check configuration separately from real read/write receipts.
 
     A present instruction file proves only that an adapter is installed. A
@@ -119,6 +138,11 @@ def probe(root: Path, *, home: Path | None = None) -> dict[str, dict[str, Any]]:
     """
     home = (home or Path.home()).expanduser().resolve()
     receipts = load(root)
+    expected_project_id = None
+    if project_path is not None:
+        from lwm.project_id import resolve_project_id
+
+        expected_project_id = resolve_project_id(project_path).project_id
     out: dict[str, dict[str, Any]] = {}
     for tool in KNOWN_TOOLS:
         targets = [home / relative for relative in TOOL_TARGETS.get(tool, ())]
@@ -126,8 +150,8 @@ def probe(root: Path, *, home: Path | None = None) -> dict[str, dict[str, Any]]:
         readable = installed and all(path.stat().st_size > 0 for path in targets)
         read_receipt = receipts.get(f"{tool}:read")
         write_receipt = receipts.get(f"{tool}:write")
-        read_verified = isinstance(read_receipt, dict) and read_receipt.get("status") == "verified"
-        write_verified = isinstance(write_receipt, dict) and write_receipt.get("status") == "verified"
+        read_verified = _is_fresh_native(read_receipt, expected_project_id)
+        write_verified = _is_fresh_native(write_receipt, expected_project_id)
         if read_verified and write_verified:
             status = "verified_bidirectional"
         elif read_verified:
@@ -142,6 +166,7 @@ def probe(root: Path, *, home: Path | None = None) -> dict[str, dict[str, Any]]:
             "targets": [str(path) for path in targets],
             "read_receipt": read_receipt if isinstance(read_receipt, dict) else None,
             "write_receipt": write_receipt if isinstance(write_receipt, dict) else None,
+            "expected_project_id": expected_project_id,
         }
     return out
 

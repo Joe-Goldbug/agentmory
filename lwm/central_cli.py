@@ -37,11 +37,12 @@ from lwm import promote as lwm_promote
 from lwm import project_memory as lwm_project_memory
 from lwm import shell_hook as lwm_shell_hook
 from lwm import capabilities as lwm_capabilities
+from lwm import lifecycle as lwm_lifecycle
 from lwm import memory_api as lwm_memory_api
 from lwm.recall import render_recall_packet
 from lwm import registry as lwm_registry
 from lwm.events import validate_event
-from lwm.project_id import record_project
+from lwm.project_id import record_project, resolve_project_root
 
 
 hub_app = typer.Typer(
@@ -171,6 +172,10 @@ def record_cmd(
     if not parsed.get("project_path"):
         parsed["project_path"] = os.getcwd()
 
+    # Every producer may send a nested cwd. Store the real repository root so
+    # context, events and capability receipts cannot disagree about a project.
+    parsed["project_path"] = str(resolve_project_root(str(parsed["project_path"])))
+
     if not parsed.get("tool"):
         typer.secho("--tool is required", err=True, fg=typer.colors.RED)
         raise typer.Exit(2)
@@ -255,10 +260,11 @@ def context_cmd(
     if format not in {"markdown", "json"}:
         typer.secho("--format must be markdown or json", err=True, fg=typer.colors.RED)
         raise typer.Exit(2)
+    canonical_project = resolve_project_root(project) if project else None
     report = lwm_context.build(
         root.resolve(),
         tool=tool,
-        project_path=str(project.resolve()) if project else None,
+        project_path=str(canonical_project) if canonical_project else None,
         format=format,
         limit=limit,
     )
@@ -276,6 +282,38 @@ def context_cmd(
         markdown = report.markdown.rstrip() + f"\n\nWarning: {warnings[-1]}\n"
         report = replace(report, markdown=markdown, data=data)
     typer.echo(report.markdown)
+
+
+@hub_app.command("lifecycle")
+def lifecycle_cmd(
+    phase: str = typer.Argument(..., help="start | stop"),
+    tool: str = typer.Option(..., "--tool", help="Tool name."),
+    project: Path = typer.Option(Path("."), "--project", "-p", help="Current project path."),
+    session_id: str | None = typer.Option(None, "--session-id", help="Host session id."),
+    task: str | None = typer.Option(None, "--task", help="Sanitized end summary."),
+    source: str = typer.Option("native-hook", "--source", help="Receipt source."),
+    root: Path = typer.Option(Path("."), "--root", help="Wiki root.", exists=False),
+) -> None:
+    """Handle a native lifecycle boundary with a canonical project root."""
+
+    if phase not in {"start", "stop"}:
+        typer.secho("phase must be start or stop", err=True, fg=typer.colors.RED)
+        raise typer.Exit(2)
+    if phase == "start":
+        result = lwm_lifecycle.start(
+            root, tool=tool, project_path=project, session_id=session_id, source=source
+        )
+        typer.echo(result.context_markdown)
+        return
+    result = lwm_lifecycle.stop(
+        root,
+        tool=tool,
+        project_path=project,
+        session_id=session_id,
+        task=task,
+        source=source,
+    )
+    typer.echo(f"lifecycle stop -> {result.event_path}")
 
 
 @hub_app.command("promote")
@@ -674,7 +712,7 @@ def install_ide_hooks_cmd(
         help="Report what would be touched without writing.",
     ),
     tools: str = typer.Option(
-        "claude-code,codex,kiro,trae,minimax",
+        "claude-code,codex,kiro,opencode,trae,minimax",
         "--tools",
         help="Comma-separated list of IDE tools to install hooks for.",
     ),
@@ -687,7 +725,7 @@ def install_ide_hooks_cmd(
         typer.secho("dry-run: would write hook configs under ", fg=typer.colors.YELLOW, nl=False)
         typer.echo(str(target_home))
         return
-    installs = lwm_hooks_gen.install_ide_hooks(target_home, tools=tool_list)
+    installs = lwm_hooks_gen.install_ide_hooks(target_home, root=root.resolve(), tools=tool_list)
     for entry in installs:
         typer.echo(f"{entry.tool}: {entry.config_path} ({entry.detail})")
 

@@ -38,8 +38,8 @@ def test_codex_hook_is_written(tmp_path: Path) -> None:
 
 def test_kiro_writes_settings_and_steering(tmp_path: Path) -> None:
     install = hooks_gen.install_kiro(tmp_path)
-    body = json.loads(install.config_path.read_text(encoding="utf-8"))
-    assert body["hooks"]["on"] == "session_start"
+    assert not install.config_path.exists()
+    assert "preserved settings" in install.detail
     steering = (tmp_path / ".kiro" / "steering" / "lwm.md").read_text(encoding="utf-8")
     assert "LLM-WorkMem inbound hook" in steering
 
@@ -63,13 +63,25 @@ def test_minimax_hook_is_written(tmp_path: Path) -> None:
     assert result.returncode == 0
 
 
+def test_opencode_plugin_handles_start_and_end(tmp_path: Path) -> None:
+    install = hooks_gen.install_opencode(tmp_path, root=tmp_path / "workmem")
+    text = install.config_path.read_text(encoding="utf-8")
+    assert "session.created" in text
+    assert "session.idle" in text
+    config = json.loads((tmp_path / ".config" / "opencode" / "opencode.json").read_text())
+    assert str(install.config_path) in config["plugin"]
+
+
 def test_install_ide_hooks_is_idempotent(tmp_path: Path) -> None:
     """Re-installing should be a no-op on the second run."""
 
     first = hooks_gen.install_ide_hooks(tmp_path)
-    assert all("updated" in entry.detail for entry in first)
+    assert any("updated" in entry.detail for entry in first)
     second = hooks_gen.install_ide_hooks(tmp_path)
-    assert all("already current" in entry.detail for entry in second)
+    assert all(
+        "already current" in entry.detail or "preserved settings" in entry.detail
+        for entry in second
+    )
 
 
 def test_install_ide_hooks_ignores_unknown(tmp_path: Path) -> None:
@@ -83,7 +95,7 @@ def test_install_ide_hooks_ignores_unknown(tmp_path: Path) -> None:
 def test_install_ide_hooks_helper(tmp_path: Path) -> None:
     installs = hooks_gen.install_ide_hooks(tmp_path)
     tool_names = {entry.tool for entry in installs}
-    assert tool_names == {"claude-code", "codex", "kiro", "trae", "minimax"}
+    assert tool_names == {"claude-code", "codex", "kiro", "opencode", "trae", "minimax"}
 
 
 def test_install_ide_hooks_cli_defaults_include_minimax(tmp_path: Path) -> None:

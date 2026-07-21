@@ -144,6 +144,9 @@ def materialize_runtime_layout(root: Path) -> Path:
     _replace_with_symlink(runtime_state, source_state)
     if package_source.is_dir():
         shutil.copytree(package_source, package_target, dirs_exist_ok=True)
+    adapters_source = root / "adapters"
+    if adapters_source.is_dir():
+        shutil.copytree(adapters_source, runtime_root / "adapters", dirs_exist_ok=True)
     return runtime_root
 
 
@@ -641,6 +644,9 @@ def _launch_runner_path(label: str, root: Path) -> Path:
 
 def _installed_lwm_path() -> Path:
     """Return the one runtime used by launchd and all generated schedules."""
+    global_launcher = Path.home() / ".local" / "bin" / "lwm"
+    if global_launcher.is_file():
+        return global_launcher
     return Path.home() / "Library" / "Application Support" / "llm-workmem-runtime" / "app" / "venv" / "bin" / "lwm"
 
 
