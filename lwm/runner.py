@@ -8,11 +8,12 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from lwm import lifecycle
 from lwm.adapters import write_global_adapters
-from lwm.ingest import run as ingest_run
-from lwm.watch import render_watch_report, run_watch
 from lwm.cbmem_bridge import sync_registered_projects
+from lwm.ingest import run as ingest_run
 from lwm.loop_state import begin_loop, close_loop, record_evaluation, write_state
+from lwm.watch import render_watch_report, run_watch
 
 
 ADAPTER_MODULES: tuple[tuple[str, str, tuple[str, ...]], ...] = (
@@ -45,6 +46,12 @@ def _sweep_shell_events(root: Path) -> int:
     shell_dir = root / "raw" / "shell"
     if not shell_dir.is_dir():
         return 0
+    seen_path = root / "state" / "shell-session-events.json"
+    try:
+        payload = json.loads(seen_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        payload = []
+    seen = set(payload) if isinstance(payload, list) else set()
     rc = 0
     for jsonl in sorted(shell_dir.glob("*.jsonl")):
         for line in jsonl.read_text(encoding="utf-8", errors="replace").splitlines()[-1:]:
@@ -52,6 +59,26 @@ def _sweep_shell_events(root: Path) -> int:
                 continue
             try:
                 payload = json.loads(line)
+                event_key = ":".join(
+                    str(value)
+                    for value in (
+                        jsonl.name,
+                        payload.get("ts"),
+                        payload.get("session"),
+                        payload.get("command"),
+                    )
+                )
+                if event_key in seen:
+                    continue
+                project_path = str(payload.get("pwd") or root)
+                session_id = str(payload.get("session") or jsonl.stem)
+                lifecycle.start(
+                    root,
+                    tool="shell",
+                    project_path=project_path,
+                    session_id=session_id,
+                    source="watcher-observed",
+                )
                 event = {
                     "tool": "shell",
                     "project_path": payload.get("pwd", str(root)),
@@ -69,8 +96,20 @@ def _sweep_shell_events(root: Path) -> int:
                     timeout=30,
                 )
                 rc |= result.returncode
+                if result.returncode == 0:
+                    lifecycle.stop(
+                        root,
+                        tool="shell",
+                        project_path=project_path,
+                        session_id=session_id,
+                        task="Shell command observed complete",
+                        source="watcher-observed",
+                    )
+                    seen.add(event_key)
             except (OSError, json.JSONDecodeError, subprocess.TimeoutExpired):
                 rc |= 1
+    seen_path.parent.mkdir(parents=True, exist_ok=True)
+    seen_path.write_text(json.dumps(sorted(seen)), encoding="utf-8")
     return rc
 
 

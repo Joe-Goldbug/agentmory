@@ -6,13 +6,13 @@ import sqlite3
 import time
 from pathlib import Path
 
-from lwm import capabilities, lifecycle
 from adapters.hooks import (
     antigravity_sessions,
     kiro_sessions,
     trae_sessions,
     vscode_sessions,
 )
+from lwm import capabilities, lifecycle, runner
 from lwm.project_id import resolve_project_root
 
 
@@ -241,3 +241,31 @@ def test_trae_observer_records_local_session_boundaries(tmp_path: Path) -> None:
     receipts = capabilities.load(tmp_path)
     assert receipts["trae:read"]["source"] == "watcher-observed"
     assert receipts["trae:write"]["source"] == "watcher-observed"
+
+
+def test_shell_sweep_records_observed_lifecycle(tmp_path: Path, monkeypatch) -> None:
+    project = _git_project(tmp_path)
+    shell_dir = tmp_path / "raw" / "shell"
+    shell_dir.mkdir(parents=True)
+    (shell_dir / "2026-07-22.jsonl").write_text(
+        json.dumps(
+            {
+                "ts": 1,
+                "pwd": str(project),
+                "session": "shell-1",
+                "command": "print verification",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        "lwm.runner.subprocess.run",
+        lambda *args, **kwargs: type(
+            "Result", (), {"returncode": 0, "stdout": "", "stderr": ""}
+        )(),
+    )
+    assert runner._sweep_shell_events(tmp_path) == 0
+    receipts = capabilities.load(tmp_path)
+    assert receipts["shell:read"]["source"] == "watcher-observed"
+    assert receipts["shell:write"]["source"] == "watcher-observed"

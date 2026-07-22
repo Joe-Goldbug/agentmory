@@ -45,20 +45,25 @@ _lbm_shell_hook_root() {
 # being so aggressive that they nuke useful audit context.
 _lbm_shell_hook_sensitive() {
   local cmd="$1"
+  local secret_option='(^|[[:space:]])--?(token|password|passwd|secret|apikey|api[-_]?key|access[-_]?key)='
+  local secret_env='(^|[[:space:]])(AWS_SECRET|GITHUB_TOKEN|OPENAI_API_KEY|ANTHROPIC_API_KEY|HUGGINGFACE_TOKEN)[[:space:]]*='
+  local secret_post='(^|[[:space:]])curl[[:space:]]+.*-[[:space:]]*X[[:space:]]+POST.*-d[[:space:]]+.*(token|password|secret)'
+  local ssh_remote='(^|[[:space:]])ssh[[:space:]]+.*@'
+  local gpg_secret='(^|[[:space:]])gpg[[:space:]]+(--(decrypt|import|export-secret-keys)|--passphrase)'
   # Word-boundary match against common secrets
-  if [[ "$cmd" =~ (^|[[:space:]])(\-\-?(token|password|passwd|secret|apikey|api[-_]?key|access[-_]?key)= ]] then
+  if [[ "$cmd" =~ "$secret_option" ]]; then
     return 0
   fi
-  if [[ "$cmd" =~ (^|[[:space:]])(AWS_SECRET|GITHUB_TOKEN|OPENAI_API_KEY|ANTHROPIC_API_KEY|HUGGINGFACE_TOKEN)[[:space:]]*= ]] then
+  if [[ "$cmd" =~ "$secret_env" ]]; then
     return 0
   fi
-  if [[ "$cmd" =~ (^|[[:space:]])(curl[[:space:]]+.*-[[:space:]]*X[[:space:]]+POST.*-d[[:space:]]+.*(token|password|secret)) ]] then
+  if [[ "$cmd" =~ "$secret_post" ]]; then
     return 0
   fi
-  if [[ "$cmd" =~ (^|[[:space:]])ssh[[:space:]]+.*@ ]] then
+  if [[ "$cmd" =~ "$ssh_remote" ]]; then
     return 0
   fi
-  if [[ "$cmd" =~ (^|[[:space:]])gpg[[:space:]]+(--(decrypt|import|export-secret-keys)|--passphrase) ]] then
+  if [[ "$cmd" =~ "$gpg_secret" ]]; then
     return 0
   fi
   return 1

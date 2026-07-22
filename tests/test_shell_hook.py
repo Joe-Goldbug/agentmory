@@ -12,11 +12,18 @@ Scope Lock:
 
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 
 import pytest
 
 from lwm import shell_hook
+
+
+def test_bundled_hook_has_valid_zsh_syntax() -> None:
+    hook = Path(__file__).parents[1] / "lwm" / "lwm_shell_hook.zsh"
+    result = subprocess.run(["zsh", "-n", str(hook)], capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
 
 
 def _seed_rc(path: Path, body: str) -> None:
