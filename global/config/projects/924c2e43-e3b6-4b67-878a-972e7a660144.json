@@ -43,7 +43,8 @@
         "command(/usr/bin/python3 \"/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/automation/launchd/com\\.ethan\\.lwm\\.harvest/run-harvest\\.py\")",
         "command(\"/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/\\.venv/bin/python3\" \"/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/automation/launchd/com\\.ethan\\.lwm\\.harvest/run-harvest\\.py\")",
         "read_file(/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/AntigravitySync/brain/cce6676a-7607-4c7a-849e-aad0b3f51e8e/.system_generated/tasks/task-104.log)",
-        "command(find)"
+        "command(find)",
+        "command(\"/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/.venv/bin/lwm\")"
       ]
     }
   },
@@ -52,5 +53,6 @@
     "internetPolicy": "AGENT_SETTING_POLICY_ASK",
     "autoExecutionPolicy": "CASCADE_COMMANDS_AUTO_EXECUTION_OFF",
     "artifactReviewMode": "ARTIFACT_REVIEW_MODE_ALWAYS"
-  }
+  },
+  "updatedAt": "2026-07-22T13:29:10.553023Z"
 }

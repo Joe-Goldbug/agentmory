@@ -1,6 +1,6 @@
 {
   "status": "healthy",
-  "checked_at": "2026-07-15T07:44:29.261904+00:00",
+  "checked_at": "2026-07-22T16:01:58.977628+00:00",
   "infrastructure": {
     "launchd": {
       "loaded": true,
@@ -9,19 +9,297 @@
       "last_exit_code": 0,
       "has_history": true,
       "running": false,
-      "runs": 3
+      "runs": 8
     },
-    "last_health_json_mtime": "2026-07-15T07:44:16.322485+00:00",
-    "pid": 52860
+    "last_health_json_mtime": "2026-07-22T15:56:48.451959+00:00",
+    "pid": 31767
   },
   "data_flow": {
     "last_processed_at": "fca1a08e-ddf9-4259-8b49-b7bb616e8fce.json",
-    "event_index_entries": 30
+    "event_index_entries": 138
+  },
+  "cycle": {
+    "due": false,
+    "last_status": "success",
+    "last_success_at": "2026-07-22T22:01:52+08:00",
+    "last_receipt_id": "a8434d9d-7360-430a-8097-0a5791fa78ad",
+    "last_reason": "due",
+    "loop_id": "8848d508-1fcc-4d90-9f4e-a8d913a3f42b",
+    "loop_phase": "update",
+    "loop_exit_state": "continue",
+    "loop_objective": "scheduled memory refresh",
+    "loop_next_action": "wait for the next due window",
+    "loop_evidence_count": 1,
+    "loop_human_gate": false
+  },
+  "capabilities": {
+    "codex": {
+      "configuration": "verified_bidirectional",
+      "installed": true,
+      "targets": [
+        "/Users/ethan/.codex/AGENTS.md"
+      ],
+      "read": {
+        "tool": "codex",
+        "direction": "read",
+        "project_id": "git-9f1cb19971812dd3",
+        "source": "lifecycle-hook",
+        "detail": "",
+        "status": "verified",
+        "recorded_at": "2026-07-22T22:03:35+08:00"
+      },
+      "write": {
+        "tool": "codex",
+        "direction": "write",
+        "project_id": "git-9f1cb19971812dd3",
+        "source": "lifecycle-hook",
+        "detail": "",
+        "status": "verified",
+        "recorded_at": "2026-07-22T22:03:35+08:00"
+      },
+      "bidirectional": true
+    },
+    "claude-code": {
+      "configuration": "verified_bidirectional",
+      "installed": true,
+      "targets": [
+        "/Users/ethan/.claude/settings.json"
+      ],
+      "read": {
+        "tool": "claude-code",
+        "direction": "read",
+        "project_id": "git-9f1cb19971812dd3",
+        "source": "native-hook",
+        "detail": "",
+        "status": "verified",
+        "recorded_at": "2026-07-21T09:49:50+08:00"
+      },
+      "write": {
+        "tool": "claude-code",
+        "direction": "write",
+        "project_id": "git-9f1cb19971812dd3",
+        "source": "native-hook",
+        "detail": "",
+        "status": "verified",
+        "recorded_at": "2026-07-21T09:49:50+08:00"
+      },
+      "bidirectional": true
+    },
+    "opencode": {
+      "configuration": "verified_bidirectional",
+      "installed": true,
+      "targets": [
+        "/Users/ethan/.config/opencode/AGENTS.md",
+        "/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/integrations/opencode/lwm-workmem.ts"
+      ],
+      "read": {
+        "tool": "opencode",
+        "direction": "read",
+        "project_id": "git-9f1cb19971812dd3",
+        "source": "native-hook",
+        "detail": "",
+        "status": "verified",
+        "recorded_at": "2026-07-22T23:32:07+08:00"
+      },
+      "write": {
+        "tool": "opencode",
+        "direction": "write",
+        "project_id": "git-9f1cb19971812dd3",
+        "source": "native-hook",
+        "detail": "",
+        "status": "verified",
+        "recorded_at": "2026-07-22T23:32:20+08:00"
+      },
+      "bidirectional": true
+    },
+    "shell": {
+      "configuration": "verified_bidirectional",
+      "installed": true,
+      "targets": [
+        "/Users/ethan/.zshrc"
+      ],
+      "read": {
+        "tool": "shell",
+        "direction": "read",
+        "project_id": "git-9f1cb19971812dd3",
+        "source": "watcher-observed",
+        "detail": "",
+        "status": "verified",
+        "recorded_at": "2026-07-22T21:59:34+08:00"
+      },
+      "write": {
+        "tool": "shell",
+        "direction": "write",
+        "project_id": "git-9f1cb19971812dd3",
+        "source": "watcher-observed",
+        "detail": "",
+        "status": "verified",
+        "recorded_at": "2026-07-22T21:59:34+08:00"
+      },
+      "bidirectional": true
+    },
+    "vscode": {
+      "configuration": "verified_bidirectional",
+      "installed": true,
+      "targets": [
+        "/Users/ethan/Library/Application Support/Code/User/prompts/copilot-workflow-memory.instructions.md"
+      ],
+      "read": {
+        "tool": "vscode",
+        "direction": "read",
+        "project_id": "git-9f1cb19971812dd3",
+        "source": "watcher-observed",
+        "detail": "",
+        "status": "verified",
+        "recorded_at": "2026-07-22T10:45:49+08:00"
+      },
+      "write": {
+        "tool": "vscode",
+        "direction": "write",
+        "project_id": "git-9f1cb19971812dd3",
+        "source": "watcher-observed",
+        "detail": "",
+        "status": "verified",
+        "recorded_at": "2026-07-22T10:47:20+08:00"
+      },
+      "bidirectional": true
+    },
+    "kiro": {
+      "configuration": "verified_bidirectional",
+      "installed": true,
+      "targets": [
+        "/Users/ethan/.kiro/steering/llm-workmem.md"
+      ],
+      "read": {
+        "tool": "kiro",
+        "direction": "read",
+        "project_id": "git-9f1cb19971812dd3",
+        "source": "watcher-observed",
+        "detail": "",
+        "status": "verified",
+        "recorded_at": "2026-07-22T22:47:05+08:00"
+      },
+      "write": {
+        "tool": "kiro",
+        "direction": "write",
+        "project_id": "git-9f1cb19971812dd3",
+        "source": "watcher-observed",
+        "detail": "",
+        "status": "verified",
+        "recorded_at": "2026-07-22T22:47:05+08:00"
+      },
+      "bidirectional": true
+    },
+    "antigravity": {
+      "configuration": "verified_bidirectional",
+      "installed": true,
+      "targets": [
+        "/Users/ethan/.agents/AGENTS.md",
+        "/Users/ethan/.agents/GLOBAL.md"
+      ],
+      "read": {
+        "tool": "antigravity",
+        "direction": "read",
+        "project_id": "git-9f1cb19971812dd3",
+        "source": "watcher-observed",
+        "detail": "",
+        "status": "verified",
+        "recorded_at": "2026-07-22T21:45:52+08:00"
+      },
+      "write": {
+        "tool": "antigravity",
+        "direction": "write",
+        "project_id": "git-9f1cb19971812dd3",
+        "source": "watcher-observed",
+        "detail": "",
+        "status": "verified",
+        "recorded_at": "2026-07-22T21:45:52+08:00"
+      },
+      "bidirectional": true
+    },
+    "trae": {
+      "configuration": "verified_bidirectional",
+      "installed": true,
+      "targets": [
+        "/Users/ethan/.traerules"
+      ],
+      "read": {
+        "tool": "trae",
+        "direction": "read",
+        "project_id": "git-9f1cb19971812dd3",
+        "source": "watcher-observed",
+        "detail": "",
+        "status": "verified",
+        "recorded_at": "2026-07-22T21:52:43+08:00"
+      },
+      "write": {
+        "tool": "trae",
+        "direction": "write",
+        "project_id": "git-9f1cb19971812dd3",
+        "source": "watcher-observed",
+        "detail": "",
+        "status": "verified",
+        "recorded_at": "2026-07-22T21:52:43+08:00"
+      },
+      "bidirectional": true
+    },
+    "trae-solo": {
+      "configuration": "verified_bidirectional",
+      "installed": true,
+      "targets": [
+        "/Users/ethan/.traerules"
+      ],
+      "read": {
+        "tool": "trae-solo",
+        "direction": "read",
+        "project_id": "git-9f1cb19971812dd3",
+        "source": "watcher-observed",
+        "detail": "",
+        "status": "verified",
+        "recorded_at": "2026-07-22T23:16:58+08:00"
+      },
+      "write": {
+        "tool": "trae-solo",
+        "direction": "write",
+        "project_id": "git-9f1cb19971812dd3",
+        "source": "watcher-observed",
+        "detail": "",
+        "status": "verified",
+        "recorded_at": "2026-07-22T23:16:58+08:00"
+      },
+      "bidirectional": true
+    },
+    "minimax": {
+      "configuration": "verified_bidirectional",
+      "installed": true,
+      "targets": [
+        "/Users/ethan/.minimax/agents/coder/agent.md"
+      ],
+      "read": {
+        "tool": "minimax",
+        "direction": "read",
+        "project_id": "git-9f1cb19971812dd3",
+        "source": "watcher-observed",
+        "detail": "",
+        "status": "verified",
+        "recorded_at": "2026-07-22T23:14:35+08:00"
+      },
+      "write": {
+        "tool": "minimax",
+        "direction": "write",
+        "project_id": "git-9f1cb19971812dd3",
+        "source": "watcher-observed",
+        "detail": "",
+        "status": "verified",
+        "recorded_at": "2026-07-22T23:14:36+08:00"
+      },
+      "bidirectional": true
+    }
   },
   "inbox_counts": {
     "inbox": 0,
-    "processed": 26,
-    "rejected": 1027,
+    "processed": 127,
+    "rejected": 2336,
     "failed": 0
   },
   "quality": {
@@ -29,53 +307,97 @@
     "issues": 0,
     "llms_txt": {
       "exists": true,
-      "size_bytes": 10438,
-      "mtime": "2026-07-14T12:40:16.252688+00:00"
+      "size_bytes": 26631,
+      "mtime": "2026-07-22T14:01:48.477384+00:00"
     },
-    "privacy_rejection_rate": 0.9753086419753086
+    "privacy_rejection_rate": 0.0004060089321965083,
+    "rejection_breakdown": {
+      "duplicate": 2335,
+      "privacy_blocked": 1
+    },
+    "cbmem": {
+      "status": "healthy",
+      "projects": 1,
+      "checked_at": "2026-07-22T23:43:55+08:00"
+    }
   },
   "tools": [
     {
+      "tool": "antigravity",
+      "last_event_at": "2026-07-22T21:45:53+08:00",
+      "last_event_type": "session_summary",
+      "last_project_id": "git-f419aa0396446d92",
+      "event_count": 11
+    },
+    {
       "tool": "claude-code",
-      "last_event_at": "2026-07-14T11:48:13+08:00",
-      "last_event_type": "session_start",
-      "last_project_id": "adhoc-8450de1cce500204",
-      "event_count": 7
+      "last_event_at": "2026-07-21T09:49:50+08:00",
+      "last_event_type": "session_summary",
+      "last_project_id": "git-9f1cb19971812dd3",
+      "event_count": 11
     },
     {
       "tool": "codex",
-      "last_event_at": "2026-07-15T15:44:14+08:00",
-      "last_event_type": "verification",
-      "last_project_id": "git-9f1cb19971812dd3",
-      "event_count": 15
-    },
-    {
-      "tool": "minimax",
-      "last_event_at": "2026-07-14T20:36:02+08:00",
+      "last_event_at": "2026-07-22T23:40:06+08:00",
       "last_event_type": "workflow_observation",
       "last_project_id": "git-9f1cb19971812dd3",
-      "event_count": 2
+      "event_count": 55
     },
     {
-      "tool": "opencode",
-      "last_event_at": "2026-07-13T00:10:36+08:00",
-      "last_event_type": "session_summary",
-      "last_project_id": "git-9f1cb19971812dd3",
+      "tool": "copilot",
+      "last_event_at": "2026-07-20T22:49:14+08:00",
+      "last_event_type": "session_start",
+      "last_project_id": "git-c8cd424ecb1297cc",
       "event_count": 1
     },
     {
-      "tool": "shell",
-      "last_event_at": "2026-07-13T00:08:09+08:00",
-      "last_event_type": "workflow_observation",
+      "tool": "kiro",
+      "last_event_at": "2026-07-22T22:47:05+08:00",
+      "last_event_type": "session_summary",
+      "last_project_id": "git-9f1cb19971812dd3",
+      "event_count": 8
+    },
+    {
+      "tool": "minimax",
+      "last_event_at": "2026-07-22T23:14:35+08:00",
+      "last_event_type": "session_summary",
+      "last_project_id": "adhoc-ae39667d705a85a0",
+      "event_count": 11
+    },
+    {
+      "tool": "opencode",
+      "last_event_at": "2026-07-22T23:26:39+08:00",
+      "last_event_type": "session_start",
       "last_project_id": "git-9f1cb19971812dd3",
       "event_count": 2
     },
     {
-      "tool": "trae",
-      "last_event_at": "2026-07-11T23:46:41+08:00",
-      "last_event_type": "verification",
+      "tool": "shell",
+      "last_event_at": "2026-07-22T21:59:34+08:00",
+      "last_event_type": "session_summary",
       "last_project_id": "git-9f1cb19971812dd3",
-      "event_count": 3
+      "event_count": 6
+    },
+    {
+      "tool": "trae",
+      "last_event_at": "2026-07-22T23:45:53+08:00",
+      "last_event_type": "workflow_observation",
+      "last_project_id": "git-9f1cb19971812dd3",
+      "event_count": 24
+    },
+    {
+      "tool": "trae-solo",
+      "last_event_at": "2026-07-22T23:16:58+08:00",
+      "last_event_type": "session_start",
+      "last_project_id": "git-9f1cb19971812dd3",
+      "event_count": 2
+    },
+    {
+      "tool": "vscode",
+      "last_event_at": "2026-07-22T10:41:02+08:00",
+      "last_event_type": "session_summary",
+      "last_project_id": "git-066b4fe6c113c888",
+      "event_count": 7
     }
   ]
 }

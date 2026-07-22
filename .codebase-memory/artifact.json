@@ -1,11 +1,11 @@
 {
     "schema_version": 2,
-    "commit": "f8a118293d3b100d2d5aa14a408937cd62a3c0a7",
-    "indexed_at": "2026-07-14T12:36:58Z",
+    "commit": "09b277819886405123eebfa0f61635c610ade00a",
+    "indexed_at": "2026-07-22T15:43:56Z",
     "project": "Users-ethan-Library-Mobile-Documents-com-apple-CloudDocs-Downloads-LLM-WorkMem",
-    "nodes": 21056,
-    "edges": 29543,
-    "original_size": 48103424,
-    "compressed_size": 3300242,
+    "nodes": 21924,
+    "edges": 33635,
+    "original_size": 52035584,
+    "compressed_size": 3794587,
     "compression_level": 3
 }

@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "codegraph": {
+      "command": "/opt/homebrew/bin/codegraph",
+      "args": [
+        "serve",
+        "--mcp"
+      ]
+    }
+  }
+}

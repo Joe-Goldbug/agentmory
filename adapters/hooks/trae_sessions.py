@@ -5,9 +5,13 @@ from __future__ import annotations
 import argparse
 import json
 import sqlite3
+import sys
 import time
 from pathlib import Path
 from urllib.parse import unquote, urlparse
+
+# Keep direct script execution independent of the caller's working directory.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from lwm import lifecycle
 

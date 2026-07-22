@@ -15,7 +15,6 @@ import json
 import os
 import re
 import shutil
-import tempfile
 import time
 import uuid
 from dataclasses import dataclass
@@ -96,9 +95,9 @@ def submit_event(
 
     target_dir = ensure_bucket_dir(root, bucket, day=day)
     target = target_dir / f"{payload['event_id']}.json"
-    tmp_dir = Path(tempfile.gettempdir()) / f"lwm-inbox-{os.getpid()}"
-    tmp_dir.mkdir(parents=True, exist_ok=True)
-    tmp = tmp_dir / f".{target.name}.{os.getpid()}.tmp"
+    # Keep the temporary file beside its target. Besides preserving atomic
+    # rename semantics, this avoids cross-sandbox moves on macOS IDE hosts.
+    tmp = target_dir / f".{target.name}.{os.getpid()}.tmp"
     tmp.write_text(
         json.dumps(payload, ensure_ascii=False, indent=2),
         encoding="utf-8",

@@ -6,6 +6,13 @@
       "foregroundOverride": "#383A42",
       "primary": "#4078F2"
     },
+    "globalPermissionGrants": {
+      "allow": [
+        "command(python3 -c '\nimport sys\nfilepath = \"/Users/ethan/Desktop/🌙光路Phōtódos/🌙光路10-剧本-解离\\.html\"\nwith open\\(filepath, \"r\", encoding=\"utf-8\"\\) as f:\n    lines = f\\.readlines\\(\\)\n\nfor i, line in enumerate\\(lines\\):\n    if \"ctx\\.restore\\(\\);\" in line and \"\\}\" in lines\\[i\\+1\\] and \"\\}\" in lines\\[i\\+2\\] and \"drawParticles\\(\\);\" in lines\\[i\\+3\\]:\n        print\\(\"Found the extra \\} at line\", i\\+2\\)\n        lines\\.pop\\(i\\+2\\)\n        break\n        \nwith open\\(filepath, \"w\", encoding=\"utf-8\"\\) as f:\n    f\\.writelines\\(lines\\)\nprint\\(\"Extra bracket removed\\.\"\\)\n')",
+        "command(cat \u003c\u003c'EOF' \u003e/Users/ethan/\\.gemini/antigravity/scratch/pup_test/real_check\\.js)",
+        "command(node /Users/ethan/\\.gemini/antigravity/scratch/pup_test/real_check\\.js)"
+      ]
+    },
     "remoteControlHostname": "10-0-0-55-hidden-jet",
     "themeMode": "THEME_MODE_LIGHT"
   }

@@ -1,0 +1,23 @@
+{
+  "loop_id": "8848d508-1fcc-4d90-9f4e-a8d913a3f42b",
+  "objective": "scheduled memory refresh",
+  "constraints": [],
+  "success_criteria": [
+    "full cycle runs when due"
+  ],
+  "phase": "update",
+  "expected_observation": "the previous successful cycle is still within its interval",
+  "expected_outcome": "wait without overwriting the previous full-cycle evidence",
+  "actual_observation": "full cycle not due",
+  "actual_outcome": "previous full-cycle evidence remains current",
+  "evidence": [
+    "state/last-cycle.json"
+  ],
+  "criteria_met": true,
+  "attempt": 1,
+  "next_action": "wait for the next due window",
+  "exit_state": "continue",
+  "human_gate": false,
+  "started_at": "2026-07-22T23:48:21+08:00",
+  "finished_at": null
+}

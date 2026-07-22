@@ -42,5 +42,6 @@
     "internetPolicy": "AGENT_SETTING_POLICY_ASK",
     "autoExecutionPolicy": "CASCADE_COMMANDS_AUTO_EXECUTION_OFF",
     "artifactReviewMode": "ARTIFACT_REVIEW_MODE_ALWAYS"
-  }
+  },
+  "updatedAt": "2026-06-30T14:24:19.792384Z"
 }

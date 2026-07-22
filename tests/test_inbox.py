@@ -33,6 +33,30 @@ def test_submit_and_move(tmp_path: Path) -> None:
     assert status.processed == 1
 
 
+def test_submit_uses_same_directory_for_atomic_replace(tmp_path: Path, monkeypatch) -> None:
+    event = make_event(
+        tool="trae",
+        project_path=str(tmp_path),
+        project_id="git-x",
+        event_type="workflow_observation",
+        task="sandbox-safe write",
+    )
+    replacements: list[tuple[Path, Path]] = []
+    real_replace = inbox.os.replace
+
+    def capture_replace(source: str | Path, target: str | Path) -> None:
+        replacements.append((Path(source), Path(target)))
+        real_replace(source, target)
+
+    monkeypatch.setattr(inbox.os, "replace", capture_replace)
+
+    target = inbox.submit_event(tmp_path, event)
+
+    assert replacements == [(replacements[0][0], target)]
+    assert replacements[0][0].parent == target.parent
+    assert not replacements[0][0].exists()
+
+
 def test_dedup_evaluates_duplicate(tmp_path: Path) -> None:
     event = make_event(
         tool="claude-code",

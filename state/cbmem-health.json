@@ -1,0 +1,13 @@
+{
+  "checked_at": "2026-07-22T23:43:55+08:00",
+  "projects": {
+    "git-9f1cb19971812dd3": {
+      "status": "ok",
+      "path": "/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem",
+      "returncode": 0,
+      "stderr": "level=info msg=mem.init budget_mb=24576 total_ram_mb=49152\nwarning: passing raw JSON to 'cli index_repository' is deprecated and will be removed in a future release; use flags (run 'cli index_repository --help'), --args-file <path>, or piped stdin.\nlevel=info msg=index.supervisor.reap outcome=clean exit_code=0 signal=0\n"
+    }
+  },
+  "binary": "/Users/ethan/bin/codebase-memory-mcp",
+  "status": "healthy"
+}

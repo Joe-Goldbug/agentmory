@@ -1,0 +1,15 @@
+{
+  "receipt_id": "0320710d-8930-4d5f-803e-ec7f1587d8a8",
+  "kind": "supervisor",
+  "started_at": "2026-07-22T23:48:21+08:00",
+  "finished_at": "2026-07-22T23:48:21+08:00",
+  "status": "success",
+  "reason": "not_due",
+  "processed": 0,
+  "accepted": 0,
+  "duplicate": 0,
+  "privacy_blocked": 0,
+  "invalid": 0,
+  "failed": 0,
+  "error": null
+}

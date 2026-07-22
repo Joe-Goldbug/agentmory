@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from lwm import insights, promote
+from lwm import insights, promote, schema
 from lwm.events import make_event
 
 
@@ -48,6 +48,7 @@ def test_two_projects_promote_to_global(tmp_path: Path) -> None:
     assert any(d.approved for d in decisions)
     global_pages = list((tmp_path / "wiki" / "global").glob("*.md"))
     assert global_pages
+    assert schema.validate_schema(tmp_path).issues == ()
 
 
 def test_temp_token_blocks_promotion(tmp_path: Path) -> None:

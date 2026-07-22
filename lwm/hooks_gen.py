@@ -136,14 +136,15 @@ const root = {quoted_root};
 
 export const LlmWorkMemPlugin: Plugin = async ({{ directory, $ }}) => {{
   const invoke = async (phase: "start" | "stop", event: unknown) => {{
-    const data = event as {{ properties?: {{ info?: {{ id?: string }} }} }};
-    const sessionId = String(data.properties?.info?.id ?? "");
+    const data = event as {{ properties?: {{ sessionID?: string; info?: {{ id?: string }} }} }};
+    const sessionId = String(data.properties?.sessionID ?? data.properties?.info?.id ?? "");
+    if (!sessionId) return;
     await $`lwm hub lifecycle ${{phase}} --tool opencode --project ${{directory}} --session-id ${{sessionId}} --root ${{root}} --source native-hook`.quiet();
   }};
   return {{
     event: async ({{ event }}) => {{
       if (event.type === "session.created") await invoke("start", event);
-      if (event.type === "session.idle" || event.type === "session.deleted") await invoke("stop", event);
+      if (event.type === "session.idle" || event.type === "session.error" || event.type === "session.deleted") await invoke("stop", event);
     }},
   }};
 }};

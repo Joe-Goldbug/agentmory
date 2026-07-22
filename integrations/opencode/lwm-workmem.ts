@@ -76,7 +76,9 @@ export const LlmWorkmemPlugin: Plugin = async ({ directory, $ }) => {
   return {
     event: async ({ event }) => {
       if (event.type === "session.created") await lifecycle("start", event)
-      if (event.type === "session.deleted") await lifecycle("stop", event)
+      if (event.type === "session.idle") await finalize(event, "idle")
+      if (event.type === "session.error") await finalize(event, "error")
+      if (event.type === "session.deleted") await finalize(event, "idle")
     },
 
     "experimental.chat.system.transform": async (_input, output) => {
@@ -100,13 +102,6 @@ export const LlmWorkmemPlugin: Plugin = async ({ directory, $ }) => {
       if (prompt) lastPromptBySession.set(input.sessionID, prompt)
     },
 
-    "session.idle": async ({ event }) => {
-      await finalize(event, "idle")
-    },
-
-    "session.error": async ({ event }) => {
-      await finalize(event, "error")
-    },
   }
 }
 

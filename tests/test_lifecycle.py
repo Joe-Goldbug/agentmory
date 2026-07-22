@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 import os
 import sqlite3
+import subprocess
+import sys
 import time
 from pathlib import Path
 
@@ -22,6 +24,42 @@ def _git_project(tmp_path: Path) -> Path:
     (project / ".git").mkdir(parents=True)
     (project / "nested").mkdir()
     return project
+
+
+def test_trae_sessions_script_imports_from_outside_project(tmp_path: Path) -> None:
+    script = Path(trae_sessions.__file__).resolve()
+    env = os.environ.copy()
+    env.pop("PYTHONPATH", None)
+
+    result = subprocess.run(
+        [sys.executable, str(script), "--help"],
+        cwd=tmp_path,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "trae-sessions" in result.stdout
+
+
+def test_kiro_sessions_script_imports_from_outside_project(tmp_path: Path) -> None:
+    script = Path(kiro_sessions.__file__).resolve()
+    env = os.environ.copy()
+    env.pop("PYTHONPATH", None)
+
+    result = subprocess.run(
+        [sys.executable, str(script), "--help"],
+        cwd=tmp_path,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "kiro-sessions" in result.stdout
 
 
 def test_resolve_project_root_uses_git_toplevel_for_nested_path(tmp_path: Path, monkeypatch) -> None:

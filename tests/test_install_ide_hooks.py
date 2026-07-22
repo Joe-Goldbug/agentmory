@@ -68,6 +68,10 @@ def test_opencode_plugin_handles_start_and_end(tmp_path: Path) -> None:
     text = install.config_path.read_text(encoding="utf-8")
     assert "session.created" in text
     assert "session.idle" in text
+    assert "session.error" in text
+    assert 'event: async ({ event })' in text
+    assert 'event.type === "session.idle" || event.type === "session.error"' in text
+    assert "properties?.sessionID" in text
     config = json.loads((tmp_path / ".config" / "opencode" / "opencode.json").read_text())
     assert str(install.config_path) in config["plugin"]
 

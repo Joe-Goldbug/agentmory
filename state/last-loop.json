@@ -1,0 +1,30 @@
+{
+  "loop_id": "b817ed1d-2aad-4f9c-a1a2-a01c952e374e",
+  "objective": "scheduled memory refresh",
+  "constraints": [
+    "one bounded cycle",
+    "preserve source evidence"
+  ],
+  "success_criteria": [
+    "audit passes",
+    "health is healthy",
+    "external evidence exists"
+  ],
+  "phase": "update",
+  "expected_observation": "configured sources and runtime inputs are readable",
+  "expected_outcome": "ingest, audit, export, and health leave fresh evidence",
+  "actual_observation": "exit=0; audit_ok=True; health=healthy; evidence=3",
+  "actual_outcome": "verified scheduled refresh",
+  "evidence": [
+    "state/health.json",
+    "llms.txt",
+    "llms.json"
+  ],
+  "criteria_met": true,
+  "attempt": 1,
+  "next_action": "",
+  "exit_state": "completed_verified",
+  "human_gate": false,
+  "started_at": "2026-07-22T22:01:56+08:00",
+  "finished_at": "2026-07-22T22:02:03+08:00"
+}

@@ -187,9 +187,8 @@ def promote(
         "---\n"
         f"title: {insight.title}\n"
         "type: principle\n"
-        "tags:\n"
-        f"  - global\n  - {insight.tag}\n"
-        "sources:\n  - wiki/insights\n"
+        f"tags: [global, {insight.tag}]\n"
+        "sources: []\n"
         f"updated: {now}\n"
         "---\n\n"
     )
