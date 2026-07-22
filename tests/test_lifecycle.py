@@ -6,7 +6,7 @@ import time
 from pathlib import Path
 
 from lwm import capabilities, lifecycle
-from adapters.hooks import vscode_sessions
+from adapters.hooks import antigravity_sessions, kiro_sessions, vscode_sessions
 from lwm.project_id import resolve_project_root
 
 
@@ -126,3 +126,79 @@ def test_vscode_observer_reads_workspace_storage_transcript(tmp_path: Path, monk
     receipts = capabilities.load(tmp_path)
     assert receipts["vscode:read"]["source"] == "watcher-observed"
     assert receipts["vscode:write"]["source"] == "watcher-observed"
+
+
+def test_kiro_observer_records_local_session_boundaries(tmp_path: Path, monkeypatch) -> None:
+    project = _git_project(tmp_path)
+    sessions_root = tmp_path / "workspace-sessions"
+    workspace_sessions = sessions_root / "encoded-workspace"
+    workspace_sessions.mkdir(parents=True)
+    session_id = "session-1"
+    (workspace_sessions / "sessions.json").write_text(
+        json.dumps(
+            [
+                {
+                    "sessionId": session_id,
+                    "title": "Test",
+                    "workspaceDirectory": str(project),
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+    session_path = workspace_sessions / f"{session_id}.json"
+    session_path.write_text("{}", encoding="utf-8")
+    old = time.time() - 120
+    os.utime(session_path, (old, old))
+
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "kiro-sessions",
+            "--root",
+            str(tmp_path),
+            "--sessions-root",
+            str(sessions_root),
+        ],
+    )
+    assert kiro_sessions.main() == 0
+    receipts = capabilities.load(tmp_path)
+    assert receipts["kiro:read"]["source"] == "watcher-observed"
+    assert receipts["kiro:write"]["source"] == "watcher-observed"
+
+
+def test_antigravity_observer_records_local_session_boundaries(
+    tmp_path: Path, monkeypatch
+) -> None:
+    project = _git_project(tmp_path)
+    metadata = tmp_path / "conversation_metadata.json"
+    metadata.write_text(
+        json.dumps(
+            {
+                "conversations": {
+                    "session-1": {
+                        "summary": {
+                            "ID": "session-1",
+                            "UpdatedAt": "2020-01-01T00:00:00Z",
+                            "WorkspaceURIs": [project.as_uri()],
+                        }
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "antigravity-sessions",
+            "--root",
+            str(tmp_path),
+            "--metadata",
+            str(metadata),
+        ],
+    )
+    assert antigravity_sessions.main() == 0
+    receipts = capabilities.load(tmp_path)
+    assert receipts["antigravity:read"]["source"] == "watcher-observed"
+    assert receipts["antigravity:write"]["source"] == "watcher-observed"

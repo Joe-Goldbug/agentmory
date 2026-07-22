@@ -18,8 +18,10 @@ from lwm.loop_state import begin_loop, close_loop, record_evaluation, write_stat
 ADAPTER_MODULES: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("codex", "adapters.hooks.codex_export", ()),
     ("kiro", "adapters.hooks.kiro_steering_watch", ()),
+    ("kiro-sessions", "adapters.hooks.kiro_sessions", ()),
     ("trae", "adapters.hooks.trae_attach", ()),
     ("antigravity", "adapters.hooks.antigravity_watch", ()),
+    ("antigravity-sessions", "adapters.hooks.antigravity_sessions", ()),
     ("minimax", "adapters.hooks.minimax_attach", ()),
     ("vscode-sessions", "adapters.hooks.vscode_sessions", ()),
     ("vscode", "adapters.hooks.vscode_tasks", ("--project",)),
