@@ -1,7 +1,13 @@
 import json
 from pathlib import Path
 
-from lwm.capabilities import probe, record
+from lwm.capabilities import (
+    NATIVE_RECEIPT_SOURCES,
+    _latest_receipt,
+    load,
+    probe,
+    record,
+)
 
 
 def test_probe_distinguishes_configured_from_verified(tmp_path: Path) -> None:
@@ -77,3 +83,23 @@ def test_probe_selects_matching_project_from_receipt_history(
     result = probe(tmp_path, home=home, project_path=current)
 
     assert result["claude-code"]["status"] == "verified_bidirectional"
+
+
+def test_receipt_history_preserves_projects_during_repeated_updates(tmp_path: Path) -> None:
+    record(tmp_path, tool="codex", direction="write", project_id="target", source="lifecycle-hook")
+    for index in range(150):
+        record(
+            tmp_path,
+            tool="codex",
+            direction="write",
+            project_id=f"other-{index}",
+            source="watcher-observed",
+        )
+    receipt = _latest_receipt(
+        load(tmp_path),
+        "codex:write",
+        "target",
+        allowed_sources=NATIVE_RECEIPT_SOURCES,
+    )
+    assert receipt is not None
+    assert receipt["project_id"] == "target"

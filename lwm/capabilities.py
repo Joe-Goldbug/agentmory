@@ -127,8 +127,16 @@ def record(
         if not isinstance(entries, list):
             entries = [previous] if isinstance(previous, dict) else []
         entries = [item for item in entries if isinstance(item, dict)]
+        entries = [
+            item
+            for item in entries
+            if not (
+                item.get("project_id") == project_id
+                and item.get("source") == source
+            )
+        ]
         entries.append(entry)
-        history[key] = entries[-100:]
+        history[key] = entries[-250:]
         payload["_history"] = history
         payload[key] = entry
         path = _path(root)
