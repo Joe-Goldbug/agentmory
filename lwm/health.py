@@ -374,7 +374,7 @@ def collect(root: Path, *, strict: bool = False) -> HealthSnapshot:
             }
             for t in tools
         ],
-        "capabilities": capabilities.summary(root),
+        "capabilities": capabilities.summary(root, project_path=root),
     }
     status = _classify(snapshot_dict, strict=strict)
     return HealthSnapshot(

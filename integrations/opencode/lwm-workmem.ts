@@ -28,6 +28,22 @@ function textFromParts(parts: unknown[]): string {
 export const LlmWorkmemPlugin: Plugin = async ({ directory, $ }) => {
   const lastPromptBySession = new Map<string, string>()
 
+  const sessionIdFromEvent = (event: unknown): string => {
+    const properties = (event as { properties?: Record<string, unknown> })?.properties ?? {}
+    const info = (properties.info as Record<string, unknown> | undefined) ?? {}
+    return String(properties.sessionID ?? properties.sessionId ?? info.id ?? "")
+  }
+
+  const lifecycle = async (phase: "start" | "stop", event: unknown): Promise<void> => {
+    const sessionID = sessionIdFromEvent(event)
+    if (!sessionID) return
+    try {
+      await $`${LWM} hub lifecycle ${phase} --tool opencode --project ${directory} --session-id ${sessionID} --root ${ROOT} --source native-hook`.quiet().nothrow()
+    } catch {
+      // Lifecycle evidence must never interrupt an OpenCode session.
+    }
+  }
+
   const record = async (event: Record<string, unknown>): Promise<void> => {
     try {
       await $`${LWM} hub record ${JSON.stringify(event)} --root ${ROOT}`.quiet().nothrow()
@@ -37,6 +53,11 @@ export const LlmWorkmemPlugin: Plugin = async ({ directory, $ }) => {
   }
 
   return {
+    event: async ({ event }) => {
+      if (event.type === "session.created") await lifecycle("start", event)
+      if (event.type === "session.deleted") await lifecycle("stop", event)
+    },
+
     "experimental.chat.system.transform": async (_input, output) => {
       try {
         const result = await $`${LWM} hub context --tool opencode --project ${directory} --limit 6 ${ROOT}`
@@ -59,6 +80,7 @@ export const LlmWorkmemPlugin: Plugin = async ({ directory, $ }) => {
     },
 
     "session.idle": async ({ event }) => {
+      await lifecycle("stop", event)
       const sessionID = event.properties.sessionID
       const prompt = lastPromptBySession.get(sessionID) || "(no prompt text captured)"
       await record({

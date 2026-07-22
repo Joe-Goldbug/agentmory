@@ -37,6 +37,44 @@ TOOL_TARGETS = {
 }
 
 
+def _tool_targets(tool: str, home: Path) -> tuple[Path, ...]:
+    """Resolve adapter files from the current real installation paths."""
+    if tool == "opencode":
+        config_root = home / ".config" / "opencode"
+        agents = config_root / "AGENTS.md"
+        plugin_candidates: list[Path] = [config_root / "plugins" / "llm-workmem.ts"]
+        config_path = config_root / "opencode.json"
+        try:
+            config = json.loads(config_path.read_text(encoding="utf-8"))
+            plugins = config.get("plugin", []) if isinstance(config, dict) else []
+            if isinstance(plugins, list):
+                for plugin in plugins:
+                    if not isinstance(plugin, str) or "lwm-workmem" not in plugin.lower():
+                        continue
+                    candidate = Path(plugin).expanduser()
+                    if not candidate.is_absolute():
+                        candidate = config_root / candidate
+                    plugin_candidates.insert(0, candidate)
+        except (OSError, json.JSONDecodeError, TypeError):
+            pass
+        plugin = next(
+            (candidate for candidate in plugin_candidates if candidate.is_file()),
+            plugin_candidates[0],
+        )
+        return (agents, plugin)
+
+    if tool == "vscode":
+        prompts = home / "Library" / "Application Support" / "Code" / "User" / "prompts"
+        candidates = (
+            prompts / "llm-workmem.instructions.md",
+            prompts / "copilot-workflow-memory.instructions.md",
+        )
+        installed = tuple(path for path in candidates if path.is_file())
+        return installed or (candidates[0],)
+
+    return tuple(home / relative for relative in TOOL_TARGETS.get(tool, ()))
+
+
 def _path(root: Path) -> Path:
     return root / "state" / "capability-receipts.json"
 
@@ -90,21 +128,32 @@ def record(
     return entry
 
 
-def summary(root: Path) -> dict[str, dict[str, Any]]:
+def summary(
+    root: Path, *, project_path: str | Path | None = None
+) -> dict[str, dict[str, Any]]:
     payload = load(root)
-    installed = probe(root)
+    installed = probe(root, project_path=project_path)
     out: dict[str, dict[str, Any]] = {}
     for tool in KNOWN_TOOLS:
         reads = payload.get(f"{tool}:read")
         writes = payload.get(f"{tool}:write")
+        read = installed[tool]["read_receipt"] or {"status": "unverified"}
+        write = installed[tool]["write_receipt"] or {"status": "unverified"}
         out[tool] = {
             "configuration": installed[tool]["status"],
             "installed": installed[tool]["installed"],
             "targets": installed[tool]["targets"],
-            "read": reads if isinstance(reads, dict) else {"status": "unverified"},
-            "write": writes if isinstance(writes, dict) else {"status": "unverified"},
-            "bidirectional": bool(
-                reads and writes and reads.get("status") == "verified" and writes.get("status") == "verified"
+            "read": read if isinstance(read, dict) else {"status": "unverified"},
+            "write": write if isinstance(write, dict) else {"status": "unverified"},
+            "bidirectional": (
+                installed[tool]["status"] == "verified_bidirectional"
+                if project_path is not None
+                else bool(
+                    reads
+                    and writes
+                    and reads.get("status") == "verified"
+                    and writes.get("status") == "verified"
+                )
             ),
         }
     return out
@@ -113,7 +162,7 @@ def summary(root: Path) -> dict[str, dict[str, Any]]:
 def _is_fresh_native(receipt: Any, expected_project_id: str | None) -> bool:
     if not isinstance(receipt, dict) or receipt.get("status") != "verified":
         return False
-    if receipt.get("source") not in {"native-hook", "lifecycle-hook"}:
+    if receipt.get("source") not in {"native-hook", "lifecycle-hook", "watcher-observed"}:
         return False
     if expected_project_id and receipt.get("project_id") != expected_project_id:
         return False
@@ -145,7 +194,7 @@ def probe(
         expected_project_id = resolve_project_id(project_path).project_id
     out: dict[str, dict[str, Any]] = {}
     for tool in KNOWN_TOOLS:
-        targets = [home / relative for relative in TOOL_TARGETS.get(tool, ())]
+        targets = list(_tool_targets(tool, home))
         installed = bool(targets) and all(path.is_file() for path in targets)
         readable = installed and all(path.stat().st_size > 0 for path in targets)
         read_receipt = receipts.get(f"{tool}:read")

@@ -34,6 +34,13 @@ def test_write_schedule_bundle_writes_all_files(tmp_path: Path) -> None:
     assert "<integer>3600</integer>" in text
 
 
+def test_schedule_runner_uses_local_runtime_copy(tmp_path: Path) -> None:
+    bundle = write_schedule_bundle(tmp_path, label="com.ethan.lwm.local", interval_seconds=900)
+    text = bundle.runner_path.read_text(encoding="utf-8")
+    assert "SOURCE_ROOT" not in text
+    assert "sys.path.insert(0, str(ROOT))" in text
+
+
 def test_schedule_bundle_is_idempotent(tmp_path: Path) -> None:
     """Re-running with the same label should rewrite the same plist contents."""
 

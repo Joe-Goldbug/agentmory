@@ -702,10 +702,8 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-SOURCE_ROOT = Path({str(source_root)!r})
 ROOT = Path({str(runtime_root)!r})
 LAUNCH_BASE = Path({str(launch_base)!r})
-sys.path.insert(0, str(SOURCE_ROOT))
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(LAUNCH_BASE))
 

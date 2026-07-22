@@ -250,11 +250,21 @@ def install_minimax(home: Path) -> HookInstall:
 def install_opencode(home: Path, *, root: Path) -> HookInstall:
     """Install OpenCode's documented local plugin without replacing config."""
 
-    target = home / ".config" / "opencode" / "plugins" / "llm-workmem.ts"
-    changed = _safe_replace(target, _opencode_plugin(root))
     config_path = home / ".config" / "opencode" / "opencode.json"
     config = _load_json_object(config_path)
     plugins = config.get("plugin") if isinstance(config.get("plugin"), list) else []
+    registered = next(
+        (
+            Path(plugin).expanduser()
+            for plugin in plugins
+            if isinstance(plugin, str) and "lwm-workmem" in plugin.lower()
+        ),
+        None,
+    )
+    target = registered or home / ".config" / "opencode" / "plugins" / "llm-workmem.ts"
+    # Keep a real registered plugin's richer behavior intact. This prevents a
+    # later install/schedule run from replacing it with the fallback template.
+    changed = False if registered and target.is_file() else _safe_replace(target, _opencode_plugin(root))
     marker = str(target)
     if marker not in plugins:
         config["plugin"] = [*plugins, marker]

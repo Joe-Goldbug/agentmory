@@ -72,6 +72,22 @@ def test_opencode_plugin_handles_start_and_end(tmp_path: Path) -> None:
     assert str(install.config_path) in config["plugin"]
 
 
+def test_opencode_install_preserves_registered_plugin(tmp_path: Path) -> None:
+    config_dir = tmp_path / ".config" / "opencode"
+    config_dir.mkdir(parents=True)
+    target = tmp_path / "custom" / "lwm-workmem.ts"
+    target.parent.mkdir()
+    target.write_text("custom plugin with context and summary", encoding="utf-8")
+    (config_dir / "opencode.json").write_text(
+        json.dumps({"plugin": [str(target)]}), encoding="utf-8"
+    )
+
+    install = hooks_gen.install_opencode(tmp_path, root=tmp_path / "workmem")
+
+    assert install.config_path == target
+    assert target.read_text(encoding="utf-8") == "custom plugin with context and summary"
+
+
 def test_install_ide_hooks_is_idempotent(tmp_path: Path) -> None:
     """Re-installing should be a no-op on the second run."""
 
