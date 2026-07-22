@@ -21,7 +21,29 @@ def _load_json(path: Path) -> object:
 
 def _workspace(path: Path) -> str | None:
     payload = _load_json(path)
-    folder = payload.get("folder") if isinstance(payload, dict) else None
+    if not isinstance(payload, dict):
+        return None
+    folder = payload.get("folder")
+    if not isinstance(folder, str) or not folder:
+        workspace = payload.get("workspace")
+        if not isinstance(workspace, str) or not workspace:
+            return None
+        parsed_workspace = urlparse(workspace)
+        workspace_path = Path(
+            unquote(parsed_workspace.path)
+            if parsed_workspace.scheme == "file"
+            else workspace
+        )
+        workspace_payload = _load_json(workspace_path)
+        folders = (
+            workspace_payload.get("folders")
+            if isinstance(workspace_payload, dict)
+            else None
+        )
+        first = folders[0] if isinstance(folders, list) and folders else None
+        folder = first.get("path") if isinstance(first, dict) else None
+        if isinstance(folder, str) and folder and not Path(folder).is_absolute():
+            folder = str((workspace_path.parent / folder).resolve())
     if not isinstance(folder, str) or not folder:
         return None
     parsed = urlparse(folder)

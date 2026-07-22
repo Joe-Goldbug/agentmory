@@ -243,6 +243,43 @@ def test_trae_observer_records_local_session_boundaries(tmp_path: Path) -> None:
     assert receipts["trae:write"]["source"] == "watcher-observed"
 
 
+def test_trae_observer_resolves_indirect_workspace_file(tmp_path: Path) -> None:
+    project = _git_project(tmp_path)
+    storage = tmp_path / "workspaceStorage"
+    workspace_dir = storage / "workspace-1"
+    workspace_dir.mkdir(parents=True)
+    workspace_file = tmp_path / "workspaces" / "project.code-workspace"
+    workspace_file.parent.mkdir()
+    workspace_file.write_text(
+        json.dumps({"folders": [{"path": f"../{project.name}"}]}),
+        encoding="utf-8",
+    )
+    (workspace_dir / "workspace.json").write_text(
+        json.dumps({"workspace": workspace_file.as_uri()}), encoding="utf-8"
+    )
+    database = workspace_dir / "state.vscdb"
+    connection = sqlite3.connect(database)
+    connection.execute("CREATE TABLE ItemTable (key TEXT UNIQUE ON CONFLICT REPLACE, value BLOB)")
+    connection.execute(
+        "INSERT INTO ItemTable (key, value) VALUES (?, ?)",
+        ("icube_session_agent_map", json.dumps({"session-1": "solo_agent"})),
+    )
+    connection.commit()
+    connection.close()
+
+    trae_sessions.observe(
+        tmp_path,
+        storage,
+        "trae-solo",
+        set(),
+        settle_seconds=0.0,
+    )
+    receipts = capabilities.load(tmp_path)
+    assert trae_sessions._workspace(workspace_dir / "workspace.json") == str(project)
+    assert receipts["trae-solo:read"]["source"] == "watcher-observed"
+    assert receipts["trae-solo:write"]["source"] == "watcher-observed"
+
+
 def test_shell_sweep_records_observed_lifecycle(tmp_path: Path, monkeypatch) -> None:
     project = _git_project(tmp_path)
     shell_dir = tmp_path / "raw" / "shell"
