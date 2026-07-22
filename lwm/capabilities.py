@@ -21,6 +21,8 @@ KNOWN_TOOLS = (
     "minimax",
 )
 
+NATIVE_RECEIPT_SOURCES = {"native-hook", "lifecycle-hook", "watcher-observed"}
+
 TOOL_TARGETS = {
     "codex": (".codex/AGENTS.md",),
     "claude-code": (".claude/settings.json",),
@@ -140,7 +142,11 @@ def record(
 
 
 def _latest_receipt(
-    payload: dict[str, Any], key: str, expected_project_id: str | None
+    payload: dict[str, Any],
+    key: str,
+    expected_project_id: str | None,
+    *,
+    allowed_sources: set[str] | None = None,
 ) -> dict[str, Any] | None:
     candidates: list[dict[str, Any]] = []
     current = payload.get(key)
@@ -152,6 +158,10 @@ def _latest_receipt(
     if expected_project_id:
         candidates = [
             item for item in candidates if item.get("project_id") == expected_project_id
+        ]
+    if allowed_sources:
+        candidates = [
+            item for item in candidates if item.get("source") in allowed_sources
         ]
     if not candidates:
         return None
@@ -192,7 +202,7 @@ def summary(
 def _is_fresh_native(receipt: Any, expected_project_id: str | None) -> bool:
     if not isinstance(receipt, dict) or receipt.get("status") != "verified":
         return False
-    if receipt.get("source") not in {"native-hook", "lifecycle-hook", "watcher-observed"}:
+    if receipt.get("source") not in NATIVE_RECEIPT_SOURCES:
         return False
     if expected_project_id and receipt.get("project_id") != expected_project_id:
         return False
@@ -227,8 +237,18 @@ def probe(
         targets = list(_tool_targets(tool, home))
         installed = bool(targets) and all(path.is_file() for path in targets)
         readable = installed and all(path.stat().st_size > 0 for path in targets)
-        read_receipt = _latest_receipt(receipts, f"{tool}:read", expected_project_id)
-        write_receipt = _latest_receipt(receipts, f"{tool}:write", expected_project_id)
+        read_receipt = _latest_receipt(
+            receipts,
+            f"{tool}:read",
+            expected_project_id,
+            allowed_sources=NATIVE_RECEIPT_SOURCES,
+        )
+        write_receipt = _latest_receipt(
+            receipts,
+            f"{tool}:write",
+            expected_project_id,
+            allowed_sources=NATIVE_RECEIPT_SOURCES,
+        )
         read_verified = _is_fresh_native(read_receipt, expected_project_id)
         write_verified = _is_fresh_native(write_receipt, expected_project_id)
         if read_verified and write_verified:

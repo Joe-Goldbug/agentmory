@@ -68,6 +68,7 @@ def test_probe_selects_matching_project_from_receipt_history(
     record(tmp_path, tool="claude-code", direction="write", project_id="other", source="native-hook")
     record(tmp_path, tool="claude-code", direction="read", project_id="current", source="native-hook")
     record(tmp_path, tool="claude-code", direction="write", project_id="current", source="native-hook")
+    record(tmp_path, tool="claude-code", direction="read", project_id="current", source="cli-context")
     monkeypatch.setattr(
         "lwm.project_id.resolve_project_id",
         lambda _path: type("Resolution", (), {"project_id": "current"})(),
