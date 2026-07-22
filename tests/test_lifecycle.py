@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import json
+import os
+import time
 from pathlib import Path
 
 from lwm import capabilities, lifecycle
@@ -77,6 +80,48 @@ def test_vscode_observer_records_local_session_boundaries(tmp_path: Path, monkey
         encoding="utf-8",
     )
     monkeypatch.setattr("sys.argv", ["vscode-sessions", "--root", str(tmp_path), "--sessions", str(sessions.parent)])
+    assert vscode_sessions.main() == 0
+    receipts = capabilities.load(tmp_path)
+    assert receipts["vscode:read"]["source"] == "watcher-observed"
+    assert receipts["vscode:write"]["source"] == "watcher-observed"
+
+
+def test_vscode_observer_reads_workspace_storage_transcript(tmp_path: Path, monkeypatch) -> None:
+    project = _git_project(tmp_path)
+    storage = tmp_path / "workspaceStorage" / "one"
+    transcript_dir = storage / "GitHub.copilot-chat" / "transcripts"
+    transcript_dir.mkdir(parents=True)
+    (storage / "workspace.json").write_text(
+        json.dumps({"folder": project.as_uri()}), encoding="utf-8"
+    )
+    transcript = transcript_dir / "session-1.jsonl"
+    transcript.write_text(
+        json.dumps({"id": "start", "type": "session.start", "data": {"sessionId": "session-1"}})
+        + "\n",
+        encoding="utf-8",
+    )
+    old = time.time() - 120
+    os.utime(transcript, (old, old))
+
+    def fake_git(cwd: Path, args: list[str]) -> str | None:
+        if args == ["rev-parse", "--show-toplevel"]:
+            return str(project)
+        return None
+
+    monkeypatch.setattr("lwm.project_id._run_git", fake_git)
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "vscode-sessions",
+            "--root",
+            str(tmp_path),
+            "--sessions",
+            str(tmp_path / "missing-sessions"),
+            "--workspace-storage",
+            str(tmp_path / "workspaceStorage"),
+        ],
+    )
+
     assert vscode_sessions.main() == 0
     receipts = capabilities.load(tmp_path)
     assert receipts["vscode:read"]["source"] == "watcher-observed"

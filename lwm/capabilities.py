@@ -117,6 +117,17 @@ def record(
     }
     try:
         payload = load(root)
+        history = payload.get("_history")
+        if not isinstance(history, dict):
+            history = {}
+        previous = payload.get(key)
+        entries = history.get(key)
+        if not isinstance(entries, list):
+            entries = [previous] if isinstance(previous, dict) else []
+        entries = [item for item in entries if isinstance(item, dict)]
+        entries.append(entry)
+        history[key] = entries[-100:]
+        payload["_history"] = history
         payload[key] = entry
         path = _path(root)
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -128,6 +139,25 @@ def record(
     return entry
 
 
+def _latest_receipt(
+    payload: dict[str, Any], key: str, expected_project_id: str | None
+) -> dict[str, Any] | None:
+    candidates: list[dict[str, Any]] = []
+    current = payload.get(key)
+    if isinstance(current, dict):
+        candidates.append(current)
+    history = payload.get("_history")
+    if isinstance(history, dict) and isinstance(history.get(key), list):
+        candidates.extend(item for item in history[key] if isinstance(item, dict))
+    if expected_project_id:
+        candidates = [
+            item for item in candidates if item.get("project_id") == expected_project_id
+        ]
+    if not candidates:
+        return None
+    return max(candidates, key=lambda item: str(item.get("recorded_at", "")))
+
+
 def summary(
     root: Path, *, project_path: str | Path | None = None
 ) -> dict[str, dict[str, Any]]:
@@ -135,8 +165,8 @@ def summary(
     installed = probe(root, project_path=project_path)
     out: dict[str, dict[str, Any]] = {}
     for tool in KNOWN_TOOLS:
-        reads = payload.get(f"{tool}:read")
-        writes = payload.get(f"{tool}:write")
+        reads = _latest_receipt(payload, f"{tool}:read", None)
+        writes = _latest_receipt(payload, f"{tool}:write", None)
         read = installed[tool]["read_receipt"] or {"status": "unverified"}
         write = installed[tool]["write_receipt"] or {"status": "unverified"}
         out[tool] = {
@@ -197,8 +227,8 @@ def probe(
         targets = list(_tool_targets(tool, home))
         installed = bool(targets) and all(path.is_file() for path in targets)
         readable = installed and all(path.stat().st_size > 0 for path in targets)
-        read_receipt = receipts.get(f"{tool}:read")
-        write_receipt = receipts.get(f"{tool}:write")
+        read_receipt = _latest_receipt(receipts, f"{tool}:read", expected_project_id)
+        write_receipt = _latest_receipt(receipts, f"{tool}:write", expected_project_id)
         read_verified = _is_fresh_native(read_receipt, expected_project_id)
         write_verified = _is_fresh_native(write_receipt, expected_project_id)
         if read_verified and write_verified:

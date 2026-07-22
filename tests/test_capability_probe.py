@@ -52,3 +52,27 @@ def test_watcher_observed_lifecycle_receipts_are_eligible(tmp_path: Path) -> Non
     record(tmp_path, tool="vscode", direction="write", source="watcher-observed")
 
     assert probe(tmp_path, home=home)["vscode"]["status"] == "verified_bidirectional"
+
+
+def test_probe_selects_matching_project_from_receipt_history(
+    tmp_path: Path, monkeypatch
+) -> None:
+    home = tmp_path / "home"
+    target = home / ".claude" / "settings.json"
+    target.parent.mkdir(parents=True)
+    target.write_text("LLM-WorkMem", encoding="utf-8")
+    current = tmp_path / "current"
+    current.mkdir()
+
+    record(tmp_path, tool="claude-code", direction="read", project_id="other", source="native-hook")
+    record(tmp_path, tool="claude-code", direction="write", project_id="other", source="native-hook")
+    record(tmp_path, tool="claude-code", direction="read", project_id="current", source="native-hook")
+    record(tmp_path, tool="claude-code", direction="write", project_id="current", source="native-hook")
+    monkeypatch.setattr(
+        "lwm.project_id.resolve_project_id",
+        lambda _path: type("Resolution", (), {"project_id": "current"})(),
+    )
+
+    result = probe(tmp_path, home=home, project_path=current)
+
+    assert result["claude-code"]["status"] == "verified_bidirectional"
