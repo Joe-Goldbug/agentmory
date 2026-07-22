@@ -2,11 +2,17 @@ from __future__ import annotations
 
 import json
 import os
+import sqlite3
 import time
 from pathlib import Path
 
 from lwm import capabilities, lifecycle
-from adapters.hooks import antigravity_sessions, kiro_sessions, vscode_sessions
+from adapters.hooks import (
+    antigravity_sessions,
+    kiro_sessions,
+    trae_sessions,
+    vscode_sessions,
+)
 from lwm.project_id import resolve_project_root
 
 
@@ -202,3 +208,36 @@ def test_antigravity_observer_records_local_session_boundaries(
     receipts = capabilities.load(tmp_path)
     assert receipts["antigravity:read"]["source"] == "watcher-observed"
     assert receipts["antigravity:write"]["source"] == "watcher-observed"
+
+
+def test_trae_observer_records_local_session_boundaries(tmp_path: Path) -> None:
+    project = _git_project(tmp_path)
+    storage = tmp_path / "workspaceStorage"
+    workspace_dir = storage / "workspace-1"
+    workspace_dir.mkdir(parents=True)
+    (workspace_dir / "workspace.json").write_text(
+        json.dumps({"folder": project.as_uri()}), encoding="utf-8"
+    )
+    database = workspace_dir / "state.vscdb"
+    connection = sqlite3.connect(database)
+    connection.execute("CREATE TABLE ItemTable (key TEXT UNIQUE ON CONFLICT REPLACE, value BLOB)")
+    connection.execute(
+        "INSERT INTO ItemTable (key, value) VALUES (?, ?)",
+        ("icube_session_agent_map", json.dumps({"session-1": "solo_agent"})),
+    )
+    connection.commit()
+    connection.close()
+    old = time.time() - 120
+    os.utime(database, (old, old))
+
+    seen: set[str] = set()
+    trae_sessions.observe(
+        tmp_path,
+        storage,
+        "trae",
+        seen,
+        settle_seconds=30.0,
+    )
+    receipts = capabilities.load(tmp_path)
+    assert receipts["trae:read"]["source"] == "watcher-observed"
+    assert receipts["trae:write"]["source"] == "watcher-observed"

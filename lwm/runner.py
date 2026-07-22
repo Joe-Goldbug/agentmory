@@ -20,6 +20,7 @@ ADAPTER_MODULES: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("kiro", "adapters.hooks.kiro_steering_watch", ()),
     ("kiro-sessions", "adapters.hooks.kiro_sessions", ()),
     ("trae", "adapters.hooks.trae_attach", ()),
+    ("trae-sessions", "adapters.hooks.trae_sessions", ()),
     ("antigravity", "adapters.hooks.antigravity_watch", ()),
     ("antigravity-sessions", "adapters.hooks.antigravity_sessions", ()),
     ("minimax", "adapters.hooks.minimax_attach", ()),
