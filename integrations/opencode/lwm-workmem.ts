@@ -27,6 +27,7 @@ function textFromParts(parts: unknown[]): string {
 
 export const LlmWorkmemPlugin: Plugin = async ({ directory, $ }) => {
   const lastPromptBySession = new Map<string, string>()
+  const finalizedSessions = new Set<string>()
 
   const sessionIdFromEvent = (event: unknown): string => {
     const properties = (event as { properties?: Record<string, unknown> })?.properties ?? {}
@@ -50,6 +51,26 @@ export const LlmWorkmemPlugin: Plugin = async ({ directory, $ }) => {
     } catch {
       // Memory capture must never interrupt an OpenCode session.
     }
+  }
+
+  const finalize = async (event: unknown, outcome: "idle" | "error"): Promise<void> => {
+    const sessionID = sessionIdFromEvent(event)
+    if (!sessionID || finalizedSessions.has(sessionID)) return
+    finalizedSessions.add(sessionID)
+    await lifecycle("stop", event)
+    const prompt = lastPromptBySession.get(sessionID) || "(no prompt text captured)"
+    await record({
+      tool: "opencode",
+      project_path: directory,
+      session_id: sessionID,
+      event_type: "session_summary",
+      task: outcome === "error" ? `Provider error after: ${prompt}` : prompt,
+      importance: "project",
+      privacy: "sanitized",
+      source: { kind: "opencode-plugin", path: `session.${outcome}` },
+      tags: ["opencode", `session-${outcome}`],
+    })
+    lastPromptBySession.delete(sessionID)
   }
 
   return {
@@ -80,21 +101,11 @@ export const LlmWorkmemPlugin: Plugin = async ({ directory, $ }) => {
     },
 
     "session.idle": async ({ event }) => {
-      await lifecycle("stop", event)
-      const sessionID = event.properties.sessionID
-      const prompt = lastPromptBySession.get(sessionID) || "(no prompt text captured)"
-      await record({
-        tool: "opencode",
-        project_path: directory,
-        session_id: sessionID,
-        event_type: "session_summary",
-        task: prompt,
-        importance: "project",
-        privacy: "sanitized",
-        source: { kind: "opencode-plugin", path: "session.idle" },
-        tags: ["opencode", "session-idle"],
-      })
-      lastPromptBySession.delete(sessionID)
+      await finalize(event, "idle")
+    },
+
+    "session.error": async ({ event }) => {
+      await finalize(event, "error")
     },
   }
 }

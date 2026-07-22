@@ -312,6 +312,41 @@ def test_minimax_observer_records_finished_session_boundaries(tmp_path: Path) ->
     assert receipts["minimax:write"]["source"] == "watcher-observed"
 
 
+def test_trae_solo_route_fallback_records_session_boundaries(tmp_path: Path) -> None:
+    project = _git_project(tmp_path)
+    storage = tmp_path / "workspaceStorage"
+    workspace_dir = storage / "workspace-1"
+    workspace_dir.mkdir(parents=True)
+    (workspace_dir / "workspace.json").write_text(
+        json.dumps({"folder": project.as_uri()}), encoding="utf-8"
+    )
+    state_database = workspace_dir / "state.vscdb"
+    connection = sqlite3.connect(state_database)
+    connection.execute("CREATE TABLE ItemTable (key TEXT, value BLOB)")
+    connection.commit()
+    connection.close()
+    global_database = tmp_path / "global-state.vscdb"
+    connection = sqlite3.connect(global_database)
+    connection.execute("CREATE TABLE ItemTable (key TEXT, value BLOB)")
+    connection.execute(
+        "INSERT INTO ItemTable VALUES (?, ?)",
+        ("solo-lite:route:user", "/session/solo-session-1"),
+    )
+    connection.commit()
+    connection.close()
+
+    trae_sessions.observe_solo_route(
+        tmp_path,
+        storage,
+        global_database,
+        set(),
+        settle_seconds=0.0,
+    )
+    receipts = capabilities.load(tmp_path)
+    assert receipts["trae-solo:read"]["source"] == "watcher-observed"
+    assert receipts["trae-solo:write"]["source"] == "watcher-observed"
+
+
 def test_shell_sweep_records_observed_lifecycle(tmp_path: Path, monkeypatch) -> None:
     project = _git_project(tmp_path)
     shell_dir = tmp_path / "raw" / "shell"

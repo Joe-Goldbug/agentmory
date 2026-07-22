@@ -69,6 +69,73 @@ def _session_ids(database: Path) -> tuple[str, ...]:
     return tuple(str(key) for key in payload) if isinstance(payload, dict) else ()
 
 
+def _solo_route_session(database: Path) -> str | None:
+    try:
+        connection = sqlite3.connect(f"file:{database}?mode=ro", uri=True)
+        try:
+            row = connection.execute(
+                "SELECT value FROM ItemTable WHERE key LIKE 'solo-lite:route:%' LIMIT 1"
+            ).fetchone()
+        finally:
+            connection.close()
+    except (OSError, sqlite3.Error):
+        return None
+    value = row[0] if row and isinstance(row[0], str) else ""
+    prefix = "/session/"
+    return value.split(prefix, 1)[1] if value.startswith(prefix) else None
+
+
+def observe_solo_route(
+    root: Path,
+    storage: Path,
+    database: Path,
+    seen: set[str],
+    *,
+    settle_seconds: float,
+) -> None:
+    session_id = _solo_route_session(database)
+    if not session_id or not storage.is_dir():
+        return
+    candidates: list[tuple[float, str]] = []
+    for workspace_dir in storage.iterdir():
+        workspace = _workspace(workspace_dir / "workspace.json")
+        state_database = workspace_dir / "state.vscdb"
+        if not workspace or not state_database.is_file():
+            continue
+        try:
+            candidates.append((state_database.stat().st_mtime, workspace))
+        except OSError:
+            continue
+    if not candidates:
+        return
+    _, workspace = max(candidates)
+    start_key = f"trae-solo:start:route:{session_id}"
+    if start_key not in seen:
+        lifecycle.start(
+            root,
+            tool="trae-solo",
+            project_path=workspace,
+            session_id=session_id,
+            source="watcher-observed",
+        )
+        seen.add(start_key)
+    try:
+        settled = database.stat().st_mtime <= time.time() - settle_seconds
+    except OSError:
+        settled = False
+    stop_key = f"trae-solo:stop:route:{session_id}"
+    if settled and stop_key not in seen:
+        lifecycle.stop(
+            root,
+            tool="trae-solo",
+            project_path=workspace,
+            session_id=session_id,
+            task="TRAE Solo local session observed idle",
+            source="watcher-observed",
+        )
+        seen.add(stop_key)
+
+
 def observe(
     root: Path,
     storage: Path,
@@ -131,6 +198,13 @@ def main() -> int:
             seen,
             settle_seconds=args.settle_seconds,
         )
+    observe_solo_route(
+        root,
+        base / "TRAE SOLO" / "User" / "workspaceStorage",
+        base / "TRAE SOLO" / "User" / "globalStorage" / "state.vscdb",
+        seen,
+        settle_seconds=args.settle_seconds,
+    )
     seen_path.parent.mkdir(parents=True, exist_ok=True)
     seen_path.write_text(json.dumps(sorted(seen)), encoding="utf-8")
     return 0
