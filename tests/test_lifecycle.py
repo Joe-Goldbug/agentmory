@@ -9,6 +9,7 @@ from pathlib import Path
 from adapters.hooks import (
     antigravity_sessions,
     kiro_sessions,
+    minimax_sessions,
     trae_sessions,
     vscode_sessions,
 )
@@ -278,6 +279,37 @@ def test_trae_observer_resolves_indirect_workspace_file(tmp_path: Path) -> None:
     assert trae_sessions._workspace(workspace_dir / "workspace.json") == str(project)
     assert receipts["trae-solo:read"]["source"] == "watcher-observed"
     assert receipts["trae-solo:write"]["source"] == "watcher-observed"
+
+
+def test_minimax_observer_records_finished_session_boundaries(tmp_path: Path) -> None:
+    project = _git_project(tmp_path)
+    database = tmp_path / "runtime-state.sqlite"
+    connection = sqlite3.connect(database)
+    connection.execute(
+        "CREATE TABLE local_runtime_sessions "
+        "(session_id TEXT PRIMARY KEY, record_json TEXT, updated_at_ms INTEGER)"
+    )
+    connection.execute(
+        "INSERT INTO local_runtime_sessions VALUES (?, ?, ?)",
+        (
+            "session-1",
+            json.dumps(
+                {
+                    "sessionId": "session-1",
+                    "workspaceDir": str(project),
+                    "status": "finished",
+                }
+            ),
+            1,
+        ),
+    )
+    connection.commit()
+    connection.close()
+
+    minimax_sessions.observe(tmp_path, database, set())
+    receipts = capabilities.load(tmp_path)
+    assert receipts["minimax:read"]["source"] == "watcher-observed"
+    assert receipts["minimax:write"]["source"] == "watcher-observed"
 
 
 def test_shell_sweep_records_observed_lifecycle(tmp_path: Path, monkeypatch) -> None:

@@ -25,6 +25,7 @@ ADAPTER_MODULES: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("antigravity", "adapters.hooks.antigravity_watch", ()),
     ("antigravity-sessions", "adapters.hooks.antigravity_sessions", ()),
     ("minimax", "adapters.hooks.minimax_attach", ()),
+    ("minimax-sessions", "adapters.hooks.minimax_sessions", ()),
     ("vscode-sessions", "adapters.hooks.vscode_sessions", ()),
     ("vscode", "adapters.hooks.vscode_tasks", ("--project",)),
 )
