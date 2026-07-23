@@ -23,7 +23,12 @@ def _slug(name: str) -> str:
 
 
 def test_write_schedule_bundle_writes_all_files(tmp_path: Path) -> None:
-    bundle = write_schedule_bundle(tmp_path, label="com.ethan.lwm.test", interval_seconds=3600)
+    bundle = write_schedule_bundle(
+        tmp_path,
+        label="com.ethan.lwm.test",
+        interval_seconds=3600,
+        home=tmp_path / "home",
+    )
     assert bundle.script_path.is_file()
     assert bundle.runner_path.is_file()
     assert bundle.launch_runner_path.is_file()
@@ -35,7 +40,12 @@ def test_write_schedule_bundle_writes_all_files(tmp_path: Path) -> None:
 
 
 def test_schedule_runner_uses_local_runtime_copy(tmp_path: Path) -> None:
-    bundle = write_schedule_bundle(tmp_path, label="com.ethan.lwm.local", interval_seconds=900)
+    bundle = write_schedule_bundle(
+        tmp_path,
+        label="com.ethan.lwm.local",
+        interval_seconds=900,
+        home=tmp_path / "home",
+    )
     text = bundle.runner_path.read_text(encoding="utf-8")
     assert "SOURCE_ROOT" not in text
     assert "sys.path.insert(0, str(ROOT))" in text
@@ -44,8 +54,18 @@ def test_schedule_runner_uses_local_runtime_copy(tmp_path: Path) -> None:
 def test_schedule_bundle_is_idempotent(tmp_path: Path) -> None:
     """Re-running with the same label should rewrite the same plist contents."""
 
-    first = write_schedule_bundle(tmp_path, label="com.ethan.lwm.idem", interval_seconds=7200)
-    second = write_schedule_bundle(tmp_path, label="com.ethan.lwm.idem", interval_seconds=7200)
+    first = write_schedule_bundle(
+        tmp_path,
+        label="com.ethan.lwm.idem",
+        interval_seconds=7200,
+        home=tmp_path / "home",
+    )
+    second = write_schedule_bundle(
+        tmp_path,
+        label="com.ethan.lwm.idem",
+        interval_seconds=7200,
+        home=tmp_path / "home",
+    )
     assert first.plist_path.read_text(encoding="utf-8") == second.plist_path.read_text(
         encoding="utf-8"
     )
@@ -54,12 +74,16 @@ def test_schedule_bundle_is_idempotent(tmp_path: Path) -> None:
 def test_schedule_bundle_runtime_layout(tmp_path: Path) -> None:
     """Runtime workspace under ``~/Library/Application Support`` mirrors the mutable roots.
 
-    The directory layout stays inside the user's real ``Application Support``
-    even when called with ``tmp_path``; we therefore only assert structural
-    invariants that the write path itself controls (plist / script / runner).
+    The directory layout stays inside an isolated test HOME so the suite never
+    creates persistent data in the user's real ``Application Support``.
     """
 
-    bundle = write_schedule_bundle(tmp_path, label="com.ethan.lwm.rt", interval_seconds=10800)
+    bundle = write_schedule_bundle(
+        tmp_path,
+        label="com.ethan.lwm.rt",
+        interval_seconds=10800,
+        home=tmp_path / "home",
+    )
     assert bundle.runtime_root.is_dir()
     assert bundle.runtime_root.name  # non-empty name
     # The package itself copies whatever exists in ``root / lwm``; tmp_path has
@@ -87,7 +111,12 @@ def test_load_schedule_bundle_invokes_launchctl(
         return m
 
     monkeypatch.setattr(harvest_module.subprocess, "run", _fake_run)
-    bundle = write_schedule_bundle(tmp_path, label="com.ethan.lwm.load", interval_seconds=3600)
+    bundle = write_schedule_bundle(
+        tmp_path,
+        label="com.ethan.lwm.load",
+        interval_seconds=3600,
+        home=tmp_path / "home",
+    )
     harvest_module.load_schedule_bundle(bundle)
     verbs = [c[1][1] for c in calls if len(c[1]) > 1]
     assert "bootout" in verbs

@@ -765,6 +765,10 @@ def write_dashboard_html(root: Path, out_path: Path | None = None) -> Path:
     target = out_path or (root / "knowledge-digest.html")
     export_dir = target.with_name(f"{target.stem}.pages")
     export_dir.mkdir(parents=True, exist_ok=True)
+    expected_exports = {_static_page_filename(page.rel_path) for page in context.pages}
+    for stale_export in export_dir.glob("*.html"):
+        if stale_export.name not in expected_exports:
+            stale_export.unlink()
     for page in context.pages:
         page_export = export_dir / _static_page_filename(page.rel_path)
         page_export.write_text(

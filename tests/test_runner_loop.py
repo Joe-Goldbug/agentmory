@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import subprocess
 
 import lwm.health as health
 import lwm.runner as runner
@@ -74,3 +75,34 @@ def test_runner_records_human_gate_when_health_proof_is_unknown(tmp_path: Path, 
     assert state is not None
     assert state.exit_state == "human_required"
     assert state.human_gate is True
+
+
+def test_shell_sweep_ignores_legacy_non_json_tail(tmp_path: Path, monkeypatch) -> None:
+    shell_dir = tmp_path / "raw" / "shell"
+    shell_dir.mkdir(parents=True)
+    (shell_dir / "legacy.jsonl").write_text("legacy shell history line\n", encoding="utf-8")
+    monkeypatch.setattr(
+        runner.subprocess,
+        "run",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("record must not run")),
+    )
+
+    assert runner._sweep_shell_events(tmp_path) == 0
+    assert (tmp_path / "state" / "shell-session-events.json").read_text(encoding="utf-8") == "[]"
+
+
+def test_shell_sweep_keeps_valid_record_failure_visible(tmp_path: Path, monkeypatch) -> None:
+    shell_dir = tmp_path / "raw" / "shell"
+    shell_dir.mkdir(parents=True)
+    (shell_dir / "current.jsonl").write_text(
+        '{"ts":1,"session":"s1","pwd":"/tmp","command":"git status"}\n',
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(runner.lifecycle, "start", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        runner.subprocess,
+        "run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(args=[], returncode=2),
+    )
+
+    assert runner._sweep_shell_events(tmp_path) == 2

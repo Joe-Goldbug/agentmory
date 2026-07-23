@@ -172,6 +172,24 @@ def shutil_which(cmd: str) -> str | None:
     return which(cmd)
 
 
+def _stale_test_launch_agents(*, home: Path | None = None) -> tuple[str, ...]:
+    """Return generated LaunchAgents that still target pytest runtime roots."""
+
+    base = home if home is not None else Path(os.environ.get("HOME", str(Path.home())))
+    launch_agents = base / "Library" / "LaunchAgents"
+    if not launch_agents.is_dir():
+        return ()
+    stale: list[str] = []
+    for plist in sorted(launch_agents.glob("com.ethan.lwm.*.plist")):
+        try:
+            text = plist.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        if "/llm-workmem-runtime/test_" in text:
+            stale.append(str(plist))
+    return tuple(stale)
+
+
 def _tool_sync(index: dict[str, dict[str, Any]]) -> tuple[ToolSync, ...]:
     by_tool: dict[str, list[dict[str, Any]]] = {}
     for entry in index.values():
@@ -270,6 +288,8 @@ def _classify(snapshot: dict[str, Any], *, strict: bool = False) -> str:
     infra = snapshot["infrastructure"]
     data = snapshot["data_flow"]
     quality = snapshot["quality"]
+    if infra.get("stale_test_launch_agents"):
+        return STATUS_FAILED
     if infra.get("audit", {}).get("error") or not quality.get("audit_ok"):
         return STATUS_FAILED
     cycle = snapshot.get("cycle", {})
@@ -348,6 +368,7 @@ def collect(root: Path, *, strict: bool = False) -> HealthSnapshot:
         "checked_at": datetime.now(tz=timezone.utc).isoformat(),
         "infrastructure": {
             "launchd": _launchd_status(),
+            "stale_test_launch_agents": _stale_test_launch_agents(),
             "last_health_json_mtime": last_health_mtime,
             "pid": os.getpid(),
         },

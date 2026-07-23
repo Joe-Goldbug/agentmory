@@ -95,3 +95,23 @@ def test_launchd_status_stays_false_when_print_cannot_find_job(monkeypatch) -> N
     status = health._launchd_status()
 
     assert status == {"loaded": False, "label": "com.ethan.lwm.harvest"}
+
+
+def test_health_detects_test_launch_agent_residue(tmp_path: Path) -> None:
+    launch_agents = tmp_path / "Library" / "LaunchAgents"
+    launch_agents.mkdir(parents=True)
+    stale = launch_agents / "com.ethan.lwm.local.plist"
+    stale.write_text(
+        "<string>/Users/ethan/Library/Application Support/"
+        "llm-workmem-runtime/test_schedule_runner_uses_loca0</string>",
+        encoding="utf-8",
+    )
+    (launch_agents / "com.ethan.lwm.harvest.plist").write_text(
+        "<string>/Users/ethan/Library/Application Support/"
+        "llm-workmem-runtime/llm-workmem</string>",
+        encoding="utf-8",
+    )
+
+    residue = health._stale_test_launch_agents(home=tmp_path)
+
+    assert residue == (str(stale),)

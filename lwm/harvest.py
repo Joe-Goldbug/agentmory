@@ -11,7 +11,7 @@ import shutil
 import subprocess
 from dataclasses import dataclass
 from datetime import date
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Iterable
 
 from lwm.analysis import analyze_wiki, write_analysis_report
@@ -19,6 +19,20 @@ from lwm.compile import compile_raw_sources
 from lwm.dashboard import write_dashboard_html
 from lwm.export import write_ai_exports
 from lwm.raw_tracker import run_raw_sync
+
+
+SNAPSHOT_SKIP_DIR_NAMES = frozenset(
+    {
+        ".git",
+        ".venv",
+        "node_modules",
+        "__pycache__",
+        ".cache",
+        "Caches",
+        "cache",
+    }
+)
+HISTORICAL_HARVEST_PAGE_MAX_BYTES = 128 * 1024
 
 
 @dataclass(frozen=True)
@@ -72,8 +86,9 @@ def _downloads_root() -> Path:
     return _home() / "Library" / "Mobile Documents" / "com~apple~CloudDocs" / "Downloads"
 
 
-def _runtime_root(root: Path) -> Path:
-    return _home() / "Library" / "Application Support" / "llm-workmem-runtime" / _slugify(root.name)
+def _runtime_root(root: Path, *, home: Path | None = None) -> Path:
+    base = home if home is not None else _home()
+    return base / "Library" / "Application Support" / "llm-workmem-runtime" / _slugify(root.name)
 
 
 def _ensure_runtime_target(path: Path, *, is_dir: bool) -> None:
@@ -111,9 +126,9 @@ def _replace_with_symlink(source: Path, target: Path) -> None:
     source.symlink_to(target, target_is_directory=target.is_dir())
 
 
-def materialize_runtime_layout(root: Path) -> Path:
+def materialize_runtime_layout(root: Path, *, home: Path | None = None) -> Path:
     root = root.resolve()
-    runtime_root = _runtime_root(root)
+    runtime_root = _runtime_root(root, home=home)
     runtime_root.mkdir(parents=True, exist_ok=True)
     package_source = root / "lwm"
     package_target = runtime_root / "lwm"
@@ -402,8 +417,15 @@ def _path_is_file(path: Path) -> bool:
 def _iter_files(path: Path) -> Iterable[Path]:
     try:
         for item in sorted(path.rglob("*")):
-            if _path_is_file(item):
-                yield item
+            if not _path_is_file(item):
+                continue
+            try:
+                relative_parts = item.relative_to(path).parts
+            except ValueError:
+                continue
+            if any(part in SNAPSHOT_SKIP_DIR_NAMES for part in relative_parts):
+                continue
+            yield item
     except OSError:
         return
 
@@ -517,8 +539,9 @@ def _render_harvest_page(
     missing: tuple[tuple[str, str], ...],
 ) -> str:
     rows = []
-    for tool, rel, path in captured:
-        rows.append(f"| {tool} | {rel} | {path} |")
+    for tool, label, count, path in _summarize_captured(captured):
+        noun = "snapshot" if count == 1 else "snapshots"
+        rows.append(f"| {tool} | {label} | {count} {noun} at `{path}` |")
     if not rows:
         rows.append("| _none_ | _none_ | _none_ |")
 
@@ -600,14 +623,16 @@ def _render_group_page(
     source_files: tuple[SourceFileSpec, ...],
     captured_entries: tuple[tuple[str, str, str], ...],
 ) -> str:
-    source_paths = sorted(
-        {
-            path
-            for tool, _label, path in captured_entries
-            if tool == group.key
-        }
+    summaries = tuple(
+        summary
+        for summary in _summarize_captured(captured_entries)
+        if summary[0] == group.key
     )
-    source_lines = [f"- `{path}`" for path in source_paths]
+    source_paths = [path for _tool, _label, _count, path in summaries]
+    source_lines = []
+    for _tool, label, count, path in summaries:
+        noun = "snapshot" if count == 1 else "snapshots"
+        source_lines.append(f"- `{label}`: {count} {noun} -> `{path}`")
     if not source_lines:
         source_lines = [f"- `{source.path}`" for source in source_files if source.path.exists()]
     return f"""---
@@ -638,16 +663,87 @@ This page is kept fresh by `lwm harvest`.
 """
 
 
+def _summarize_captured(
+    captured: tuple[tuple[str, str, str], ...],
+) -> tuple[tuple[str, str, int, str], ...]:
+    grouped: dict[tuple[str, str], list[str]] = {}
+    for tool, label, path in captured:
+        grouped.setdefault((tool, label), []).append(path)
+
+    summaries: list[tuple[str, str, int, str]] = []
+    for (tool, label), paths in sorted(grouped.items()):
+        unique_paths = sorted(set(paths))
+        summary_path = unique_paths[0]
+        if len(unique_paths) > 1:
+            parts = PurePosixPath(unique_paths[0]).parts
+            if len(parts) >= 5 and parts[:2] == ("raw", "tool-snapshots"):
+                summary_path = PurePosixPath(*parts[:5]).as_posix()
+            else:
+                summary_path = PurePosixPath(unique_paths[0]).parent.as_posix()
+        summaries.append((tool, label, len(unique_paths), summary_path))
+    return tuple(summaries)
+
+
+def _compact_historical_harvest_pages(
+    root: Path,
+    *,
+    current_stamp: str,
+) -> tuple[Path, ...]:
+    """Return historical harvest pages compacted during this run."""
+    insights = root / "wiki" / "insights"
+    if not insights.is_dir():
+        return ()
+
+    compacted: list[Path] = []
+    for page in sorted(insights.glob("tool-harvest-*.md")):
+        stamp = page.stem.removeprefix("tool-harvest-")
+        if stamp == current_stamp or page.stat().st_size <= HISTORICAL_HARVEST_PAGE_MAX_BYTES:
+            continue
+        original_bytes = page.stat().st_size
+        page.write_text(
+            f"""---
+title: Tool Harvest {stamp}
+type: insight
+tags: [insight, harvest, automation, memory, archived]
+sources:
+  - raw/tool-snapshots
+updated: {stamp}
+---
+
+# Tool Harvest {stamp}
+
+This historical generated page was compacted after its detailed per-file list
+grew beyond the bounded wiki-page limit. The source evidence remains available
+under `raw/tool-snapshots/*/{stamp}/`; dependency and cache copies are excluded.
+
+## Archive Receipt
+
+- Original generated size: {original_bytes} bytes
+- Durable conclusions remain in project memory and audited wiki pages.
+- This page is retained so historical wikilinks remain valid.
+
+## See Also
+
+- [[tool-harvest]]
+- [[memory-governance]]
+""",
+            encoding="utf-8",
+        )
+        compacted.append(page)
+    return tuple(compacted)
+
+
 def _launch_runner_path(label: str, root: Path) -> Path:
     return root / "automation" / "launchd" / label / "run-harvest.py"
 
 
-def _installed_lwm_path() -> Path:
+def _installed_lwm_path(*, home: Path | None = None) -> Path:
     """Return the one runtime used by launchd and all generated schedules."""
-    global_launcher = Path.home() / ".local" / "bin" / "lwm"
+    base = home if home is not None else _home()
+    global_launcher = base / ".local" / "bin" / "lwm"
     if global_launcher.is_file():
         return global_launcher
-    return Path.home() / "Library" / "Application Support" / "llm-workmem-runtime" / "app" / "venv" / "bin" / "lwm"
+    return base / "Library" / "Application Support" / "llm-workmem-runtime" / "app" / "venv" / "bin" / "lwm"
 
 
 def _render_launchd_plist(
@@ -656,6 +752,7 @@ def _render_launchd_plist(
     interval_seconds: int,
     *,
     launch_runner_path: Path,
+    installed_lwm_path: Path,
 ) -> str:
     stdout_path = (root / "automation" / "logs" / "harvest.out.log").resolve()
     stderr_path = (root / "automation" / "logs" / "harvest.err.log").resolve()
@@ -667,7 +764,7 @@ def _render_launchd_plist(
   <string>{label}</string>
   <key>ProgramArguments</key>
   <array>
-    <string>{_installed_lwm_path()}</string>
+    <string>{installed_lwm_path}</string>
     <string>hub</string>
     <string>run-supervisor</string>
     <string>{root.resolve()}</string>
@@ -721,16 +818,22 @@ if __name__ == "__main__":
 
 
 def write_schedule_bundle(
-    root: Path, *, label: str, interval_seconds: int = 900
+    root: Path,
+    *,
+    label: str,
+    interval_seconds: int = 900,
+    home: Path | None = None,
 ) -> ScheduleOutcome:
     root = root.resolve()
-    runtime_root = materialize_runtime_layout(root)
+    effective_home = (home if home is not None else _home()).expanduser().resolve()
+    runtime_root = materialize_runtime_layout(root, home=effective_home)
+    installed_lwm_path = _installed_lwm_path(home=effective_home)
     script_path = root / "automation" / "bin" / "run-harvest.sh"
     runner_path = root / "automation" / "bin" / "run-harvest.py"
     launch_runner_path = _launch_runner_path(label, runtime_root)
     launch_base = launch_runner_path.resolve().parent
     plist_path = root / "automation" / "launchd" / f"{label}.plist"
-    launch_agents_plist_path = _home() / "Library" / "LaunchAgents" / f"{label}.plist"
+    launch_agents_plist_path = effective_home / "Library" / "LaunchAgents" / f"{label}.plist"
 
     script_path.parent.mkdir(parents=True, exist_ok=True)
     plist_path.parent.mkdir(parents=True, exist_ok=True)
@@ -742,7 +845,7 @@ def write_schedule_bundle(
         f"""#!/bin/zsh
 set -euo pipefail
 # Full cycles remain available as `hub run-cycle`; launchd uses the supervisor.
-{shlex.quote(str(_installed_lwm_path()))} hub run-supervisor {shlex.quote(str(runtime_root))}
+{shlex.quote(str(installed_lwm_path))} hub run-supervisor {shlex.quote(str(runtime_root))}
 """,
         encoding="utf-8",
     )
@@ -758,6 +861,7 @@ set -euo pipefail
             runtime_root,
             interval_seconds,
             launch_runner_path=launch_runner_path,
+            installed_lwm_path=installed_lwm_path,
         ),
         encoding="utf-8",
     )
@@ -800,6 +904,7 @@ def load_schedule_bundle(bundle: ScheduleOutcome) -> None:
 def harvest_sources(root: Path, *, compile_after_sync: bool = True) -> HarvestOutcome:
     root = root.resolve()
     stamp = date.today().isoformat()
+    _compact_historical_harvest_pages(root, current_stamp=stamp)
     groups = configured_source_groups(root)
     raw_root = root / "raw" / "tool-snapshots"
     captured: list[tuple[str, str, str]] = []

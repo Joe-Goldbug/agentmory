@@ -9,18 +9,7 @@ from datetime import date
 from pathlib import Path
 
 from lwm.audit import AuditReport, render_audit_report, run_audit
-from lwm.harvest import configured_source_groups, harvest_sources
-
-
-_SKIP_DIR_NAMES = frozenset({
-    ".git",
-    ".venv",
-    "node_modules",
-    "__pycache__",
-    ".cache",
-    "Caches",
-    "cache",
-})
+from lwm.harvest import SNAPSHOT_SKIP_DIR_NAMES, configured_source_groups, harvest_sources
 _MAX_FINGERPRINT_FILES = 5000
 _MAX_FINGERPRINT_BYTES = 50 * 1024 * 1024
 
@@ -64,7 +53,10 @@ def _file_fingerprint(path: Path) -> str:
             for item in sorted(path.rglob("*")):
                 if not item.is_file():
                     continue
-                if any(part in _SKIP_DIR_NAMES for part in item.relative_to(path).parts):
+                if any(
+                    part in SNAPSHOT_SKIP_DIR_NAMES
+                    for part in item.relative_to(path).parts
+                ):
                     continue
                 try:
                     rel = item.relative_to(path).as_posix()

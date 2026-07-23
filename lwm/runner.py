@@ -60,6 +60,12 @@ def _sweep_shell_events(root: Path) -> int:
                 continue
             try:
                 payload = json.loads(line)
+            except json.JSONDecodeError:
+                # Older shell hooks wrote plain-text history into this folder,
+                # and an active hook can also leave a temporarily partial line.
+                # Preserve that source evidence, but do not fail the whole cycle.
+                continue
+            try:
                 event_key = ":".join(
                     str(value)
                     for value in (
@@ -107,7 +113,7 @@ def _sweep_shell_events(root: Path) -> int:
                         source="watcher-observed",
                     )
                     seen.add(event_key)
-            except (OSError, json.JSONDecodeError, subprocess.TimeoutExpired):
+            except (OSError, subprocess.TimeoutExpired):
                 rc |= 1
     seen_path.parent.mkdir(parents=True, exist_ok=True)
     seen_path.write_text(json.dumps(sorted(seen)), encoding="utf-8")
