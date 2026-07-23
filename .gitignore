@@ -239,9 +239,27 @@ knowledge-digest.pages/
 # launchd harvest logs (rewritten on every run; runtime artefact only)
 /automation/logs/
 
+# LLM-WorkMem sync boundary
+# `state/` is a machine-local runtime projection (health, receipts, paths and
+# supervisor state). Durable memory lives in GLOBAL.md, projects/, wiki/ and
+# sanitized source evidence, so state must be regenerated on each machine.
+/state/*
+!/state/README.md
+
+# Local tool/session continuation data and test residue.
+/.omo/
+/lwm/_test_write.tmp
+
+# A local backup may contain machine-specific configuration or credentials.
+/global/config/mcp_config.json.backup
+
+# These are independent Antigravity working trees, not content owned by this
+# repository. Their LLM-WorkMem instruction overlays above remain versioned.
+/projects/antigravity/kind-meitner/
+/projects/antigravity/zealous-archimedes/
+
 # Tool snapshot data (auto-harvested per-machine; large, not for version control)
 /raw/tool-snapshots/
 
 # Local dev helper script (not a project deliverable)
 /fix-venv.sh
-

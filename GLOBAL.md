@@ -1,4 +1,4 @@
-# Codex & Claude Global Sync Configuration (GLOBAL.md)
+# LLM-WorkMem Global Sync Configuration (GLOBAL.md)
 
 本文件作为跨机协作与状态对齐的全局枢纽，存储在 iCloud 共享目录中。任何工具（Codex、Claude Code、Cursor 等）在启动时都必须先读取此文件。
 
@@ -13,7 +13,7 @@
 
 ### 2. iCloud 共享层 (iCloud Shared Layer)
 *所有运行工具必须能读取并同步写入此目录*
-- **[GLOBAL.md](file:///Users/ethan/Library/Mobile%20Documents/com~apple~CloudDocs/Downloads/LLM%20wiki/GLOBAL.md)**：本文件，定义全局同步习惯。
+- **[GLOBAL.md](GLOBAL.md)**：本文件，定义全局同步习惯。
 - **项目状态文件**：每个项目的 `.memory/` 下必须拥有：
   - `STATE.md`：追踪当前开发所处阶段（Idea/MVP/Launch/Scale）与核心进展。
   - `DECISIONS.md`：记录过程中的关键架构与设计判断。
@@ -23,6 +23,18 @@
 ### 3. 本机层 (Local Environment Layer)
 *仅存在于当前运行机器，不可同步*
 - 本地终端权限、依赖缓存、本地临时编译及运行状态。
+
+### 4. Git 同步边界 (Repository Boundary)
+
+Git 只同步可复用、可审计的内容：代码、测试、工具规则、`GLOBAL.md`、`wiki/`，以及 `projects/<project>/` 中经过审核的项目状态。
+
+以下内容只属于当前 Mac，必须由运行时重建，不能提交：
+
+- `state/`：健康快照、会话回执、绝对路径、守护进程和循环控制状态；它不是长期记忆真源。
+- `.omo/`、日志、缓存、临时测试文件与本机配置备份。
+- `projects/antigravity/kind-meitner/` 与 `projects/antigravity/zealous-archimedes/`：它们是独立工作目录；本仓库只保留它们上层的 LLM-WorkMem 指令覆盖层。
+
+跨机恢复顺序：拉取 Git 内容，安装运行时，再运行 `lwm hub context` 或一次健康/收集周期重建本机 `state/`。任何需要长期保留的结论必须写入 `GLOBAL.md`、对应项目状态，或经过审核的 `wiki/` 页面，不能只留在 `state/`。
 
 ---
 
