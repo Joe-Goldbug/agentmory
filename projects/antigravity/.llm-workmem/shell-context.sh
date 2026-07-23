@@ -21,5 +21,7 @@ lwm-refresh() {
 }
 
 lwm-context() {
-  sed -n '1,220p' "$LWM_ROOT/llms.txt"
+  local project="${PWD}"
+  local lwm_bin="${LWM_BIN:-lwm}"
+  "$lwm_bin" hub context --tool shell --project "$project" "$LWM_ROOT"
 }
