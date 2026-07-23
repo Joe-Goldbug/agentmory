@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from lwm.harvest import write_schedule_bundle
+from lwm.harvest import materialize_runtime_layout, write_schedule_bundle
 
 
 def _slug(name: str) -> str:
@@ -89,6 +89,28 @@ def test_schedule_bundle_runtime_layout(tmp_path: Path) -> None:
     # The package itself copies whatever exists in ``root / lwm``; tmp_path has
     # no such dir so we can only assert that no exception was raised.
     assert bundle.plist_path.is_file()
+
+
+def test_runtime_code_and_adapters_are_mirrored_without_deleted_residue(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "workmem"
+    home = tmp_path / "home"
+    (root / "lwm").mkdir(parents=True)
+    (root / "adapters").mkdir()
+    (root / "lwm" / "current.py").write_text("CURRENT = True\n", encoding="utf-8")
+    (root / "adapters" / "current.md").write_text("# Current\n", encoding="utf-8")
+
+    runtime = materialize_runtime_layout(root, home=home)
+    (runtime / "lwm" / "removed.py").write_text("OLD = True\n", encoding="utf-8")
+    (runtime / "adapters" / "removed.md").write_text("# Old\n", encoding="utf-8")
+
+    materialize_runtime_layout(root, home=home)
+
+    assert not (runtime / "lwm" / "removed.py").exists()
+    assert not (runtime / "adapters" / "removed.md").exists()
+    assert (runtime / "lwm" / "current.py").is_file()
+    assert (runtime / "adapters" / "current.md").is_file()
 
 
 def test_load_schedule_bundle_invokes_launchctl(

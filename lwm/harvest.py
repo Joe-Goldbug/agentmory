@@ -126,6 +126,21 @@ def _replace_with_symlink(source: Path, target: Path) -> None:
     source.symlink_to(target, target_is_directory=target.is_dir())
 
 
+def _mirror_runtime_tree(source: Path, target: Path) -> None:
+    """Copy a source tree and prune files removed from the source."""
+
+    shutil.copytree(source, target, dirs_exist_ok=True)
+    for item in sorted(target.rglob("*"), key=lambda path: len(path.parts), reverse=True):
+        relative = item.relative_to(target)
+        source_item = source / relative
+        if source_item.exists() or source_item.is_symlink():
+            continue
+        if item.is_dir() and not item.is_symlink():
+            shutil.rmtree(item)
+        else:
+            item.unlink()
+
+
 def materialize_runtime_layout(root: Path, *, home: Path | None = None) -> Path:
     root = root.resolve()
     runtime_root = _runtime_root(root, home=home)
@@ -158,10 +173,10 @@ def materialize_runtime_layout(root: Path, *, home: Path | None = None) -> Path:
     source_state.mkdir(parents=True, exist_ok=True)
     _replace_with_symlink(runtime_state, source_state)
     if package_source.is_dir():
-        shutil.copytree(package_source, package_target, dirs_exist_ok=True)
+        _mirror_runtime_tree(package_source, package_target)
     adapters_source = root / "adapters"
     if adapters_source.is_dir():
-        shutil.copytree(adapters_source, runtime_root / "adapters", dirs_exist_ok=True)
+        _mirror_runtime_tree(adapters_source, runtime_root / "adapters")
     return runtime_root
 
 

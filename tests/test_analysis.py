@@ -81,3 +81,40 @@ def test_analyze_write_report(tmp_path: Path) -> None:
     content = out_path.read_text(encoding="utf-8")
     assert "Knowledge Radar" in content
     assert "Wiki Analysis" in content
+
+
+def test_generated_recurring_principle_is_not_a_structural_orphan(tmp_path: Path) -> None:
+    target = tmp_path / "workmem"
+    global_dir = target / "wiki" / "global"
+    global_dir.mkdir(parents=True)
+    (global_dir / "recurring-tag-migration-across-2-projects.md").write_text(
+        """---
+title: Recurring tag `migration` across 2 projects
+type: principle
+tags: [global, migration]
+sources: []
+updated: 2026-07-23
+---
+
+# Recurring migration tag
+""",
+        encoding="utf-8",
+    )
+    (global_dir / "manual-principle.md").write_text(
+        """---
+title: Manual Principle
+type: principle
+tags: [global]
+sources: []
+updated: 2026-07-23
+---
+
+# Manual Principle
+""",
+        encoding="utf-8",
+    )
+
+    analysis = analyze_wiki(target)
+
+    assert "wiki/global/recurring-tag-migration-across-2-projects.md" not in analysis.orphan_pages
+    assert "wiki/global/manual-principle.md" in analysis.orphan_pages

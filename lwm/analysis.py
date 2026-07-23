@@ -197,6 +197,14 @@ def analyze_wiki(root: Path) -> WikiAnalysis:
     ignored_orphans.update(
         {p.rel_path for p in pages if p.page_type == "project"}
     )
+    ignored_orphans.update(
+        {
+            p.rel_path
+            for p in pages
+            if p.page_type == "principle"
+            and p.rel_path.startswith("wiki/global/recurring-tag-")
+        }
+    )
     orphan_pages = tuple(
         sorted(
             page.rel_path
