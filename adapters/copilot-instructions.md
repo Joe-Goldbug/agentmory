@@ -1,7 +1,8 @@
 <!-- LLM-WIKI:START -->
 # LLM-WorkMem Context
 
-Use this llm-workmem as the shared workflow and memory source for this tool.
+Use this llm-workmem as an auxiliary evidence source for this tool.
+Native instructions, skills, memory, planning, execution, and verification remain authoritative.
 
 Read order:
 0. **On session start**, run `lwm hub context --tool <your-tool-name> /Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem` to get the latest dynamic context (project memory, recent decisions, open questions). This is always fresher than the static files below.

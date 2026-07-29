@@ -19,7 +19,6 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass
-from datetime import date
 from pathlib import Path
 from typing import Iterable
 
@@ -82,7 +81,7 @@ def _read_search_queries(root: Path) -> tuple[str, ...]:
 
 
 def _snapshot_dir(root: Path, project: Path) -> Path:
-    return root / "raw" / "cbmem-snapshots" / date.today().isoformat() / project.name
+    return root / "raw" / "cbmem-snapshots" / "current" / project.name
 
 
 def _call_one(

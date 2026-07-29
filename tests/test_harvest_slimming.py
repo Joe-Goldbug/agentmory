@@ -12,6 +12,8 @@ from lwm.harvest import (
     _iter_files,
     _render_group_page,
     _render_harvest_page,
+    default_source_groups,
+    harvest_sources,
     write_schedule_bundle,
 )
 
@@ -123,3 +125,32 @@ def test_harvest_compacts_large_historical_pages_without_breaking_links(
     assert old_page.stat().st_size < 2_000
     assert "raw/tool-snapshots/*/2026-07-22" in old_page.read_text(encoding="utf-8")
     assert current_page.read_text(encoding="utf-8") == "# Current harvest"
+
+
+def test_default_sources_skip_full_conversation_archives() -> None:
+    sources = {
+        source.label
+        for group in default_source_groups()
+        for source in group.sources
+    }
+
+    assert "history.jsonl" not in sources
+    assert "session-projects" not in sources
+    assert "vscode-copilot-chat-sessions" not in sources
+
+
+def test_harvest_uses_one_stable_current_page(
+    tmp_path: Path, monkeypatch
+) -> None:
+    fake_home = tmp_path / "home"
+    (fake_home / ".codex").mkdir(parents=True)
+    (fake_home / ".codex" / "AGENTS.md").write_text("# Rules", encoding="utf-8")
+    monkeypatch.setattr("lwm.harvest._home", lambda: fake_home)
+
+    first = harvest_sources(tmp_path, compile_after_sync=False)
+    second = harvest_sources(tmp_path, compile_after_sync=False)
+
+    assert first.snapshot_page == tmp_path / "wiki" / "insights" / "current-harvest.md"
+    assert second.snapshot_page == first.snapshot_page
+    assert first.snapshot_page.is_file()
+    assert not list((tmp_path / "wiki" / "insights").glob("tool-harvest-*.md"))

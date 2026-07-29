@@ -61,7 +61,14 @@ Summary: {summary}
 
 def write_ai_exports(root: Path) -> ExportReport:
     root = root.resolve()
-    pages = collect_wiki_pages(root)
+    pages = tuple(
+        page
+        for page in collect_wiki_pages(root)
+        if not any(
+            part in {"insights", "review", "summaries"}
+            for part in page.path.relative_to(root / "wiki").parts
+        )
+    )
     llms_txt_path = root / "llms.txt"
     llms_full_path = root / "llms-full.txt"
     llms_json_path = root / "llms.json"

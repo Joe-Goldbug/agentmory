@@ -1,6 +1,7 @@
 # LLM-WorkMem Context
 
-Use this llm-workmem as the shared workflow and memory source for this tool.
+Use this llm-workmem as an auxiliary evidence source for this tool.
+Native instructions, skills, memory, planning, execution, and verification remain authoritative.
 
 Read order:
 1. `/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/llms.txt` for compact context.

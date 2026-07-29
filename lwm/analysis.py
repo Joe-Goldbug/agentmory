@@ -355,7 +355,7 @@ def render_analysis_report(analysis: WikiAnalysis) -> str:
 def write_analysis_report(root: Path, analysis: WikiAnalysis) -> Path:
     insights_dir = root / "wiki" / "insights"
     insights_dir.mkdir(parents=True, exist_ok=True)
-    out_path = insights_dir / f"knowledge-radar-{date.today().isoformat()}.md"
+    out_path = insights_dir / "current-radar.md"
     page = f"""---
 title: Knowledge Radar
 type: insight
@@ -366,6 +366,8 @@ updated: {date.today().isoformat()}
 ---
 
 {render_analysis_report(analysis)}
-"""
+    """
     out_path.write_text(page, encoding="utf-8")
+    for stale_page in insights_dir.glob("knowledge-radar-*.md"):
+        stale_page.unlink()
     return out_path

@@ -13,6 +13,7 @@ from lwm.raw_tracker import scan_directory
 
 IGNORED_PREFIXES = (
     "tool-snapshots/",
+    "cbmem-snapshots/",
     # Event JSON is operational queue data. It is consumed by lwm ingest and
     # must never become one generic wiki summary page per event.
     "events/",
@@ -160,6 +161,21 @@ def _append_log_entry(log_path: Path, today: str, count: int) -> None:
         log_path.write_text(current + entry, encoding="utf-8")
 
 
+def _prune_operational_index_rows(index_path: Path) -> None:
+    """Remove index rows for raw operational trees no longer compiled."""
+
+    if not index_path.is_file():
+        return
+    text = index_path.read_text(encoding="utf-8")
+    blocked = (
+        "Compiled from raw/events/",
+        "Compiled from raw/tool-snapshots/",
+        "Compiled from raw/cbmem-snapshots/",
+    )
+    lines = [line for line in text.splitlines() if not any(token in line for token in blocked)]
+    index_path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
+
+
 def compile_raw_sources(root: Path) -> CompileReport:
     root = root.resolve()
     raw_dir = root / "raw"
@@ -200,6 +216,8 @@ def compile_raw_sources(root: Path) -> CompileReport:
             )
         )
 
+    index_path = root / "wiki" / "index.md"
+    _prune_operational_index_rows(index_path)
     _append_log_entry(root / "wiki" / "log.md", today, len(compiled))
     return CompileReport(root=root, compiled=tuple(compiled))
 

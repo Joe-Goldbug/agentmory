@@ -224,6 +224,8 @@ def _run_unlocked(root: Path, *, auto_promote: bool) -> IngestReport:
                     logger.exception("ingest: unexpected failure for %s", src)
                     failed.append((src.stem, f"exception: {exc}"))
 
+    project_memory.prune_empty_pages(root)
+
     insights_written: list[Path] = []
     conflicts_written: list[Path] = []
     promoted: list[str] = []

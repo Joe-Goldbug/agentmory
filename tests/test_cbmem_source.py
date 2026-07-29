@@ -69,10 +69,8 @@ def test_harvest_cbmem_no_projects_returns_empty(tmp_path: Path) -> None:
 @requires_cbmem_binary
 def test_harvest_cbmem_writes_snapshots_per_tool(wiki_root: Path) -> None:
     """Happy path: index, architecture, search×2, dead_code, changes all
-    succeed and write a JSON snapshot under raw/cbmem-snapshots/<date>/<proj>/.
+    succeed and write current JSON snapshots under raw/cbmem-snapshots/current/<proj>/.
     """
-    from datetime import date
-
     def _fake_index(project, *, force=False, timeout=900.0):
         return _ok('{"graph": "built"}')
 
@@ -101,7 +99,7 @@ def test_harvest_cbmem_writes_snapshots_per_tool(wiki_root: Path) -> None:
     assert all(o.output_path is not None for o in outcomes)
 
     # Verify files actually exist on disk
-    snap_base = wiki_root / "raw" / "cbmem-snapshots" / date.today().isoformat()
+    snap_base = wiki_root / "raw" / "cbmem-snapshots" / "current"
     assert snap_base.is_dir()
     for proj in ("proj1", "proj2"):
         proj_dir = snap_base / proj

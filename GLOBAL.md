@@ -1,55 +1,34 @@
-# LLM-WorkMem Global Sync Configuration (GLOBAL.md)
+# LLM-WorkMem Global Contract
 
-本文件作为跨机协作与状态对齐的全局枢纽，存储在 iCloud 共享目录中。任何工具（Codex、Claude Code、Cursor 等）在启动时都必须先读取此文件。
+LLM-WorkMem is a shared, source-backed evidence layer for local IDEs and shell. Native tool instructions, skills, memory, session state, planning, execution, and verification remain authoritative.
 
----
+## One workflow
 
-## 一、双机同步分工 (Sync Layer Split)
-
-### 1. 账户层 (Account Layer)
-*不强行由脚本同步，通过平台原生同步或登录态继承*
-- **Custom Instructions**：包含当前系统的三层协作框架。
-- **System Memory**：包含个人偏好与长期运行习惯。
-
-### 2. iCloud 共享层 (iCloud Shared Layer)
-*所有运行工具必须能读取并同步写入此目录*
-- **[GLOBAL.md](GLOBAL.md)**：本文件，定义全局同步习惯。
-- **项目状态文件**：每个项目的 `.memory/` 下必须拥有：
-  - `STATE.md`：追踪当前开发所处阶段（Idea/MVP/Launch/Scale）与核心进展。
-  - `DECISIONS.md`：记录过程中的关键架构与设计判断。
-  - `NEXT.md`：指定下一轮迭代的唯一且具体的执行动作。
-  - `VERIFY.md`：记录每轮修改的验证结果和测试指令。
-
-### 3. 本机层 (Local Environment Layer)
-*仅存在于当前运行机器，不可同步*
-- 本地终端权限、依赖缓存、本地临时编译及运行状态。
-
-### 4. Git 同步边界 (Repository Boundary)
-
-Git 只同步可复用、可审计的内容：代码、测试、工具规则、`GLOBAL.md`、`wiki/`，以及 `projects/<project>/` 中经过审核的项目状态。
-
-以下内容只属于当前 Mac，必须由运行时重建，不能提交：
-
-- `state/`：健康快照、会话回执、绝对路径、守护进程和循环控制状态；它不是长期记忆真源。
-- `.omo/`、日志、缓存、临时测试文件与本机配置备份。
-- `projects/antigravity/kind-meitner/` 与 `projects/antigravity/zealous-archimedes/`：它们是独立工作目录；本仓库只保留它们上层的 LLM-WorkMem 指令覆盖层。
-
-跨机恢复顺序：拉取 Git 内容，安装运行时，再运行 `lwm hub context` 或一次健康/收集周期重建本机 `state/`。任何需要长期保留的结论必须写入 `GLOBAL.md`、对应项目状态，或经过审核的 `wiki/` 页面，不能只留在 `state/`。
-
----
-
-## 二、标准执行循环 (The Master Sequence)
-
-任何任务必须严格遵循以下执行路径，并在每一步输出验证结论：
-
-```mermaid
-graph TD
-    A[1. Sync Loop: 读取 GLOBAL 及项目四文件] --> B[2. Truth-First Loop: 搜集证据验证事实/拒绝瞎猜]
-    B --> C[3. Execute: Project/Bugfix Loop 执行最小修改]
-    C --> D[4. Verify: 测试与真机行为验证]
-    D --> E[5. Write Back: 更新项目 STATE/DECISIONS/NEXT/VERIFY 并同步]
-```
-
-### 最短路径口诀
 `sync -> truth -> execute -> verify -> write back`
-（先同步 -> 验事实 -> 最小执行 -> 跑测试 -> 写回状态）
+
+- Read the current project context before acting.
+- Separate verified facts, inference, assumptions, and unknowns.
+- Execute one bounded task with the smallest necessary change.
+- Verify with tests, build, logs, runtime behavior, or a direct check.
+- Write back only durable cross-tool evidence: decisions, meaningful changes, verification, risks, preferences, and open loops.
+
+## One memory boundary
+
+- `wiki/purpose.md`: what belongs in long-term memory.
+- `wiki/overview.md`: current system synthesis and automation status.
+- `wiki/projects/<project_id>.md`: one project page containing meaningful status, decisions, bugfixes, verifications, and open questions.
+- `wiki/global/`: audited cross-project rules and principles.
+- `raw/events/`: sanitized append-only evidence; lifecycle receipts are not durable knowledge by themselves.
+- `raw/tool-snapshots/` and `raw/cbmem-snapshots/`: current source evidence, not polished memory.
+
+## Promotion rule
+
+Keep temporary observations, empty lifecycle events, unchanged snapshots, full conversations, and unverified guesses out of durable Wiki pages. Promote only reusable, source-backed, high-signal knowledge through review.
+
+## Runtime and Git boundary
+
+Runtime state, receipts, logs, caches, absolute local paths, and launchd state are rebuilt locally and are not the long-term truth source. Git synchronizes code, tests, adapters, `GLOBAL.md`, durable Wiki pages, and reviewed project knowledge.
+
+## Cross-tool handoff
+
+Every IDE and shell may read the same LLM-WorkMem evidence and write sanitized events through `lwm hub record`. The active tool still decides the answer and owns its native workflow.

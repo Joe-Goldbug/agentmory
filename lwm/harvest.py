@@ -209,8 +209,6 @@ def default_source_groups() -> tuple[SourceGroupSpec, ...]:
             sources=(
                 SourceFileSpec(home / ".claude" / "CLAUDE.md", "global-CLAUDE.md"),
                 SourceFileSpec(home / ".claude" / "settings.json", "settings.json"),
-                SourceFileSpec(home / ".claude" / "history.jsonl", "history.jsonl"),
-                SourceFileSpec(home / ".claude" / "projects", "session-projects"),
                 SourceFileSpec(documents / "claude-code-config" / "memory" / "MEMORY.md", "MEMORY.md"),
                 SourceFileSpec(documents / "claude-code-config" / "memory", "claude-memory-folder"),
             ),
@@ -256,10 +254,6 @@ def default_source_groups() -> tuple[SourceGroupSpec, ...]:
             tags=("entity", "tool", "copilot", "github", "vscode"),
             sources=(
                 SourceFileSpec(desktop / "Mac旧文件" / "Ethan-GitHub-Copilot-Workflow.md", "Ethan-GitHub-Copilot-Workflow.md"),
-                SourceFileSpec(
-                    app_support / "Code" / "User" / "globalStorage" / "emptyWindowChatSessions",
-                    "vscode-copilot-chat-sessions",
-                ),
             ),
         ),
         SourceGroupSpec(
@@ -919,7 +913,6 @@ def load_schedule_bundle(bundle: ScheduleOutcome) -> None:
 def harvest_sources(root: Path, *, compile_after_sync: bool = True) -> HarvestOutcome:
     root = root.resolve()
     stamp = date.today().isoformat()
-    _compact_historical_harvest_pages(root, current_stamp=stamp)
     groups = configured_source_groups(root)
     raw_root = root / "raw" / "tool-snapshots"
     captured: list[tuple[str, str, str]] = []
@@ -938,7 +931,7 @@ def harvest_sources(root: Path, *, compile_after_sync: bool = True) -> HarvestOu
                         missing.append((group.key, f"{source.label}/{item.name}"))
                         continue
                     rel = item.relative_to(source.path)
-                    snapshot_path = raw_root / group.key / stamp / source.label / rel
+                    snapshot_path = raw_root / group.key / "current" / source.label / rel
                     snapshot_path.parent.mkdir(parents=True, exist_ok=True)
                     snapshot_path.write_text(text, encoding="utf-8")
                     captured.append((group.key, source.label, str(snapshot_path.relative_to(root))))
@@ -951,7 +944,7 @@ def harvest_sources(root: Path, *, compile_after_sync: bool = True) -> HarvestOu
             if not text.strip():
                 missing.append((group.key, source.label))
                 continue
-            snapshot_path = raw_root / group.key / stamp / _slugify(source.label)
+            snapshot_path = raw_root / group.key / "current" / _slugify(source.label)
             snapshot_path = snapshot_path.with_suffix(source.path.suffix or ".md")
             snapshot_path.parent.mkdir(parents=True, exist_ok=True)
             snapshot_path.write_text(text, encoding="utf-8")
@@ -961,12 +954,14 @@ def harvest_sources(root: Path, *, compile_after_sync: bool = True) -> HarvestOu
     governance_page.parent.mkdir(parents=True, exist_ok=True)
     governance_page.write_text(_render_governance_page(root, stamp, groups), encoding="utf-8")
 
-    harvest_page = root / "wiki" / "insights" / f"tool-harvest-{stamp}.md"
+    harvest_page = root / "wiki" / "insights" / "current-harvest.md"
     harvest_page.parent.mkdir(parents=True, exist_ok=True)
     harvest_page.write_text(
         _render_harvest_page(root, stamp, groups, tuple(captured), tuple(missing)),
         encoding="utf-8",
     )
+    for stale_page in harvest_page.parent.glob("tool-harvest-*.md"):
+        stale_page.unlink()
 
     for group in groups:
         target = root / group.target_page

@@ -34,7 +34,8 @@ def _context_block(root: Path, *, project: Path | None = None) -> str:
     return f"""{MARKER_START}
 # LLM-WorkMem Context
 
-Use this llm-workmem as the shared workflow and memory source for this tool.{project_line}
+Use this llm-workmem as an auxiliary evidence source for this tool.{project_line}
+Native instructions, skills, memory, planning, execution, and verification remain authoritative.
 
 Read order:
 0. **On session start**, run `{context_cmd}` to get the latest dynamic context (project memory, recent decisions, open questions). This is always fresher than the static files below.
@@ -64,14 +65,15 @@ def _cursor_rules_block(root: Path, *, project: Path | None = None) -> str:
     root = root.resolve()
     project_line = f"\nProject: `{project}`" if project else ""
     body = f"""---
-description: LLM-WorkMem shared workflow and memory source (always apply)
+description: LLM-WorkMem auxiliary evidence context (always apply)
 globs:
 alwaysApply: true
 ---
 
 # LLM-WorkMem Context
 
-Use this llm-workmem as the shared workflow and memory source for this tool.{project_line}
+Use this llm-workmem as an auxiliary evidence source for this tool.{project_line}
+Native instructions, skills, memory, planning, execution, and verification remain authoritative.
 
 Read order:
 1. `{root / "llms.txt"}` for compact context.
@@ -99,7 +101,8 @@ def _gemini_block(root: Path, *, project: Path | None = None) -> str:
     project_line = f"\nProject: `{project}`" if project else ""
     return f"""# LLM-WorkMem Context
 
-Use this llm-workmem as the shared workflow and memory source for this tool.{project_line}
+Use this llm-workmem as an auxiliary evidence source for this tool.{project_line}
+Native instructions, skills, memory, planning, execution, and verification remain authoritative.
 
 Read order:
 1. `{root / "llms.txt"}` for compact context.

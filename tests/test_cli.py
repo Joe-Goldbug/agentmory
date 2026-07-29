@@ -259,7 +259,7 @@ def test_harvest_command_refreshes_workbench(tmp_path: Path, monkeypatch) -> Non
 
     assert (target / "knowledge-digest.html").is_file()
     assert (target / "wiki" / "concepts" / "memory-governance.md").is_file()
-    assert any((target / "wiki" / "insights").glob("tool-harvest-*.md"))
+    assert (target / "wiki" / "insights" / "current-harvest.md").is_file()
     assert any((target / "raw" / "tool-snapshots").rglob("memory.md"))
     assert (target / "llms.txt").is_file()
     assert (target / "llms-full.txt").is_file()

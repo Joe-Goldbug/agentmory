@@ -212,8 +212,70 @@ def render_project_page(
     )
 
 
-def append_event(root: Path, event: dict[str, Any]) -> Path:
+def _is_meaningful_event(event: dict[str, Any]) -> bool:
+    """Keep lifecycle receipts operational unless they carry real work."""
+
+    event_type = str(event.get("event_type") or "")
+    if event_type == "session_start" or event_type == "adapter_probe":
+        return False
+    has_details = any(
+        event.get(key) for key in ("decisions", "changes", "verification", "open_questions")
+    )
+    if has_details:
+        return True
+    task = str(event.get("task") or "").strip()
+    if task.lower() in {"", "(no user text)", "(no task recorded)", "no user text"}:
+        return False
+    tags = {str(tag).strip().lower() for tag in event.get("tags") or []}
+    if "lifecycle" in tags and event_type in {"session_summary", "session_idle", "session_deleted"}:
+        return False
+    return True
+
+
+def _is_lifecycle_only_page(text: str) -> bool:
+    """Identify old project pages made only from lifecycle receipts."""
+
+    if "Last task: (no task recorded)" not in text:
+        return False
+    entries = _read_existing_entries(text)
+    if any(entries.get(name) for name in ("decisions", "bugfixes", "verifications", "open_questions")):
+        return False
+    lifecycle_markers = {
+        "session_start",
+        "session_summary",
+        "adapter_probe",
+        "(no user text)",
+        "<environment_context>",
+    }
+    status = [entry.text.strip().lower() for entry in entries.get("status", [])]
+    return bool(status) and all(
+        marker in lifecycle_markers or "observed idle" in marker for marker in status
+    )
+
+
+def prune_empty_pages(root: Path) -> list[Path]:
+    """Remove project pages that contain no durable work evidence."""
+
+    projects_dir = (root / "wiki" / "projects").resolve()
+    if not projects_dir.is_dir():
+        return []
+    removed: list[Path] = []
+    for target in sorted(projects_dir.glob("*.md")):
+        try:
+            text = target.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        if _is_lifecycle_only_page(text):
+            target.unlink()
+            removed.append(target)
+    return removed
+
+
+def append_event(root: Path, event: dict[str, Any]) -> Path | None:
     """Apply an event to the project's wiki page and return the path."""
+
+    if not _is_meaningful_event(event):
+        return None
 
     project_id = str(event["project_id"])
     target = project_page_path(root, project_id)
@@ -332,6 +394,7 @@ def normalize_existing_pages(root: Path) -> list[Path]:
 __all__ = [
     "ProjectMemoryEntry",
     "append_event",
+    "prune_empty_pages",
     "project_page_path",
     "render_project_page",
 ]
