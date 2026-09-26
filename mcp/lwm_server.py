@@ -20,17 +20,20 @@ beyond what the JSON-RPC request supplies.
 
 from __future__ import annotations
 
+import argparse
 import json
+import os
 import re
 import sys
+import uuid
 from pathlib import Path
 
-from lwm import context, inbox as lwm_inbox
 from lwm import capabilities, health as lwm_health, memory_api
 from lwm import project_memory
-from lwm.events import validate_event
+from lwm import hub_service
+from lwm.capability_proof import OBSERVATION_RECEIPT_SOURCES, PROOF_RECEIPT_SOURCES
 from lwm.project_id import record_project
-from lwm.events import make_event as make_event_default
+from lwm.tool_registry import ToolRegistry
 
 
 TOOLS = {
@@ -82,12 +85,54 @@ TOOLS = {
         "required": ["root", "question"],
     },
     "record_receipt": {
-        "description": "Record a verified tool read/write receipt.",
-        "properties": {"root": {"type": "string"}, "tool": {"type": "string"}, "direction": {"type": "string"}, "project_id": {"type": "string"}},
+        "description": "Record an observation-only tool read/write receipt. Native proof receipts must come from the host lifecycle bridge, not a generic MCP call.",
+        "properties": {
+            "root": {"type": "string"},
+            "tool": {"type": "string"},
+            "direction": {"type": "string"},
+            "project_id": {"type": "string"},
+            "source": {
+                "type": "string",
+                "enum": sorted(OBSERVATION_RECEIPT_SOURCES),
+            },
+            "evidence_path": {"type": "string"},
+            "operation_id": {"type": "string"},
+        },
         "required": ["root", "tool", "direction"],
     },
     "health": {
         "description": "Return strict shared-memory health data.",
+        "properties": {"root": {"type": "string"}},
+        "required": ["root"],
+    },
+    # Canonical cross-tool names. Legacy names above remain for compatibility.
+    "lwm_context": {
+        "description": "Return the canonical startup context for one tool and project.",
+        "properties": {"root": {"type": "string"}, "tool": {"type": "string"}, "project": {"type": "string"}, "limit": {"type": "integer", "default": 6}},
+        "required": ["root", "tool", "project"],
+    },
+    "lwm_retain": {
+        "description": "Retain one sanitized structured work event.",
+        "properties": {"root": {"type": "string"}, "event": {"type": "object"}},
+        "required": ["root", "event"],
+    },
+    "lwm_recall": {
+        "description": "Recall source-backed memory with evidence and coverage.",
+        "properties": {"root": {"type": "string"}, "question": {"type": "string"}, "project": {"type": "string"}, "limit": {"type": "integer", "default": 6}, "mode": {"type": "string", "default": "compact"}},
+        "required": ["root", "question"],
+    },
+    "lwm_handoff": {
+        "description": "Create, read, acknowledge, or close one active handoff.",
+        "properties": {"root": {"type": "string"}, "action": {"type": "string"}, "project_id": {"type": "string"}, "handoff_id": {"type": "string"}, "target_tool": {"type": "string"}, "packet": {"type": "object"}},
+        "required": ["root", "action"],
+    },
+    "lwm_coverage": {
+        "description": "Return truthful per-tool capture and delivery coverage.",
+        "properties": {"root": {"type": "string"}, "tool": {"type": "string"}, "project_id": {"type": "string"}},
+        "required": ["root"],
+    },
+    "lwm_health": {
+        "description": "Return strict cycle, quality, and capability health.",
         "properties": {"root": {"type": "string"}},
         "required": ["root"],
     },
@@ -131,20 +176,160 @@ def _search_wiki(root: Path, query: str, limit: int) -> list[dict]:
     return hits
 
 
+def _registered_bridge(
+    root: Path,
+    *,
+    host_tool: str | None,
+    host_integration: str | None,
+):
+    """Return a registry row only for an explicitly bound MCP host."""
+
+    if not host_tool or not host_integration:
+        return None
+    definition = ToolRegistry.load(root).resolve(host_tool)
+    if definition is None or host_integration not in definition.proof_integrations:
+        return None
+    return definition
+
+
+def _mcp_bridge_receipt(
+    root: Path,
+    *,
+    name: str,
+    arguments: dict,
+    result: dict,
+    host_tool: str | None,
+    host_integration: str | None,
+) -> dict | None:
+    """Record proof only for the registered MiniMax MCP read/write surface.
+
+    The evidence is intentionally bounded to operation metadata. User content
+    stays in the normal sanitized event path and is never copied into proof.
+    """
+
+    definition = _registered_bridge(
+        root,
+        host_tool=host_tool,
+        host_integration=host_integration,
+    )
+    if definition is None:
+        return None
+
+    registry = ToolRegistry.load(root)
+    operation: str
+    direction: str
+    project_id: str | None
+    event_id: str | None = None
+    if name in {"query_context", "lwm_context"}:
+        requested = registry.resolve(str(arguments.get("tool") or ""))
+        if requested is None or requested.tool_id != definition.tool_id:
+            return None
+        project_path = str(arguments.get("project") or root)
+        project_id = record_project(root, project_path).project_id
+        operation = "query_context"
+        direction = "read"
+    elif name == "lwm_retain":
+        event = arguments.get("event")
+        if not isinstance(event, dict):
+            return None
+        requested = registry.resolve(str(event.get("tool") or ""))
+        if requested is None or requested.tool_id != definition.tool_id:
+            return None
+        project_id = str(event.get("project_id") or "") or record_project(
+            root, str(event.get("project_path") or root)
+        ).project_id
+        operation = "lwm_retain"
+        direction = "write"
+        event_id = str(result.get("event_id") or "") or None
+    else:
+        return None
+
+    operation_id = f"mcp-bridge:{uuid.uuid4().hex}"
+    relative_evidence = Path("state/receipts/mcp-bridge") / f"{operation_id.split(':', 1)[1]}.json"
+    evidence = {
+        "schema_version": "1",
+        "tool": definition.tool_id,
+        "integration": host_integration,
+        "direction": direction,
+        "project_id": project_id,
+        "operation": operation,
+        "operation_id": operation_id,
+    }
+    if event_id:
+        evidence["event_id"] = event_id
+    evidence_path = root / relative_evidence
+    evidence_path.parent.mkdir(parents=True, exist_ok=True)
+    evidence_path.write_text(
+        json.dumps(evidence, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    return capabilities.record(
+        root,
+        tool=definition.tool_id,
+        direction=direction,
+        project_id=project_id,
+        source="mcp-bridge",
+        evidence_path=str(relative_evidence),
+        operation_id=operation_id,
+        detail="registered host-bound MCP bridge operation",
+    )
+
+
 def _call_tool(name: str, arguments: dict) -> dict:
     """Dispatch one tool invocation and return the ``result`` payload."""
 
     if name not in TOOLS:
         raise KeyError(name)
+    alias = {
+        "lwm_context": "query_context",
+    "lwm_recall": "recall",
+        "lwm_health": "health",
+    }.get(name, name)
+    if alias != name:
+        return _call_tool(alias, arguments)
+    if name == "lwm_retain":
+        root = Path(arguments["root"]).resolve()
+        result = hub_service.retain_event(
+            root, arguments["event"], receipt_source="watcher-observed"
+        )
+        return {
+            "ingested": not result["duplicate"],
+            "duplicate": result["duplicate"],
+            "path": result["path"],
+            "event_id": result["event_id"],
+            "existing_event_id": result.get("existing_event_id"),
+        }
+    if name == "lwm_coverage":
+        return hub_service.coverage_report(
+            Path(arguments["root"]).resolve(),
+            tool=str(arguments["tool"]) if arguments.get("tool") else None,
+            project_id=str(arguments["project_id"]) if arguments.get("project_id") else None,
+        )
+    if name == "lwm_handoff":
+        from lwm.handoff import ack_handoff, close_handoff, create_handoff, load_active
+
+        root = Path(arguments["root"]).resolve()
+        action = str(arguments.get("action") or "current")
+        if action == "current":
+            packet = load_active(root, project_id=str(arguments["project_id"]))
+            return {"packet": packet.to_dict() if packet else None}
+        if action == "create":
+            packet_data = dict(arguments.get("packet") or {})
+            packet = create_handoff(root, **packet_data)
+            return packet.to_dict()
+        if action == "ack":
+            return ack_handoff(root, handoff_id=str(arguments["handoff_id"]), target_tool=str(arguments["target_tool"])).to_dict()
+        if action == "close":
+            return close_handoff(root, handoff_id=str(arguments["handoff_id"])).to_dict()
+        raise ValueError(f"unknown handoff action: {action}")
     if name == "query_context":
         root = Path(arguments["root"]).resolve()
-        report = context.build(
+        report, _receipt = hub_service.context_for_tool(
             root,
             tool=str(arguments["tool"]),
             project_path=str(arguments["project"]),
             limit=int(arguments.get("limit", 6)),
         )
-        capabilities.record(root, tool=str(arguments["tool"]), direction="read", project_id=report.project_id, source="mcp")
         return {
             "format": "markdown",
             "markdown": report.markdown,
@@ -152,35 +337,14 @@ def _call_tool(name: str, arguments: dict) -> dict:
         }
     if name == "record_event":
         root = Path(arguments["root"]).resolve()
-        incoming = dict(arguments["event"])
-        # Project id derivation mirrors the CLI: take what was passed
-        # verbatim; only fill ``project_id`` from the path if missing.
-        if incoming.get("project_path") and "project_id" not in incoming:
-            resolution = record_project(root, str(incoming["project_path"]))
-            incoming["project_id"] = resolution.project_id
-        # Make sure event_id, timestamp, importance, privacy are populated
-        # so the schema validator never fails on the most boring key
-        # omissions. ``make_event`` fills exactly those defaults without
-        # clobbering caller-supplied values.
-        defaults = make_event_default(
-            tool=incoming.get("tool", "shell"),
-            project_path=incoming.get("project_path", ""),
-            project_id=incoming.get("project_id", "adhoc"),
-            event_type=incoming.get("event_type", "workflow_observation"),
-            task=incoming.get("task", "mcp record"),
-            timestamp=incoming.get("timestamp"),
-            event_id=incoming.get("event_id"),
-            importance=incoming.get("importance"),
-            privacy=incoming.get("privacy"),
+        result = hub_service.record_event(
+            root, arguments["event"], receipt_source="watcher-observed"
         )
-        for key, value in defaults.items():
-            incoming.setdefault(key, value)
-        report = validate_event(incoming)
-        if not report.ok:
-            raise ValueError("; ".join(issue.message for issue in report.issues))
-        rel = lwm_inbox.submit_event(root, incoming)
-        capabilities.record(root, tool=str(incoming.get("tool", "unknown")), direction="write", project_id=str(incoming.get("project_id") or ""), source="mcp")
-        return {"ingested": True, "path": str(rel), "event_id": incoming["event_id"]}
+        return {
+            "ingested": True,
+            "path": result["path"],
+            "event_id": result["event_id"],
+        }
     if name == "search_memory":
         root = Path(arguments["root"]).resolve()
         hits = _search_wiki(root, str(arguments["query"]), int(arguments.get("limit", 10)))
@@ -208,12 +372,19 @@ def _call_tool(name: str, arguments: dict) -> dict:
         )
     if name == "record_receipt":
         root = Path(arguments["root"]).resolve()
+        source = str(arguments.get("source") or "watcher-observed")
+        if source in PROOF_RECEIPT_SOURCES:
+            raise ValueError(
+                "MCP cannot write host proof receipts; use the registered host bridge"
+            )
         return capabilities.record(
             root,
             tool=str(arguments["tool"]),
             direction=str(arguments["direction"]),
             project_id=str(arguments.get("project_id") or "") or None,
-            source="mcp",
+            source=source,
+            evidence_path=str(arguments.get("evidence_path") or ""),
+            operation_id=str(arguments.get("operation_id") or ""),
         )
     if name == "health":
         root = Path(arguments["root"]).resolve()
@@ -222,7 +393,14 @@ def _call_tool(name: str, arguments: dict) -> dict:
     raise KeyError(name)
 
 
-def _serve(stream_in, stream_out) -> None:
+def _serve(
+    stream_in,
+    stream_out,
+    *,
+    default_root: Path | None = None,
+    host_tool: str | None = None,
+    host_integration: str | None = None,
+) -> None:
     for raw in stream_in:
         line = raw.strip()
         if not line:
@@ -260,7 +438,19 @@ def _serve(stream_in, stream_out) -> None:
             )
         elif method == "tools/call":
             try:
-                content = _call_tool(params["name"], params.get("arguments") or {})
+                arguments = params.get("arguments") or {}
+                if default_root is not None and isinstance(arguments, dict):
+                    arguments = dict(arguments)
+                    arguments.setdefault("root", str(default_root))
+                content = _call_tool(params["name"], arguments)
+                _mcp_bridge_receipt(
+                    Path(arguments["root"]).resolve(),
+                    name=str(params["name"]),
+                    arguments=arguments,
+                    result=content,
+                    host_tool=host_tool,
+                    host_integration=host_integration,
+                )
             except KeyError:
                 response = _err(id_, -32602, f"unknown tool: {params.get('name')}")
             except ValueError as exc:
@@ -283,10 +473,21 @@ def _serve(stream_in, stream_out) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     argv = argv if argv is not None else sys.argv[1:]
-    if not argv:
+    parser = argparse.ArgumentParser(prog="python -m mcp.lwm_server")
+    parser.add_argument("root", nargs="?", help="Default LLM-WorkMem root for tool calls.")
+    parser.add_argument("--root", dest="root_option", help="Default LLM-WorkMem root for tool calls.")
+    args = parser.parse_args(argv)
+    configured_root = args.root_option or args.root or os.environ.get("LWM_ROOT")
+    if not configured_root:
         sys.stderr.write("usage: python -m mcp.lwm_server <root>\n")
         return 2
-    _serve(sys.stdin, sys.stdout)
+    _serve(
+        sys.stdin,
+        sys.stdout,
+        default_root=Path(configured_root).expanduser().resolve(),
+        host_tool=os.environ.get("LWM_MCP_TOOL"),
+        host_integration=os.environ.get("LWM_MCP_INTEGRATION"),
+    )
     return 0
 
 

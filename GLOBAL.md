@@ -1,3 +1,5 @@
+<!-- contract-version: 1 -->
+
 # LLM-WorkMem Global Contract
 
 LLM-WorkMem is a shared, source-backed evidence layer for local IDEs and shell. Native tool instructions, skills, memory, session state, planning, execution, and verification remain authoritative.
@@ -27,7 +29,12 @@ Keep temporary observations, empty lifecycle events, unchanged snapshots, full c
 
 ## Runtime and Git boundary
 
-Runtime state, receipts, logs, caches, absolute local paths, and launchd state are rebuilt locally and are not the long-term truth source. Git synchronizes code, tests, adapters, `GLOBAL.md`, durable Wiki pages, and reviewed project knowledge.
+Runtime state, receipts, logs, caches, absolute local paths, and launchd state are rebuilt locally and are not the long-term truth source. Git synchronizes code, tests, adapters, `GLOBAL.md`, and reviewed source documents. Runtime-owned Wiki/raw/state targets reached through absolute local symlinks are not proven Git-synchronized or portable across Macs.
+
+## Security & Server Boundary (最高安全边界：服务器与外部网络)
+
+- **绝对禁止擅自进入或连接任何服务器**：严禁在未获用户明确许可的情况下，抓取本地凭证、历史 IP、SSH 配置文件并尝试连接任何外部云服务器、VPS 或远程主机。
+- **必须得到用户明确许可**：涉及任何远程服务器连接、登录、部署、配置修改或文件上传，**必须且只能在用户明确给出具体目标并下达执行许可后方可开展**。“准备部署”仅限本地构建检查与配置准备，绝不等于连接执行。
 
 ## Cross-tool handoff
 

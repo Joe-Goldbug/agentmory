@@ -19,18 +19,16 @@ import json
 import os
 import sys
 import uuid
-from dataclasses import replace
 from pathlib import Path
 from typing import Optional
 
 import typer
 
-from lwm import context as lwm_context
+from lwm import behavior_contract
 from lwm import closure as lwm_closure
 from lwm import forget as lwm_forget
 from lwm import health as lwm_health
 from lwm import hooks_gen as lwm_hooks_gen
-from lwm import inbox as lwm_inbox
 from lwm import insights as lwm_insights
 from lwm import ingest as lwm_ingest
 from lwm import promote as lwm_promote
@@ -39,10 +37,15 @@ from lwm import shell_hook as lwm_shell_hook
 from lwm import capabilities as lwm_capabilities
 from lwm import lifecycle as lwm_lifecycle
 from lwm import memory_api as lwm_memory_api
+from lwm import hub_service
+from lwm import ide_companion as lwm_ide_companion
+from lwm import migration as lwm_migration
+from lwm import memory_federation as lwm_memory_federation
+from lwm import session_bridge
+from lwm.harvest import mutable_ownership_issues, runtime_paths
 from lwm.recall import render_recall_packet
 from lwm import registry as lwm_registry
-from lwm.events import validate_event
-from lwm.project_id import record_project, resolve_project_root
+from lwm.capability_proof import PROOF_RECEIPT_SOURCES
 
 
 hub_app = typer.Typer(
@@ -50,6 +53,274 @@ hub_app = typer.Typer(
     help="Central hub: events, ingest, context, promote, insights, health",
     no_args_is_help=True,
 )
+tools_app = typer.Typer(help="List registered tools and their real collectors.", no_args_is_help=True)
+behavior_app = typer.Typer(help="Show and verify the canonical GLOBAL.md contract.", no_args_is_help=True)
+handoff_app = typer.Typer(help="Create and inspect cross-tool task handoffs.", no_args_is_help=True)
+federation_app = typer.Typer(help="Compile and restore the unified native-memory release.", no_args_is_help=True)
+hub_app.add_typer(tools_app, name="tools")
+hub_app.add_typer(behavior_app, name="behavior")
+hub_app.add_typer(handoff_app, name="handoff")
+hub_app.add_typer(federation_app, name="federation")
+
+
+@tools_app.command("list")
+def tools_list_cmd(
+    root: Path = typer.Option(Path("."), "--root", help="Wiki root."),
+    home: Path | None = typer.Option(None, "--home", help="Override the tool discovery home."),
+    json_output: bool = typer.Option(False, "--json", help="Emit JSON only."),
+) -> None:
+    rows = hub_service.list_tools(root.resolve(), home=home.resolve() if home else None)
+    if json_output:
+        typer.echo(json.dumps(rows, ensure_ascii=False, indent=2))
+        return
+    for row in rows:
+        collectors = ", ".join(row["collector_modules"]) or "hook/lifecycle"
+        host_status = str((row.get("host_probe") or {}).get("status") or "unknown")
+        typer.echo(
+            f"- {row['tool_id']}: {row['coverage_status']} "
+            f"host={host_status}; {row['status_reason']} "
+            f"[{collectors} ({row['capture_mode']})]"
+        )
+
+
+@tools_app.command("probe")
+def tools_probe_cmd(
+    root: Path = typer.Option(Path("."), "--root", help="Wiki root."),
+    home: Path | None = typer.Option(None, "--home", help="Override the tool discovery home."),
+    json_output: bool = typer.Option(False, "--json", help="Emit JSON only."),
+) -> None:
+    """Probe discovery and collector availability without claiming proof."""
+
+    rows = hub_service.list_tools(root.resolve(), home=home.resolve() if home else None)
+    if json_output:
+        typer.echo(json.dumps(rows, ensure_ascii=False, indent=2))
+        return
+    for row in rows:
+        discovered = "discovered" if row["discovered"] else "not-discovered"
+        importable = (
+            "collector-ready"
+            if row["collector_status"] == "ready"
+            else "collector-missing"
+            if row["collector_status"] == "missing"
+            else row["capture_mode"]
+        )
+        host_status = str((row.get("host_probe") or {}).get("status") or "unknown")
+        typer.echo(
+            f"- {row['tool_id']}: {discovered}, {importable}, "
+            f"host={host_status}, coverage={row['coverage_status']}; "
+            f"{row['status_reason']}"
+        )
+
+
+@hub_app.command("coverage")
+def coverage_cmd(
+    root: Path = typer.Option(Path("."), "--root", help="Wiki root."),
+    tool: str | None = typer.Option(None, "--tool"),
+    project_id: str | None = typer.Option(None, "--project-id"),
+    json_output: bool = typer.Option(False, "--json", help="Emit JSON only."),
+) -> None:
+    payload = hub_service.coverage_report(root.resolve(), tool=tool, project_id=project_id)
+    if json_output:
+        typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+        return
+    for tool_id, row in payload.items():
+        gap = ", ".join(row.get("gaps") or ())
+        typer.echo(f"- {tool_id}: {row['status']}" + (f" ({gap})" if gap else ""))
+
+
+@behavior_app.command("show")
+def behavior_show_cmd(
+    root: Path = typer.Option(Path("."), "--root", help="Wiki root."),
+    json_output: bool = typer.Option(False, "--json", help="Emit JSON only."),
+) -> None:
+    payload = hub_service.behavior_show(root.resolve())
+    typer.echo(json.dumps(payload, ensure_ascii=False, indent=2) if json_output else payload.get("text", ""))
+
+
+@behavior_app.command("verify")
+def behavior_verify_cmd(
+    root: Path = typer.Option(Path("."), "--root", help="Wiki root."),
+    expected_sha256: str | None = typer.Option(None, "--sha256"),
+) -> None:
+    payload = hub_service.behavior_verify(root.resolve(), expected_sha256=expected_sha256)
+    typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+    if not payload["valid"]:
+        raise typer.Exit(1)
+
+
+@behavior_app.command("snapshot")
+def behavior_snapshot_cmd(
+    source: Path = typer.Option(Path("GLOBAL.md"), "--source", help="Human-reviewed GLOBAL.md."),
+    root: Path = typer.Option(Path("."), "--root", help="Runtime data root."),
+) -> None:
+    """Create a versioned runtime snapshot without changing GLOBAL.md."""
+
+    source_path = source.expanduser()
+    if not source_path.is_absolute():
+        source_path = (Path.cwd() / source_path).resolve()
+    target = behavior_contract.write_snapshot(root.resolve(), source_path)
+    typer.echo(json.dumps({"snapshot": str(target), **behavior_contract.verify(root.resolve())}, ensure_ascii=False, indent=2))
+
+
+@behavior_app.command("sync")
+def behavior_sync_cmd(
+    source: Path = typer.Option(Path("GLOBAL.md"), "--source", help="Human-reviewed GLOBAL.md."),
+    root: Path = typer.Option(Path("."), "--root", help="Runtime data root."),
+) -> None:
+    """Synchronize a reviewed behavior contract into a runtime snapshot."""
+
+    source_path = source.expanduser()
+    if not source_path.is_absolute():
+        source_path = (Path.cwd() / source_path).resolve()
+    target = behavior_contract.write_snapshot(root.resolve(), source_path)
+    typer.echo(json.dumps({"snapshot": str(target), **behavior_contract.verify(root.resolve())}, ensure_ascii=False, indent=2))
+
+
+@hub_app.command("analyze")
+def analyze_pending_cmd(
+    root: Path = typer.Option(Path("."), "--root", help="Wiki root."),
+    pending: bool = typer.Option(False, "--pending", help="Process pending candidates."),
+) -> None:
+    if not pending:
+        typer.echo("pass --pending to process optional analysis candidates")
+        raise typer.Exit(2)
+    typer.echo(json.dumps(hub_service.analyze_pending(root.resolve()), ensure_ascii=False, indent=2))
+
+
+@hub_app.command("review-analysis")
+def review_analysis_cmd(
+    candidate_id: str = typer.Argument(..., help="Analysis candidate id."),
+    decision: str = typer.Option(..., "--decision", help="accept | reject | promote"),
+    root: Path = typer.Option(Path("."), "--root", help="Wiki root."),
+) -> None:
+    """Review one validated compiler result without auto-promoting it."""
+
+    try:
+        payload = hub_service.review_analysis(
+            root.resolve(), candidate_id, decision=decision
+        )
+    except (FileNotFoundError, ValueError) as exc:
+        typer.secho(str(exc), err=True, fg=typer.colors.RED)
+        raise typer.Exit(2) from exc
+    typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+
+
+@federation_app.command("compile")
+def federation_compile_cmd(
+    root: Path = typer.Option(Path("."), "--root", help="Wiki root."),
+) -> None:
+    """Compile current Codex/OpenCode native memory into one release."""
+
+    typer.echo(json.dumps(lwm_memory_federation.compile_federated_memory(root.resolve()), ensure_ascii=False, indent=2))
+
+
+@federation_app.command("restore")
+def federation_restore_cmd(
+    release_id: str = typer.Argument(..., help="Previously generated release id."),
+    root: Path = typer.Option(Path("."), "--root", help="Wiki root."),
+) -> None:
+    """Restore a previous unified-memory release."""
+
+    typer.echo(json.dumps(lwm_memory_federation.restore_federated_release(root.resolve(), release_id), ensure_ascii=False, indent=2))
+
+
+@hub_app.command("promote-analysis")
+def promote_analysis_cmd(
+    candidate_id: str = typer.Argument(..., help="Accepted analysis candidate id."),
+    root: Path = typer.Option(Path("."), "--root", help="Wiki root."),
+) -> None:
+    """Explicitly promote one accepted candidate through stable evidence gates."""
+
+    try:
+        payload = hub_service.promote_analysis(root.resolve(), candidate_id)
+    except (FileNotFoundError, ValueError) as exc:
+        typer.secho(str(exc), err=True, fg=typer.colors.RED)
+        raise typer.Exit(2) from exc
+    typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+
+
+@hub_app.command("verify-cycle")
+def verify_cycle_cmd(
+    cycle_id: str = typer.Argument("", help="Cycle id, or a data root to verify its latest receipt."),
+    root: Path = typer.Option(Path("."), "--root", help="Wiki root."),
+    strict: bool = typer.Option(False, "--strict"),
+) -> None:
+    effective_root = root.resolve()
+    if cycle_id and Path(cycle_id).is_dir() and str(root) == ".":
+        effective_root = Path(cycle_id).resolve()
+        from lwm.cycle_receipt import load_last_attempt, load_latest
+
+        latest = load_latest(effective_root) or load_last_attempt(effective_root) or {}
+        cycle_id = str(latest.get("cycle_id") or latest.get("receipt_id") or "")
+    if not cycle_id:
+        typer.secho("No cycle id or latest receipt found.", err=True, fg=typer.colors.RED)
+        raise typer.Exit(2)
+    payload = hub_service.verify_cycle(effective_root, cycle_id, strict=strict)
+    typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+    if not payload["valid"]:
+        raise typer.Exit(1)
+
+
+@handoff_app.command("create")
+def handoff_create_nested_cmd(
+    project_id: str = typer.Option(..., "--project-id", "-p"),
+    task_id: str = typer.Option(..., "--task-id", "-t"),
+    objective: str = typer.Option("", "--objective", "-o"),
+    current_state: str = typer.Option("", "--current-state", "-s"),
+    source_tool: str = typer.Option("codex", "--source-tool"),
+    supersedes: str | None = typer.Option(None, "--supersedes"),
+    next_action: str = typer.Option("", "--next-action"),
+    root: Path = typer.Option(Path("."), "--root"),
+) -> None:
+    from lwm.handoff import create_handoff
+
+    packet = create_handoff(
+        root.resolve(),
+        project_id=project_id,
+        task_id=task_id,
+        objective=objective,
+        current_state=current_state,
+        source_tool=source_tool,
+        supersedes=supersedes,
+        next_action=next_action,
+    )
+    typer.echo(packet.handoff_id)
+
+
+@handoff_app.command("current")
+def handoff_current_nested_cmd(
+    project_id: str = typer.Option(..., "--project-id", "-p"),
+    root: Path = typer.Option(Path("."), "--root"),
+) -> None:
+    from lwm.handoff import load_active, render_handoff_markdown
+
+    packet = load_active(root.resolve(), project_id=project_id)
+    if packet is None:
+        raise typer.Exit(1)
+    typer.echo(render_handoff_markdown(packet))
+
+
+@handoff_app.command("ack")
+def handoff_ack_nested_cmd(
+    handoff_id: str = typer.Option(..., "--handoff-id"),
+    target_tool: str = typer.Option(..., "--target-tool"),
+    root: Path = typer.Option(Path("."), "--root"),
+) -> None:
+    from lwm.handoff import ack_handoff
+
+    ack_handoff(root.resolve(), handoff_id=handoff_id, target_tool=target_tool)
+    typer.echo("ack recorded")
+
+
+@handoff_app.command("close")
+def handoff_close_nested_cmd(
+    handoff_id: str = typer.Option(..., "--handoff-id"),
+    root: Path = typer.Option(Path("."), "--root"),
+) -> None:
+    from lwm.handoff import close_handoff
+
+    closed = close_handoff(root.resolve(), handoff_id=handoff_id)
+    typer.echo(closed.closed_at)
 
 
 def _read_stdin() -> str:
@@ -172,60 +443,31 @@ def record_cmd(
     if not parsed.get("project_path"):
         parsed["project_path"] = os.getcwd()
 
-    # Every producer may send a nested cwd. Store the real repository root so
-    # context, events and capability receipts cannot disagree about a project.
-    parsed["project_path"] = str(resolve_project_root(str(parsed["project_path"])))
-
-    if not parsed.get("tool"):
-        typer.secho("--tool is required", err=True, fg=typer.colors.RED)
-        raise typer.Exit(2)
-    if not parsed.get("event_type"):
-        parsed["event_type"] = "workflow_observation"
-
-    if not parsed.get("project_id") and parsed.get("project_path"):
-        resolution = record_project(root, parsed["project_path"])
-        parsed["project_id"] = resolution.project_id
-
-    validation = validate_event(parsed)
-    if not validation.ok:
-        typer.secho(
-            "invalid event: " + "; ".join(i.render() for i in validation.issues),
-            err=True,
-            fg=typer.colors.RED,
-        )
-        raise typer.Exit(2)
-
-    target = lwm_inbox.submit_event(root, parsed)
-    lwm_capabilities.record(
-        root,
-        tool=str(parsed["tool"]),
-        direction="write",
-        project_id=str(parsed.get("project_id") or "") or None,
-        source="cli-record",
-    )
-    # ``raw/`` may be a symlink into the launchd runtime workspace. Resolve
-    # both paths for storage, but do not assume the target remains below the
-    # user-facing wiki root when rendering the report.
     try:
-        display_target = target.relative_to(root)
-    except ValueError:
-        display_target = Path(os.path.relpath(target, root))
-    typer.secho(f"recorded -> {display_target}", fg=typer.colors.GREEN)
+        result = hub_service.record_event(root, parsed, receipt_source="cli-record")
+    except ValueError as exc:
+        typer.secho(f"invalid event: {exc}", err=True, fg=typer.colors.RED)
+        raise typer.Exit(2) from exc
+    typer.secho(f"recorded -> {result['path']}", fg=typer.colors.GREEN)
 
 
 @hub_app.command("ingest")
 def ingest_cmd(
     root: Path = typer.Argument(Path("."), help="Wiki root.", exists=False),
     no_lock: bool = typer.Option(False, "--no-lock", help="Skip lockfile acquisition."),
-    no_promote: bool = typer.Option(False, "--no-promote", help="Skip auto-promotion."),
+    promote: bool = typer.Option(
+        False,
+        "--promote",
+        help="Evaluate legacy candidates after ingest; never write global memory.",
+    ),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Verbose output."),
 ) -> None:
-    """Process events from ``raw/events/inbox/`` into project memory."""
+    """Ingest events; the legacy ``--promote`` flag is observation-only."""
 
     report = lwm_ingest.run(
         root.resolve(),
         with_lock=not no_lock,
-        auto_promote=not no_promote,
+        auto_promote=promote,
     )
     typer.echo(report.render())
     if report.processed:
@@ -260,27 +502,12 @@ def context_cmd(
     if format not in {"markdown", "json"}:
         typer.secho("--format must be markdown or json", err=True, fg=typer.colors.RED)
         raise typer.Exit(2)
-    canonical_project = resolve_project_root(project) if project else None
-    report = lwm_context.build(
-        root.resolve(),
-        tool=tool,
-        project_path=str(canonical_project) if canonical_project else None,
-        format=format,
-        limit=limit,
+    report, _receipt = hub_service.context_for_tool(
+        root.resolve(), tool=tool, project_path=project, limit=limit
     )
-    receipt = lwm_capabilities.record(
-        root.resolve(),
-        tool=tool,
-        direction="read",
-        project_id=report.project_id,
-        source="cli-context",
-    )
-    if receipt.get("status") != "verified":
-        warnings = list(report.data.get("warnings") or [])
-        warnings.append(f"Read receipt unavailable: {receipt.get('error', 'unknown error')}")
-        data = {**report.data, "warnings": warnings}
-        markdown = report.markdown.rstrip() + f"\n\nWarning: {warnings[-1]}\n"
-        report = replace(report, markdown=markdown, data=data)
+    if format == "json":
+        typer.echo(json.dumps(report.data, ensure_ascii=False, indent=2))
+        return
     typer.echo(report.markdown)
 
 
@@ -290,8 +517,18 @@ def lifecycle_cmd(
     tool: str = typer.Option(..., "--tool", help="Tool name."),
     project: Path = typer.Option(Path("."), "--project", "-p", help="Current project path."),
     session_id: str | None = typer.Option(None, "--session-id", help="Host session id."),
+    task_id: str | None = typer.Option(None, "--task-id", help="Structured task identity."),
     task: str | None = typer.Option(None, "--task", help="Sanitized end summary."),
-    source: str = typer.Option("native-hook", "--source", help="Receipt source."),
+    handoff_json: str | None = typer.Option(
+        None,
+        "--handoff-json",
+        help="Bounded structured handoff summary JSON; raw prompts are not accepted as handoff state.",
+    ),
+    source: str = typer.Option(
+        "watcher-observed",
+        "--source",
+        help="Receipt source; native-hook is reserved for a real host integration.",
+    ),
     root: Path = typer.Option(Path("."), "--root", help="Wiki root.", exists=False),
 ) -> None:
     """Handle a native lifecycle boundary with a canonical project root."""
@@ -299,21 +536,192 @@ def lifecycle_cmd(
     if phase not in {"start", "stop"}:
         typer.secho("phase must be start or stop", err=True, fg=typer.colors.RED)
         raise typer.Exit(2)
+    if source in PROOF_RECEIPT_SOURCES:
+        typer.secho(
+            "proof sources require a verified host integration; use `lwm hub bridge` "
+            "with host_proof or keep this command observation-only",
+            err=True,
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(2)
     if phase == "start":
         result = lwm_lifecycle.start(
-            root, tool=tool, project_path=project, session_id=session_id, source=source
+            root,
+            tool=tool,
+            project_path=project,
+            session_id=session_id,
+            task_id=task_id,
+            source=source,
         )
         typer.echo(result.context_markdown)
         return
+    handoff_summary = None
+    if handoff_json:
+        try:
+            parsed_handoff = json.loads(handoff_json)
+        except json.JSONDecodeError as exc:
+            typer.secho(f"--handoff-json must be valid JSON: {exc}", err=True, fg=typer.colors.RED)
+            raise typer.Exit(2) from exc
+        if not isinstance(parsed_handoff, dict):
+            typer.secho("--handoff-json must be a JSON object", err=True, fg=typer.colors.RED)
+            raise typer.Exit(2)
+        handoff_summary = parsed_handoff
     result = lwm_lifecycle.stop(
         root,
         tool=tool,
         project_path=project,
         session_id=session_id,
+        task_id=task_id,
         task=task,
+        handoff_summary=handoff_summary,
         source=source,
     )
     typer.echo(f"lifecycle stop -> {result.event_path}")
+    if result.handoff_created:
+        typer.echo(f"handoff created -> {result.handoff_id}")
+    if result.warning:
+        typer.secho(result.warning, err=True, fg=typer.colors.YELLOW)
+
+
+@hub_app.command("bridge")
+def bridge_cmd(
+    request: str | None = typer.Argument(
+        None,
+        help="Versioned JSON request; omit it to read one JSON object from stdin.",
+    ),
+    output: str = typer.Option(
+        "json",
+        "--output",
+        help="json for the machine contract, or markdown for direct Context delivery.",
+    ),
+    root: Path = typer.Option(Path("."), "--root", help="Wiki root.", exists=False),
+) -> None:
+    """Run the shared JSON session bridge used by IDEs and CLIs."""
+
+    raw = request
+    if raw is None:
+        if sys.stdin.isatty():
+            typer.secho("bridge request is required", err=True, fg=typer.colors.RED)
+            raise typer.Exit(2)
+        raw = sys.stdin.read()
+    if output not in {"json", "markdown"}:
+        typer.secho("--output must be json or markdown", err=True, fg=typer.colors.RED)
+        raise typer.Exit(2)
+    try:
+        parsed = json.loads(raw)
+        result = session_bridge.dispatch(
+            root.resolve(),
+            parsed,
+            trusted_host=os.environ.get("LWM_HOST_BRIDGE") == "1",
+        )
+    except (json.JSONDecodeError, TypeError, ValueError) as exc:
+        typer.secho(f"invalid bridge request: {exc}", err=True, fg=typer.colors.RED)
+        raise typer.Exit(2) from exc
+    if output == "markdown":
+        if result["phase"] not in {"context", "start"}:
+            typer.secho(
+                "--output markdown is only valid for context or start",
+                err=True,
+                fg=typer.colors.RED,
+            )
+            raise typer.Exit(2)
+        typer.echo(result.get("context_markdown", ""))
+        return
+    typer.echo(json.dumps(result, ensure_ascii=False, indent=2))
+
+
+@hub_app.command("bridge-stop")
+def bridge_stop_cmd(
+    tool: str = typer.Option(..., "--tool", help="Registered tool name."),
+    project: Path = typer.Option(Path("."), "--project", "-p", help="Current project path."),
+    session_id: str | None = typer.Option(None, "--session-id", help="Host session id."),
+    task_id: str | None = typer.Option(None, "--task-id", help="Structured task identity."),
+    task: str | None = typer.Option(None, "--task", help="Sanitized end summary."),
+    handoff_json: str | None = typer.Option(
+        None,
+        "--handoff-json",
+        help="Bounded structured handoff summary JSON; raw prompts are not accepted.",
+    ),
+    source: str = typer.Option(
+        "watcher-observed",
+        "--source",
+        help="Receipt source; native-hook is reserved for a real host integration.",
+    ),
+    root: Path = typer.Option(Path("."), "--root", help="Wiki root.", exists=False),
+) -> None:
+    """Submit a structured stop through the shared JSON Session Bridge.
+
+    This is a shell-friendly convenience wrapper. The canonical business
+    contract remains ``lwm hub bridge`` and the legacy lifecycle command is
+    compatibility-only.
+    """
+
+    handoff: dict[str, object] | None = None
+    if source in PROOF_RECEIPT_SOURCES:
+        typer.secho(
+            "bridge-stop cannot claim a proof source without host_proof; "
+            "use `lwm hub bridge` from the host integration",
+            err=True,
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(2)
+    if handoff_json:
+        try:
+            parsed = json.loads(handoff_json)
+        except json.JSONDecodeError as exc:
+            typer.secho(f"--handoff-json must be valid JSON: {exc}", err=True, fg=typer.colors.RED)
+            raise typer.Exit(2) from exc
+        if not isinstance(parsed, dict):
+            typer.secho("--handoff-json must be a JSON object", err=True, fg=typer.colors.RED)
+            raise typer.Exit(2)
+        handoff = parsed
+
+    request: dict[str, object] = {
+        "phase": "stop",
+        "tool": tool,
+        "project_path": str(project),
+        "source": source,
+    }
+    if session_id:
+        request["session_id"] = session_id
+    if task_id:
+        request["task_id"] = task_id
+    if task:
+        request["task"] = task
+    if handoff is not None:
+        request["handoff"] = handoff
+
+    try:
+        result = session_bridge.dispatch(root.resolve(), request)
+    except (TypeError, ValueError) as exc:
+        typer.secho(f"invalid bridge stop request: {exc}", err=True, fg=typer.colors.RED)
+        raise typer.Exit(2) from exc
+    typer.echo(json.dumps(result, ensure_ascii=False, indent=2))
+
+
+@hub_app.command("bridge-contract")
+def bridge_contract_cmd(
+    project: Path = typer.Option(Path("."), "--project", "-p", help="Project path."),
+    root: Path = typer.Option(Path("."), "--root", help="Wiki root.", exists=False),
+    simulate: bool = typer.Option(
+        False,
+        "--simulate",
+        help="Required: run an isolated contract check without claiming host proof.",
+    ),
+) -> None:
+    """Exercise the bridge for each registered tool in simulation mode only."""
+
+    if not simulate:
+        typer.secho(
+            "refusing live bridge-contract run; pass --simulate with a temporary root",
+            err=True,
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(2)
+    result = session_bridge.simulate_registry_contract(root.resolve(), project.resolve())
+    typer.echo(json.dumps(result, ensure_ascii=False, indent=2))
+    if not result["all_contracts_pass"]:
+        raise typer.Exit(1)
 
 
 @hub_app.command("promote")
@@ -322,14 +730,22 @@ def promote_cmd(
     scan: bool = typer.Option(False, "--scan", help="Scan processed events first."),
     auto: bool = typer.Option(False, "--auto", help="Run promotion directly."),
 ) -> None:
-    """Promote insight candidates to global memory.
+    """Scan legacy insight candidates without bypassing review.
 
-    Without flags, ``--scan`` collects candidates from processed events,
-    then ``--auto`` promotes eligible ones and writes the rest to
-    ``wiki/review/candidate-*.md``.
+    ``--scan`` remains a read/derived-candidate compatibility operation.
+    The old ``--auto`` writer is retired; global memory can only be written
+    through ``hub review-analysis`` followed by ``hub promote-analysis``.
     """
 
     root = root.resolve()
+    if auto:
+        typer.secho(
+            "legacy --auto is disabled; use hub review-analysis and "
+            "hub promote-analysis",
+            err=True,
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(2)
     if not scan and not auto:
         typer.secho("pass --scan and/or --auto", err=True, fg=typer.colors.YELLOW)
         raise typer.Exit(2)
@@ -388,6 +804,7 @@ def health_cmd(
             "data_flow": snapshot.data_flow,
             "cycle": snapshot.cycle,
             "capabilities": snapshot.capabilities,
+            "capabilities_scope": snapshot.capabilities_scope,
             "inbox_counts": snapshot.inbox_counts,
             "quality": snapshot.quality,
             "tools": [
@@ -425,7 +842,12 @@ def closure_cmd(
         runtime_root=runtime_root.resolve() if runtime_root else None,
     )
     if json_output:
-        payload = {"status": report.status, "checks": report.checks, "failed_checks": report.failed_checks}
+        payload = {
+            "status": report.status,
+            "checks": report.checks,
+            "failed_checks": report.failed_checks,
+            "degraded_checks": report.degraded_checks,
+        }
         typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
     else:
         typer.echo(f"# LLM-WorkMem Closure - {report.status}")
@@ -433,6 +855,8 @@ def closure_cmd(
             typer.echo(f"- {name}: {status}")
         if report.failed_checks:
             typer.echo(f"- failed_checks: {', '.join(report.failed_checks)}")
+        if report.degraded_checks:
+            typer.echo(f"- degraded_checks: {', '.join(report.degraded_checks)}")
     if report.status == "blocked":
         raise typer.Exit(2)
     if report.status == "degraded":
@@ -471,14 +895,32 @@ def receipt_cmd(
     tool: str = typer.Option(..., "--tool"),
     direction: str = typer.Option(..., "--direction", help="read or write"),
     project_id: str | None = typer.Option(None, "--project-id"),
-    source: str = typer.Option("cli", "--source"),
+    source: str = typer.Option("watcher-observed", "--source", help="Proof source or observation source."),
+    evidence_path: str = typer.Option("", "--evidence-path", help="Evidence path for a qualifying proof receipt."),
+    operation_id: str = typer.Option("", "--operation-id", help="Unique operation id for a qualifying proof receipt."),
     detail: str = typer.Option("", "--detail"),
     root: Path = typer.Argument(Path("."), help="Wiki root.", exists=False),
 ) -> None:
     """Record a verified tool read/write receipt."""
 
+    if source in PROOF_RECEIPT_SOURCES:
+        typer.secho(
+            "refusing direct proof receipt: use the real host bridge with host_proof; "
+            "CLI receipt is observation-only",
+            err=True,
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(2)
+
     result = lwm_capabilities.record(
-        root.resolve(), tool=tool, direction=direction, project_id=project_id, source=source, detail=detail
+        root.resolve(),
+        tool=tool,
+        direction=direction,
+        project_id=project_id,
+        source=source,
+        evidence_path=evidence_path,
+        operation_id=operation_id,
+        detail=detail,
     )
     typer.echo(json.dumps(result, ensure_ascii=False))
 
@@ -568,6 +1010,21 @@ def reflect_cmd(
     typer.echo(lwm_memory_api.reflect_project(root.resolve(), project_id))
 
 
+@hub_app.command("rebuild-projects")
+def rebuild_projects_cmd(
+    root: Path = typer.Argument(Path("."), help="Wiki root.", exists=False),
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        help="Report page writes/removals without modifying derived pages.",
+    ),
+) -> None:
+    """Rebuild derived project memory from admitted processed evidence."""
+
+    report = lwm_project_memory.rebuild_project_pages(root.resolve(), dry_run=dry_run)
+    typer.echo(json.dumps(report.as_dict(), ensure_ascii=False, indent=2))
+
+
 @hub_app.command("register-project")
 def register_project_cmd(
     project: Path = typer.Argument(...),
@@ -583,11 +1040,64 @@ def run_supervisor_cmd(
     root: Path = typer.Argument(Path("."), help="Wiki root.", exists=False),
     force: bool = typer.Option(False, "--force", help="Run a full cycle now, regardless of the 12-hour due check."),
 ) -> None:
-    """Run the 15-minute supervisor; execute the full cycle only when due."""
+    """Run the supervisor; execute the full cycle only when the 12-hour window is due."""
+
+    resolved = root.resolve()
+    issues = mutable_ownership_issues(resolved)
+    if issues:
+        typer.secho(
+            "refusing supervisor write: mutable data is owned outside the selected root",
+            err=True,
+            fg=typer.colors.RED,
+        )
+        for issue in issues:
+            typer.secho(f"- {issue}", err=True)
+        raise typer.Exit(2)
 
     from lwm.supervisor import run_supervisor
 
-    raise typer.Exit(run_supervisor(root.resolve(), force=force))
+    raise typer.Exit(run_supervisor(resolved, force=force))
+
+
+@hub_app.command("migrate-data-owner")
+def migrate_data_owner_cmd(
+    manifest: Path = typer.Option(..., "--manifest", help="Reviewed read-only migration manifest."),
+    approval_id: str = typer.Option(..., "--approval-id", help="Manifest-bound approval id."),
+    root: Path = typer.Option(Path("."), "--root", help="LLM-WorkMem checkout root."),
+    runtime_base: Path | None = typer.Option(
+        None,
+        "--runtime-base",
+        help="Expected runtime base; defaults to the selected HOME layout.",
+    ),
+    home: Path | None = typer.Option(None, "--home", help="Override HOME for local verification."),
+    json_output: bool = typer.Option(False, "--json", help="Emit the migration report as JSON."),
+) -> None:
+    """Apply only a verified, manifest-bound local data-owner migration."""
+
+    resolved_root = root.expanduser().resolve()
+    selected_runtime_base = (
+        runtime_base.expanduser().resolve()
+        if runtime_base is not None
+        else runtime_paths(resolved_root, home=home).runtime_base.resolve()
+    )
+    try:
+        report = lwm_migration.apply_data_owner_migration(
+            manifest.expanduser(),
+            approval_id,
+            root=resolved_root,
+            runtime_base=selected_runtime_base,
+            home=home.expanduser().resolve() if home else None,
+        )
+    except (lwm_migration.MigrationApprovalError, OSError, RuntimeError) as exc:
+        typer.secho(f"migration refused: {exc}", err=True, fg=typer.colors.RED)
+        raise typer.Exit(2) from exc
+    if json_output:
+        typer.echo(json.dumps(report, ensure_ascii=False, indent=2))
+    else:
+        typer.secho("local data-owner migration applied", fg=typer.colors.GREEN)
+        typer.echo(f"runtime_root: {report['runtime_root']}")
+        typer.echo(f"manifest: {report['manifest_path']}")
+        typer.echo(f"approval_id: {report['approval_id']}")
 
 
 @hub_app.command("install-shell-hook")
@@ -618,6 +1128,34 @@ def install_shell_hook_cmd(
         f"{verb} LBM shell hook ({result.hook_path}) in {result.rc_path}",
         fg=typer.colors.GREEN,
     )
+
+
+@hub_app.command("install-ide-companion")
+def install_ide_companion_cmd(
+    tool: str = typer.Option("vscode", "--tool", help="vscode | cursor | trae | kiro."),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Resolve the host without installing."),
+) -> None:
+    """Install the VS Code-compatible companion with a host-specific identity."""
+
+    if tool not in lwm_ide_companion.SUPPORTED_TOOLS:
+        typer.secho(
+            f"unsupported companion tool: {tool}; choose one of {', '.join(lwm_ide_companion.SUPPORTED_TOOLS)}",
+            err=True,
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(2)
+    try:
+        result = lwm_ide_companion.install_companion(tool, dry_run=dry_run)
+    except (FileNotFoundError, RuntimeError, ValueError) as exc:
+        typer.secho(f"companion install refused: {exc}", err=True, fg=typer.colors.RED)
+        raise typer.Exit(2) from exc
+    if dry_run:
+        typer.secho(f"dry-run: host={result.host_command[0]}", fg=typer.colors.YELLOW)
+        typer.echo(f"tool={result.tool}")
+        typer.echo("no files were written")
+        return
+    typer.secho(f"installed LLM-WorkMem companion for {result.tool}", fg=typer.colors.GREEN)
+    typer.echo(f"host={result.host_command[0]}")
 
 
 @hub_app.command("uninstall-shell-hook")
@@ -712,7 +1250,7 @@ def install_ide_hooks_cmd(
         help="Report what would be touched without writing.",
     ),
     tools: str = typer.Option(
-        "claude-code,codex,kiro,opencode,trae,minimax",
+        "claude-code,codex,cursor,kiro,opencode,trae,minimax,gemini-cli,antigravity",
         "--tools",
         help="Comma-separated list of IDE tools to install hooks for.",
     ),
@@ -728,6 +1266,76 @@ def install_ide_hooks_cmd(
     installs = lwm_hooks_gen.install_ide_hooks(target_home, root=root.resolve(), tools=tool_list)
     for entry in installs:
         typer.echo(f"{entry.tool}: {entry.config_path} ({entry.detail})")
+
+
+@hub_app.command("handoff-create")
+def handoff_create_cmd(
+    project_id: str = typer.Option(..., "--project-id", "-p"),
+    task_id: str = typer.Option(..., "--task-id", "-t"),
+    objective: str = typer.Option("", "--objective", "-o"),
+    current_state: str = typer.Option("", "--current-state", "-s"),
+    source_tool: str = typer.Option("claude-code", "--source-tool"),
+    supersedes: str | None = typer.Option(None, "--supersedes"),
+    next_action: str = typer.Option("", "--next-action"),
+    root: Path = typer.Argument(Path(".")),
+) -> None:
+    """Create a handoff packet for ``project_id`` (spec §4 / §11)."""
+
+    from lwm.handoff import create_handoff
+
+    packet = create_handoff(
+        root.resolve(),
+        project_id=project_id,
+        task_id=task_id,
+        objective=objective,
+        current_state=current_state,
+        source_tool=source_tool,
+        supersedes=supersedes,
+        next_action=next_action,
+    )
+    typer.echo(packet.handoff_id)
+
+
+@hub_app.command("handoff-current")
+def handoff_current_cmd(
+    project_id: str = typer.Option(..., "--project-id", "-p"),
+    root: Path = typer.Argument(Path(".")),
+) -> None:
+    """Print the active handoff (or nothing) for ``project_id``."""
+
+    from lwm.handoff import load_active, render_handoff_markdown
+
+    packet = load_active(root.resolve(), project_id=project_id)
+    if packet is None:
+        raise typer.Exit(1)
+    typer.echo(render_handoff_markdown(packet))
+
+
+@hub_app.command("handoff-ack")
+def handoff_ack_cmd(
+    handoff_id: str = typer.Option(..., "--handoff-id"),
+    target_tool: str = typer.Option(..., "--target-tool"),
+    root: Path = typer.Argument(Path(".")),
+) -> None:
+    """Record that ``target_tool`` read this handoff."""
+
+    from lwm.handoff import ack_handoff
+
+    ack_handoff(root.resolve(), handoff_id=handoff_id, target_tool=target_tool)
+    typer.echo("ack recorded")
+
+
+@hub_app.command("handoff-close")
+def handoff_close_cmd(
+    handoff_id: str = typer.Option(..., "--handoff-id"),
+    root: Path = typer.Argument(Path(".")),
+) -> None:
+    """Close a handoff: stamp ``closed_at`` and clear the active pointer."""
+
+    from lwm.handoff import close_handoff
+
+    closed = close_handoff(root.resolve(), handoff_id=handoff_id)
+    typer.echo(closed.closed_at)
 
 
 def register(app: typer.Typer) -> None:

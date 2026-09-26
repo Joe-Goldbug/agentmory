@@ -23,8 +23,10 @@ from typing import Any
 
 from lwm import dedup, inbox
 from lwm import capabilities
-from lwm.audit import run_audit
+from lwm.audit import AuditReport, run_audit
 from lwm.cycle_state import is_due, read_receipt
+from lwm.cycle_receipt import load_last_attempt, load_latest
+from lwm.eval import packaged_eval_suite
 from lwm.loop_state import read_active, read_last
 
 
@@ -63,6 +65,7 @@ class HealthSnapshot:
     quality: dict[str, Any]
     tools: tuple[ToolSync, ...]
     inbox_counts: dict[str, int]
+    capabilities_scope: str = "all_projects"
 
     def render(self) -> str:
         lines = [f"# LLM-WorkMem Health — {self.status}", ""]
@@ -85,6 +88,7 @@ class HealthSnapshot:
         for line in self.tools:
             lines.append(f"- {line.render()}")
         lines.append("")
+        lines.append(f"capabilities_scope: {self.capabilities_scope}")
         lines.append("## Quality")
         for key, value in self.quality.items():
             lines.append(f"- {key}: {value}")
@@ -211,14 +215,30 @@ def _tool_sync(index: dict[str, dict[str, Any]]) -> tuple[ToolSync, ...]:
     return tuple(out)
 
 
-def _audit_summary(root: Path) -> dict[str, Any]:
+def _audit_summary(root: Path, audit_report: AuditReport | None = None) -> dict[str, Any]:
     try:
-        report = run_audit(root, eval_suite=None, eval_mode="quick")
+        report = audit_report or run_audit(
+            root,
+            eval_suite=packaged_eval_suite(),
+            eval_mode="quick",
+        )
     except Exception as exc:  # noqa: BLE001
-        return {"audit_ok": False, "error": str(exc)}
+        return {"audit_ok": False, "eval_verified": False, "error": str(exc)}
     return {
         "audit_ok": bool(report.ok),
         "issues": int(report.analysis_errors + report.schema_issues + report.review_items),
+        "issue_breakdown": {
+            "analysis_errors": report.analysis_errors,
+            "schema_issues": report.schema_issues,
+            "review_items": report.review_items,
+        },
+        "source_gaps": {
+            "local": report.source_gaps_local,
+            "external": report.source_gaps_external,
+        },
+        "eval_pass": report.eval_pass,
+        "eval_total": report.eval_total,
+        "eval_verified": report.eval_total > 0,
     }
 
 
@@ -290,17 +310,36 @@ def _classify(snapshot: dict[str, Any], *, strict: bool = False) -> str:
     quality = snapshot["quality"]
     if infra.get("stale_test_launch_agents"):
         return STATUS_FAILED
-    if infra.get("audit", {}).get("error") or not quality.get("audit_ok"):
+    if quality.get("error"):
         return STATUS_FAILED
+    if not quality.get("audit_ok"):
+        # Review candidates and source gaps are quality work, not evidence-core
+        # corruption. Keep the hub usable and visible as degraded; only the
+        # explicit core/runtime failures below may make strict health fail.
+        return STATUS_DEGRADED
     cycle = snapshot.get("cycle", {})
     if strict:
-        if cycle.get("last_status") == "failed":
+        if cycle.get("last_status") in {"failed", "failed_core"} or cycle.get("core_status") == "failed_core":
             return STATUS_FAILED
         if cycle.get("due") or not cycle.get("last_success_at"):
+            return STATUS_DEGRADED
+        if not quality.get("eval_verified"):
+            return STATUS_DEGRADED
+        if quality.get("eval_total", 0) <= 0 or quality.get("eval_pass") != quality.get("eval_total"):
+            return STATUS_DEGRADED
+        if cycle.get("context_smoke_ok") is not True:
+            return STATUS_DEGRADED
+        if cycle.get("last_cycle_exit_code") != 0:
+            return STATUS_DEGRADED
+        if cycle.get("runtime_import_independent") is not True:
+            return STATUS_DEGRADED
+        if data.get("last_cycle_failed", 0) != 0:
             return STATUS_DEGRADED
         if cycle.get("loop_exit_state") in {None, "human_required", "blocked"}:
             return STATUS_DEGRADED
         if quality.get("cbmem", {}).get("status") not in {"healthy", "not_configured"}:
+            return STATUS_DEGRADED
+        if cycle.get("last_status") == "success_with_warnings":
             return STATUS_DEGRADED
     if inbox_counts(snapshot)["inbox"] > 100:
         return STATUS_DEGRADED
@@ -329,7 +368,13 @@ def _last_processed_at(events_root_path: Path) -> str | None:
     return candidates[0][0]
 
 
-def collect(root: Path, *, strict: bool = False) -> HealthSnapshot:
+def collect(
+    root: Path,
+    *,
+    strict: bool = False,
+    audit_report: AuditReport | None = None,
+    cycle_override: dict[str, Any] | None = None,
+) -> HealthSnapshot:
     root = root.resolve()
     status_inbox = inbox.inbox_status(root)
     counts = {
@@ -340,15 +385,51 @@ def collect(root: Path, *, strict: bool = False) -> HealthSnapshot:
     }
     index = dedup.load_event_index(root)
     tools = _tool_sync(index)
+    v2_receipt = load_latest(root)
+    last_attempt = load_last_attempt(root)
     receipt = read_receipt(root)
     loop_state = read_active(root) or read_last(root)
     rejection_breakdown = _rejection_breakdown(root)
+    receipt_is_v2 = (
+        isinstance(v2_receipt, dict)
+        and v2_receipt.get("schema_version") == 2
+    ) or (
+        isinstance(last_attempt, dict)
+        and last_attempt.get("schema_version") == 2
+    )
+    latest_cycle = (
+        v2_receipt
+        if isinstance(v2_receipt, dict) and v2_receipt.get("schema_version") == 2
+        else last_attempt if receipt_is_v2 else receipt
+    )
+    latest_cycle_is_attempt = latest_cycle is last_attempt and isinstance(last_attempt, dict)
+    latest_status = (
+        latest_cycle.get("core_status")
+        if receipt_is_v2
+        else latest_cycle.get("status") if latest_cycle else None
+    ) if isinstance(latest_cycle, dict) else None
+    latest_finished = (
+        latest_cycle.get("finished_at") if isinstance(latest_cycle, dict) else None
+    )
+    latest_quality = (
+        latest_cycle.get("quality")
+        if receipt_is_v2 and isinstance(latest_cycle, dict)
+        else None
+    )
+    if not isinstance(latest_quality, dict):
+        latest_quality = {}
     cycle = {
         "due": is_due(root),
-        "last_status": receipt.get("status") if receipt else None,
-        "last_success_at": receipt.get("finished_at") if receipt and receipt.get("status") == "success" else None,
-        "last_receipt_id": receipt.get("receipt_id") if receipt else None,
-        "last_reason": receipt.get("reason") if receipt else None,
+        "last_status": latest_status,
+        "core_status": latest_cycle.get("core_status") if receipt_is_v2 else None,
+        "receipt_schema_version": 2 if receipt_is_v2 else 1 if receipt else None,
+        "last_success_at": latest_finished if latest_status == "success" else None,
+        "last_receipt_id": (
+            latest_cycle.get("receipt_id") or latest_cycle.get("cycle_id")
+            if isinstance(latest_cycle, dict)
+            else None
+        ),
+        "last_reason": latest_cycle.get("reason") if isinstance(latest_cycle, dict) else None,
         "loop_id": loop_state.loop_id if loop_state else None,
         "loop_phase": loop_state.phase if loop_state else None,
         "loop_exit_state": loop_state.exit_state if loop_state else None,
@@ -356,13 +437,28 @@ def collect(root: Path, *, strict: bool = False) -> HealthSnapshot:
         "loop_next_action": loop_state.next_action if loop_state else None,
         "loop_evidence_count": len(loop_state.evidence) if loop_state else 0,
         "loop_human_gate": loop_state.human_gate if loop_state else False,
+        "last_attempt_id": last_attempt.get("cycle_id") if isinstance(last_attempt, dict) else None,
+        "last_attempt_status": last_attempt.get("core_status") if isinstance(last_attempt, dict) else None,
+        "last_attempt_is_current": latest_cycle_is_attempt,
+        "context_smoke_ok": latest_quality.get("context_ok"),
+        "last_cycle_exit_code": latest_cycle.get("exit_code") if receipt_is_v2 else None,
+        "runtime_import_independent": (
+            latest_cycle.get("runtime_import_independent") if receipt_is_v2 else None
+        ),
     }
+    if cycle_override:
+        cycle.update(cycle_override)
     last_processed = _last_processed_at(inbox.events_root(root))
     health_path = root / "state" / "health.json"
     last_health_mtime = (
         datetime.fromtimestamp(health_path.stat().st_mtime, tz=timezone.utc).isoformat()
         if health_path.is_file()
         else None
+    )
+    audit_summary = (
+        _audit_summary(root, audit_report)
+        if audit_report is not None
+        else _audit_summary(root)
     )
     snapshot_dict: dict[str, Any] = {
         "checked_at": datetime.now(tz=timezone.utc).isoformat(),
@@ -375,11 +471,12 @@ def collect(root: Path, *, strict: bool = False) -> HealthSnapshot:
         "data_flow": {
             "last_processed_at": last_processed,
             "event_index_entries": len(index),
+            "last_cycle_failed": counts["failed"],
         },
         "cycle": cycle,
         "inbox_counts": counts,
         "quality": {
-            **_audit_summary(root),
+            **audit_summary,
             "llms_txt": _llms_txt_state(root),
             "privacy_rejection_rate": _privacy_rate_from_breakdown(rejection_breakdown, counts),
             "rejection_breakdown": rejection_breakdown,
@@ -395,7 +492,12 @@ def collect(root: Path, *, strict: bool = False) -> HealthSnapshot:
             }
             for t in tools
         ],
-        "capabilities": capabilities.summary(root, project_path=root),
+        # Health is a runtime-wide host view, not a project-scoped report.
+        # Project-specific proof remains available through `hub coverage
+        # --project-id`; filtering here made healthy host receipts appear
+        # unverified simply because they belonged to another project.
+        "capabilities": capabilities.summary(root, project_path=None),
+        "capabilities_scope": "all_projects",
     }
     status = _classify(snapshot_dict, strict=strict)
     return HealthSnapshot(
@@ -408,6 +510,7 @@ def collect(root: Path, *, strict: bool = False) -> HealthSnapshot:
         quality=snapshot_dict["quality"],
         tools=tools,
         inbox_counts=counts,
+        capabilities_scope=str(snapshot_dict["capabilities_scope"]),
     )
 
 
@@ -423,6 +526,7 @@ def write_snapshot(snapshot: HealthSnapshot) -> Path:
         "data_flow": snapshot.data_flow,
         "cycle": snapshot.cycle,
         "capabilities": snapshot.capabilities,
+        "capabilities_scope": snapshot.capabilities_scope,
         "inbox_counts": snapshot.inbox_counts,
         "quality": snapshot.quality,
         "tools": [
@@ -440,7 +544,14 @@ def write_snapshot(snapshot: HealthSnapshot) -> Path:
     return target
 
 
-def collect_and_write(root: Path, *, now: datetime | None = None, strict: bool = False) -> HealthSnapshot:
+def collect_and_write(
+    root: Path,
+    *,
+    now: datetime | None = None,
+    strict: bool = False,
+    audit_report: AuditReport | None = None,
+    cycle_override: dict[str, Any] | None = None,
+) -> HealthSnapshot:
     """Snapshot the system and persist ``state/health.json`` + side files."""
 
     # Always keep ``state/promotion-state.json`` present so consumers can
@@ -454,7 +565,12 @@ def collect_and_write(root: Path, *, now: datetime | None = None, strict: bool =
         _promote.save_promotion_state(
             root, {"approved": [], "rejected": []}
         )
-    snapshot = collect(root, strict=strict)
+    snapshot = collect(
+        root,
+        strict=strict,
+        audit_report=audit_report,
+        cycle_override=cycle_override,
+    )
     health_path = root / "state" / "health.json"
     payload = {
         "status": snapshot.status,
@@ -463,6 +579,7 @@ def collect_and_write(root: Path, *, now: datetime | None = None, strict: bool =
         "data_flow": snapshot.data_flow,
         "cycle": snapshot.cycle,
         "capabilities": snapshot.capabilities,
+        "capabilities_scope": snapshot.capabilities_scope,
         "inbox_counts": snapshot.inbox_counts,
         "quality": snapshot.quality,
         "tools": [
@@ -492,6 +609,7 @@ def collect_and_write(root: Path, *, now: datetime | None = None, strict: bool =
         quality=snapshot.quality,
         tools=snapshot.tools,
         inbox_counts=snapshot.inbox_counts,
+        capabilities_scope=snapshot.capabilities_scope,
     )
 
 

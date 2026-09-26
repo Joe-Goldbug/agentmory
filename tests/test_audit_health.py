@@ -15,8 +15,10 @@ import json
 from pathlib import Path
 
 from lwm import audit, insights, promote
+from lwm.capabilities import record
 from lwm.events import make_event
 from lwm.health import collect_and_write
+from lwm.audit import AuditReport
 
 
 def _write_block_tags(path: Path) -> None:
@@ -59,6 +61,20 @@ def test_audit_ok_after_normalize(tmp_path: Path) -> None:
     assert report.schema_issues == 0
 
 
+def test_audit_does_not_count_source_gap_twice(tmp_path: Path) -> None:
+    page = tmp_path / "wiki" / "projects" / "demo.md"
+    _write_block_tags(page)
+
+    report = audit.run_audit(tmp_path, eval_suite=None, eval_mode="quick")
+
+    # The analyzer keeps the missing-source error as raw evidence, while the
+    # audit exposes it once through the review queue and source-gap counts.
+    assert report.analysis_errors == 0
+    assert report.review_items == 1
+    assert report.source_gaps_local == 1
+    assert report.source_gaps_external == 0
+
+
 def test_health_is_healthy(tmp_path: Path) -> None:
     """After fixup + seeding the expected ``raw/events/processed`` source,
     the snapshot reports a healthy status."""
@@ -72,8 +88,61 @@ def test_health_is_healthy(tmp_path: Path) -> None:
     from lwm.project_memory import normalize_existing_pages
 
     normalize_existing_pages(tmp_path)
-    snapshot = collect_and_write(tmp_path)
+    snapshot = collect_and_write(
+        tmp_path,
+        audit_report=audit.run_audit(tmp_path, eval_suite=None, eval_mode="quick"),
+    )
     assert snapshot.status == "healthy"
+
+
+def test_health_capabilities_use_runtime_wide_proof_scope(tmp_path: Path) -> None:
+    (tmp_path / "read.json").write_text("read evidence\n", encoding="utf-8")
+    (tmp_path / "write.json").write_text("write evidence\n", encoding="utf-8")
+    record(
+        tmp_path,
+        tool="codex",
+        direction="read",
+        project_id="another-project",
+        source="native-hook",
+        evidence_path="read.json",
+        operation_id="health-read-1",
+    )
+    record(
+        tmp_path,
+        tool="codex",
+        direction="write",
+        project_id="another-project",
+        source="native-hook",
+        evidence_path="write.json",
+        operation_id="health-write-1",
+    )
+
+    snapshot = collect_and_write(tmp_path)
+
+    assert snapshot.capabilities["codex"]["bidirectional"] is True
+
+
+def test_health_exposes_issue_and_source_gap_breakdown(tmp_path: Path) -> None:
+    report = AuditReport(
+        root=tmp_path,
+        analysis_errors=0,
+        schema_issues=0,
+        review_items=6,
+        eval_pass=2,
+        eval_total=2,
+        source_gaps_local=1,
+        source_gaps_external=5,
+    )
+
+    snapshot = collect_and_write(tmp_path, audit_report=report)
+
+    assert snapshot.quality["issues"] == 6
+    assert snapshot.quality["issue_breakdown"] == {
+        "analysis_errors": 0,
+        "schema_issues": 0,
+        "review_items": 6,
+    }
+    assert snapshot.quality["source_gaps"] == {"local": 1, "external": 5}
 
 
 def test_promotion_state_is_persisted(tmp_path: Path) -> None:

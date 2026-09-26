@@ -21,5 +21,9 @@ lwm-refresh() {
 }
 
 lwm-context() {
-  sed -n '1,220p' "$LWM_ROOT/llms.txt"
+  local project="${PWD}"
+  local lwm_bin="${LWM_BIN:-lwm}"
+  printf '%s' "$project" \
+    | python3 -c 'import json,sys; print(json.dumps({"phase":"context","tool":"shell","project_path":sys.stdin.read()}))' \
+    | "$lwm_bin" hub bridge --output markdown --root "$LWM_ROOT"
 }

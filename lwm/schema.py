@@ -32,6 +32,7 @@ ALLOWED_TYPES: frozenset[str] = frozenset(
         "principle",
         "preference",
         "review",
+        "unified-memory",
     }
 )
 

@@ -32,6 +32,46 @@ The packet includes the project identity, retrieval plan, evidence sources, curr
 
 This layer organizes evidence for IDEs and shells; it does not generate their final answer. Reads remain available when receipts or CBMEM are unavailable, while the degraded state is surfaced in warnings and health checks.
 
+## Unified Local Tool Interface
+
+The local hub can collect bounded evidence from IDEs, CLI agents, and the
+interactive shell, then return project context and handoffs to those tools.
+It remains an auxiliary evidence layer: each tool's native instructions,
+skills, planning, execution, and verification stay authoritative.
+
+Set the data root once, then run the installation steps locally:
+
+```bash
+export LWM_ROOT="/path/to/LLM-WorkMem"
+lwm install-global "$LWM_ROOT" --dry-run
+lwm install-global "$LWM_ROOT"
+lwm hub install-ide-hooks "$LWM_ROOT"
+lwm hub install-shell-hook "$LWM_ROOT"
+```
+
+Check what is installed and what has real evidence before relying on a tool:
+
+```bash
+lwm hub tools probe --root "$LWM_ROOT" --json
+lwm hub coverage --root "$LWM_ROOT" --json
+```
+
+At session start, a tool can request bounded project context. At completion,
+it can write only structured work evidence and an optional handoff:
+
+```bash
+lwm hub context --tool codex --project "$PWD" "$LWM_ROOT"
+lwm hub lifecycle stop --tool codex --project "$PWD" \
+  --task-id "$LWM_TASK_ID" \
+  --handoff-json '{"task_id":"...","objective":"...","changes":[],"verifications":[],"risks":[],"open_questions":[],"next_action":"..."}' \
+  --root "$LWM_ROOT"
+```
+
+`watcher-observed` means the local file or session boundary was observed;
+only a qualifying native hook receipt can be reported as verified tool
+integration. Use `lwm hub tools probe` and `lwm hub coverage` rather than
+assuming that a generated instruction file proves bidirectional support.
+
 ## Quick Start
 
 You can do the manual installation without needing `uv` or `act-cli`.

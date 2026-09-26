@@ -39,6 +39,8 @@ ALLOWED_EVENT_TYPES: frozenset[str] = frozenset(
     }
 )
 
+EVENT_SCHEMA_VERSION = 2
+
 ALLOWED_IMPORTANCES: frozenset[str] = frozenset(
     {"scratch", "project", "cross_project", "global"}
 )
@@ -65,12 +67,18 @@ OPTIONAL_LIST_KEYS: tuple[str, ...] = (
     "open_questions",
     "files_touched",
     "tags",
+    "risks",
 )
 
 _OPTIONAL_SCALAR_KEYS: tuple[str, ...] = (
+    "schema_version",
     "tool_version",
     "session_id",
     "task",
+    "task_id",
+    "handoff_id",
+    "operation_id",
+    "source_receipt_id",
     "confidence",
     "source",
 )
@@ -132,6 +140,7 @@ def make_event(
     changes: Iterable[str] | None = None,
     verification: Iterable[str] | None = None,
     open_questions: Iterable[str] | None = None,
+    risks: Iterable[str] | None = None,
     files_touched: Iterable[str] | None = None,
     tags: Iterable[str] | None = None,
     session_id: str | None = None,
@@ -140,10 +149,15 @@ def make_event(
     source: dict[str, Any] | None = None,
     timestamp: str | None = None,
     event_id: str | None = None,
+    task_id: str | None = None,
+    handoff_id: str | None = None,
+    operation_id: str | None = None,
+    source_receipt_id: str | None = None,
 ) -> dict[str, Any]:
     """Construct a well-formed event payload (no IO)."""
 
     payload: dict[str, Any] = {
+        "schema_version": EVENT_SCHEMA_VERSION,
         "event_id": event_id or new_event_id(),
         "timestamp": timestamp or _now_iso(),
         "tool": tool,
@@ -167,6 +181,8 @@ def make_event(
         payload["verification"] = list(verification)
     if open_questions is not None:
         payload["open_questions"] = list(open_questions)
+    if risks is not None:
+        payload["risks"] = list(risks)
     if files_touched is not None:
         payload["files_touched"] = list(files_touched)
     if tags is not None:
@@ -175,6 +191,14 @@ def make_event(
         payload["confidence"] = float(confidence)
     if source is not None:
         payload["source"] = dict(source)
+    for key, value in (
+        ("task_id", task_id),
+        ("handoff_id", handoff_id),
+        ("operation_id", operation_id),
+        ("source_receipt_id", source_receipt_id),
+    ):
+        if value is not None:
+            payload[key] = value
     return payload
 
 
@@ -203,12 +227,18 @@ def validate_event(payload: Any) -> EventReport:
         if key not in payload:
             continue
         value = payload[key]
-        if key == "confidence":
+        if key == "schema_version":
+            if isinstance(value, bool) or not isinstance(value, int) or value not in {1, EVENT_SCHEMA_VERSION}:
+                issues.append(EventIssue("$.schema_version", "must be integer 1 or 2"))
+        elif key == "confidence":
             if not isinstance(value, (int, float)) or not 0.0 <= float(value) <= 1.0:
                 issues.append(EventIssue("$.confidence", "must be float in [0,1]"))
         elif key == "source":
             if not isinstance(value, dict):
                 issues.append(EventIssue("$.source", "must be an object"))
+        elif key in {"tool_version", "session_id", "task", "task_id", "handoff_id", "operation_id", "source_receipt_id"}:
+            if not isinstance(value, str):
+                issues.append(EventIssue(f"$.{key}", "must be a string"))
 
     if "timestamp" in payload and not TIMESTAMP_RE.match(str(payload["timestamp"])):
         issues.append(EventIssue("$.timestamp", "must be ISO 8601 with offset"))
@@ -284,6 +314,7 @@ __all__ = [
     "ALLOWED_EVENT_TYPES",
     "ALLOWED_IMPORTANCES",
     "ALLOWED_PRIVACY_TAGS",
+    "EVENT_SCHEMA_VERSION",
     "EventIssue",
     "EventReport",
     "MAX_TEXT_BYTES",

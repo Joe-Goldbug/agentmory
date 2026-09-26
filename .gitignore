@@ -261,5 +261,8 @@ knowledge-digest.pages/
 # Tool snapshot data (auto-harvested per-machine; large, not for version control)
 /raw/tool-snapshots/
 
+# CodeGraph index database (machine-local, regeneratable via CodeGraph)
+/.codebase-memory/graph.db.zst
+
 # Local dev helper script (not a project deliverable)
 /fix-venv.sh

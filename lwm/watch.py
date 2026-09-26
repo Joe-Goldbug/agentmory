@@ -9,7 +9,9 @@ from datetime import date
 from pathlib import Path
 
 from lwm.audit import AuditReport, render_audit_report, run_audit
+from lwm.eval import packaged_eval_suite
 from lwm.harvest import SNAPSHOT_SKIP_DIR_NAMES, configured_source_groups, harvest_sources
+from lwm.memory_federation import compile_federated_memory
 _MAX_FINGERPRINT_FILES = 5000
 _MAX_FINGERPRINT_BYTES = 50 * 1024 * 1024
 
@@ -27,6 +29,7 @@ class WatchReport:
     harvested: bool
     audit: AuditReport
     state_path: Path
+    federation: dict[str, object] | None = None
 
     @property
     def changed(self) -> bool:
@@ -133,6 +136,12 @@ def run_watch(root: Path, *, eval_suite: Path | None = None, eval_mode: str = "s
         harvest_sources(root)
         harvested = True
 
+    federation: dict[str, object] | None = None
+    try:
+        federation = compile_federated_memory(root)
+    except Exception as exc:  # noqa: BLE001
+        federation = {"status": "error", "error": str(exc)}
+
     # cbmem harvest runs after the file-based sources so it never blocks them.
     # ``harvest_cbmem`` swallows all exceptions internally and returns
     # ``list[CbmemSnapshotOutcome]``; we intentionally ignore the return
@@ -140,7 +149,11 @@ def run_watch(root: Path, *, eval_suite: Path | None = None, eval_mode: str = "s
     from lwm.cbmem_source import harvest_cbmem
     harvest_cbmem(root)
 
-    audit = run_audit(root, eval_suite=eval_suite, eval_mode=eval_mode)
+    audit = run_audit(
+        root,
+        eval_suite=eval_suite if eval_suite is not None else packaged_eval_suite(),
+        eval_mode=eval_mode,
+    )
     _save_state(state_path, current)
     return WatchReport(
         root=root,
@@ -148,6 +161,7 @@ def run_watch(root: Path, *, eval_suite: Path | None = None, eval_mode: str = "s
         harvested=harvested,
         audit=audit,
         state_path=state_path,
+        federation=federation,
     )
 
 

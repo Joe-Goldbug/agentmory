@@ -10,6 +10,7 @@ from pathlib import Path
 
 from adapters.hooks import (
     antigravity_sessions,
+    cursor_tasks,
     kiro_sessions,
     minimax_sessions,
     trae_sessions,
@@ -17,6 +18,7 @@ from adapters.hooks import (
 )
 from lwm import capabilities, lifecycle, runner
 from lwm.project_id import resolve_project_root
+from lwm.tool_registry import ToolDefinition, ToolRegistry
 
 
 def _git_project(tmp_path: Path) -> Path:
@@ -83,15 +85,168 @@ def test_lifecycle_start_and_stop_write_canonical_hook_receipts(tmp_path: Path, 
         return None
 
     monkeypatch.setattr("lwm.project_id._run_git", fake_git)
-    started = lifecycle.start(tmp_path, tool="claude-code", project_path=project / "nested")
-    stopped = lifecycle.stop(tmp_path, tool="claude-code", project_path=project / "nested")
+    started = lifecycle.start(
+        tmp_path,
+        tool="claude-code",
+        project_path=project / "nested",
+        session_id="claude-session-1",
+        source="native-hook",
+        host_proof={
+            "integration": "claude-code-hook",
+            "event": "SessionStart",
+            "session_id": "claude-session-1",
+        },
+    )
+    stopped = lifecycle.stop(
+        tmp_path,
+        tool="claude-code",
+        project_path=project / "nested",
+        session_id="claude-session-1",
+        source="native-hook",
+        host_proof={
+            "integration": "claude-code-hook",
+            "event": "Stop",
+            "session_id": "claude-session-1",
+        },
+    )
 
     assert started.project_path == str(project.resolve())
     assert stopped.project_path == str(project.resolve())
     receipts = capabilities.load(tmp_path)
-    assert receipts["claude-code:read"]["source"] == "native-hook"
-    assert receipts["claude-code:write"]["source"] == "native-hook"
-    assert receipts["claude-code:read"]["project_id"] == receipts["claude-code:write"]["project_id"]
+    assert receipts["claude-code"]["source"] == "native-hook"
+    assert receipts["claude-code"]["direction"] == "write"
+    assert receipts["claude-code"]["project_id"] == started.project_id
+
+
+def test_lifecycle_rejects_unbound_native_proof_before_writing(tmp_path: Path) -> None:
+    project = _git_project(tmp_path)
+    try:
+        lifecycle.start(
+            tmp_path,
+            tool="claude-code",
+            project_path=project,
+            session_id="session-1",
+            source="native-hook",
+        )
+    except ValueError as exc:
+        assert "host_proof is required" in str(exc)
+    else:
+        raise AssertionError("unbound native proof was accepted")
+    assert not (tmp_path / "raw" / "events").exists()
+
+
+def test_lifecycle_default_is_observation_only(tmp_path: Path) -> None:
+    project = _git_project(tmp_path)
+    lifecycle.start(tmp_path, tool="codex", project_path=project)
+    receipts = capabilities.load(tmp_path)
+    assert receipts["codex"]["source"] == "watcher-observed"
+    assert receipts["codex"]["status"] == "observed"
+
+
+def test_lifecycle_alias_is_stored_under_canonical_tool_id(tmp_path: Path) -> None:
+    project = _git_project(tmp_path)
+    started = lifecycle.start(
+        tmp_path,
+        tool="trae-solo",
+        project_path=project,
+        source="watcher-observed",
+    )
+    event = json.loads(started.event_path.read_text(encoding="utf-8"))
+    receipts = capabilities.load(tmp_path)
+    assert event["tool"] == "trae"
+    assert "trae-solo" not in receipts
+    assert receipts["trae"]["tool"] == "trae"
+
+
+def test_lifecycle_uses_persisted_registry_aliases(tmp_path: Path) -> None:
+    project = _git_project(tmp_path)
+    ToolRegistry(
+        [
+            ToolDefinition(
+                tool_id="custom-cli",
+                display_name="Custom CLI",
+                aliases=("mycli",),
+                surfaces=("cli",),
+                discovery_paths=(".mycli",),
+            )
+        ]
+    ).save(tmp_path)
+
+    started = lifecycle.start(
+        tmp_path,
+        tool="mycli",
+        project_path=project,
+        source="watcher-observed",
+    )
+    event = json.loads(started.event_path.read_text(encoding="utf-8"))
+    assert event["tool"] == "custom-cli"
+
+
+def test_lifecycle_stop_creates_handoff_only_from_structured_summary(
+    tmp_path: Path, monkeypatch
+) -> None:
+    project = _git_project(tmp_path)
+
+    def fake_git(cwd: Path, args: list[str]) -> str | None:
+        if args == ["rev-parse", "--show-toplevel"]:
+            return str(project)
+        return None
+
+    monkeypatch.setattr("lwm.project_id._run_git", fake_git)
+    without_summary = lifecycle.stop(
+        tmp_path,
+        tool="claude-code",
+        project_path=project,
+        task_id="task-1",
+        task="raw prompt remains operational only",
+    )
+    assert without_summary.handoff_created is False
+    assert not (tmp_path / "state" / "handoffs").exists()
+
+    with_summary = lifecycle.stop(
+        tmp_path,
+        tool="claude-code",
+        project_path=project,
+        task_id="task-1",
+        task="raw prompt remains operational only",
+        handoff_summary={
+            "objective": "complete the bounded handoff path",
+            "current_state": "tests are being added",
+            "next_action": "run focused tests",
+        },
+    )
+    assert with_summary.handoff_created is True
+    assert with_summary.handoff_id
+    event_files = list((tmp_path / "raw" / "events" / "inbox").rglob("*.json"))
+    event_payloads = [
+        json.loads(path.read_text(encoding="utf-8")) for path in event_files
+    ]
+    structured = [
+        event for event in event_payloads if event.get("event_type") == "bugfix"
+    ]
+    assert len(structured) == 0
+
+    durable_stop = lifecycle.stop(
+        tmp_path,
+        tool="claude-code",
+        project_path=project,
+        task_id="task-1",
+        handoff_summary={
+            "objective": "complete the bounded handoff path",
+            "current_state": "implementation verified",
+            "changes": ["persist structured stop evidence"],
+            "verifications": ["focused tests pass"],
+        },
+    )
+    assert durable_stop.handoff_created is True
+    all_events = [
+        json.loads(path.read_text(encoding="utf-8"))
+        for path in (tmp_path / "raw" / "events" / "inbox").rglob("*.json")
+    ]
+    durable = [event for event in all_events if event.get("event_type") == "bugfix"]
+    assert len(durable) == 1
+    assert durable[0]["handoff_id"] == durable_stop.handoff_id
+    assert durable[0]["task_id"] == "task-1"
 
 
 def test_probe_requires_matching_lifecycle_receipts_for_expected_project(tmp_path: Path, monkeypatch) -> None:
@@ -107,11 +262,29 @@ def test_probe_requires_matching_lifecycle_receipts_for_expected_project(tmp_pat
         return None
 
     monkeypatch.setattr("lwm.project_id._run_git", fake_git)
-    capabilities.record(tmp_path, tool="claude-code", direction="read", project_id="wrong", source="cli-context")
-    capabilities.record(tmp_path, tool="claude-code", direction="write", project_id="wrong", source="cli-record")
+    capabilities.record(
+        tmp_path,
+        tool="claude-code",
+        direction="read",
+        project_id="other-project",
+        source="native-hook",
+    )
+    capabilities.record(
+        tmp_path,
+        tool="claude-code",
+        direction="write",
+        project_id="other-project",
+        source="native-hook",
+    )
 
     result = capabilities.probe(tmp_path, home=home, project_path=project)
-    assert result["claude-code"]["status"] == "configured_unverified"
+    # Mismatched project_id receipts must not yield verified_bidirectional.
+    assert result["claude-code"]["status"] in {
+        "configured_unverified",
+        "observed_read",
+        "observed_write",
+    }
+    assert not result["claude-code"]["status"].startswith("verified_bidirectional")
 
 
 def test_vscode_observer_records_local_session_boundaries(tmp_path: Path, monkeypatch) -> None:
@@ -127,8 +300,8 @@ def test_vscode_observer_records_local_session_boundaries(tmp_path: Path, monkey
     monkeypatch.setattr("sys.argv", ["vscode-sessions", "--root", str(tmp_path), "--sessions", str(sessions.parent)])
     assert vscode_sessions.main() == 0
     receipts = capabilities.load(tmp_path)
-    assert receipts["vscode:read"]["source"] == "watcher-observed"
-    assert receipts["vscode:write"]["source"] == "watcher-observed"
+    assert receipts["vscode"]["source"] == "watcher-observed"
+    assert receipts["vscode"]["source"] == "watcher-observed"
 
 
 def test_vscode_observer_reads_workspace_storage_transcript(tmp_path: Path, monkeypatch) -> None:
@@ -169,8 +342,8 @@ def test_vscode_observer_reads_workspace_storage_transcript(tmp_path: Path, monk
 
     assert vscode_sessions.main() == 0
     receipts = capabilities.load(tmp_path)
-    assert receipts["vscode:read"]["source"] == "watcher-observed"
-    assert receipts["vscode:write"]["source"] == "watcher-observed"
+    assert receipts["vscode"]["source"] == "watcher-observed"
+    assert receipts["vscode"]["source"] == "watcher-observed"
 
 
 def test_kiro_observer_records_local_session_boundaries(tmp_path: Path, monkeypatch) -> None:
@@ -208,8 +381,8 @@ def test_kiro_observer_records_local_session_boundaries(tmp_path: Path, monkeypa
     )
     assert kiro_sessions.main() == 0
     receipts = capabilities.load(tmp_path)
-    assert receipts["kiro:read"]["source"] == "watcher-observed"
-    assert receipts["kiro:write"]["source"] == "watcher-observed"
+    assert receipts["kiro"]["source"] == "watcher-observed"
+    assert receipts["kiro"]["source"] == "watcher-observed"
 
 
 def test_antigravity_observer_records_local_session_boundaries(
@@ -245,8 +418,8 @@ def test_antigravity_observer_records_local_session_boundaries(
     )
     assert antigravity_sessions.main() == 0
     receipts = capabilities.load(tmp_path)
-    assert receipts["antigravity:read"]["source"] == "watcher-observed"
-    assert receipts["antigravity:write"]["source"] == "watcher-observed"
+    assert receipts["antigravity"]["source"] == "watcher-observed"
+    assert receipts["antigravity"]["source"] == "watcher-observed"
 
 
 def test_trae_observer_records_local_session_boundaries(tmp_path: Path) -> None:
@@ -278,8 +451,8 @@ def test_trae_observer_records_local_session_boundaries(tmp_path: Path) -> None:
         settle_seconds=30.0,
     )
     receipts = capabilities.load(tmp_path)
-    assert receipts["trae:read"]["source"] == "watcher-observed"
-    assert receipts["trae:write"]["source"] == "watcher-observed"
+    assert receipts["trae"]["source"] == "watcher-observed"
+    assert receipts["trae"]["source"] == "watcher-observed"
 
 
 def test_trae_observer_resolves_indirect_workspace_file(tmp_path: Path) -> None:
@@ -315,8 +488,8 @@ def test_trae_observer_resolves_indirect_workspace_file(tmp_path: Path) -> None:
     )
     receipts = capabilities.load(tmp_path)
     assert trae_sessions._workspace(workspace_dir / "workspace.json") == str(project)
-    assert receipts["trae-solo:read"]["source"] == "watcher-observed"
-    assert receipts["trae-solo:write"]["source"] == "watcher-observed"
+    assert receipts["trae"]["source"] == "watcher-observed"
+    assert receipts["trae"]["source"] == "watcher-observed"
 
 
 def test_minimax_observer_records_finished_session_boundaries(tmp_path: Path) -> None:
@@ -346,8 +519,38 @@ def test_minimax_observer_records_finished_session_boundaries(tmp_path: Path) ->
 
     minimax_sessions.observe(tmp_path, database, set())
     receipts = capabilities.load(tmp_path)
-    assert receipts["minimax:read"]["source"] == "watcher-observed"
-    assert receipts["minimax:write"]["source"] == "watcher-observed"
+    assert receipts["minimax"]["source"] == "watcher-observed"
+    assert receipts["minimax"]["source"] == "watcher-observed"
+
+
+def test_cursor_project_companion_uses_cursor_identity(tmp_path: Path, monkeypatch) -> None:
+    project = _git_project(tmp_path)
+    log = project / ".llm-workmem" / "events.jsonl"
+    log.parent.mkdir(parents=True)
+    log.write_text(
+        json.dumps({"event_type": "workflow_observation", "task": "cursor task"}) + "\n",
+        encoding="utf-8",
+    )
+    emitted: list[dict] = []
+    monkeypatch.setattr(
+        "adapters.hooks._common.emit",
+        lambda root, event: emitted.append(event) or 0,
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "cursor-tasks",
+            "--root",
+            str(tmp_path),
+            "--project",
+            str(project),
+        ],
+    )
+
+    assert cursor_tasks.main() == 0
+    assert emitted[0]["tool"] == "cursor"
+    assert emitted[0]["source"]["kind"] == "cursor-tasks"
 
 
 def test_trae_solo_route_fallback_records_session_boundaries(tmp_path: Path) -> None:
@@ -381,8 +584,8 @@ def test_trae_solo_route_fallback_records_session_boundaries(tmp_path: Path) -> 
         settle_seconds=0.0,
     )
     receipts = capabilities.load(tmp_path)
-    assert receipts["trae-solo:read"]["source"] == "watcher-observed"
-    assert receipts["trae-solo:write"]["source"] == "watcher-observed"
+    assert receipts["trae"]["source"] == "watcher-observed"
+    assert receipts["trae"]["source"] == "watcher-observed"
 
 
 def test_shell_sweep_records_observed_lifecycle(tmp_path: Path, monkeypatch) -> None:
@@ -409,5 +612,5 @@ def test_shell_sweep_records_observed_lifecycle(tmp_path: Path, monkeypatch) -> 
     )
     assert runner._sweep_shell_events(tmp_path) == 0
     receipts = capabilities.load(tmp_path)
-    assert receipts["shell:read"]["source"] == "watcher-observed"
-    assert receipts["shell:write"]["source"] == "watcher-observed"
+    assert receipts["shell"]["source"] == "watcher-observed"
+    assert receipts["shell"]["source"] == "watcher-observed"

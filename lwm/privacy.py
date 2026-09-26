@@ -78,26 +78,32 @@ DEFAULT_PATH_BLOCK_NAMES: tuple[str, ...] = (
 
 # Match "name=value" or "name: value" patterns with a recognizable identifier.
 _SECRET_KV_RE = re.compile(
-    r"(?i)\b("
-    r"api[_-]?key|apikey|api[_-]?token|access[_-]?token|auth[_-]?token|bearer|"
+    r"(?i)(?<![A-Za-z0-9_])((?:[A-Za-z0-9_-]*?(?:"
+    r"api[_-]?key|apikey|api[_-]?token|access[_-]?token|auth[_-]?token|token|bearer|"
     r"client[_-]?secret|secret|password|passwd|pwd|"
     r"private[_-]?key|cookie|session[_-]?id|refresh[_-]?token"
-    r")\s*[:=]\s*['\"]?([A-Za-z0-9_\-\.\+/=]{6,})['\"]?"
+    r")[A-Za-z0-9_-]*"
+    r"))['\"]?\s*[:=]\s*['\"]?([A-Za-z0-9_\-\.\+/=]{6,})['\"]?"
 )
 
-_OPENAI_SK_RE = re.compile(r"\bsk-[A-Za-z0-9]{20,}\b")
+_OPENAI_SK_RE = re.compile(r"\bsk-[A-Za-z0-9][A-Za-z0-9._-]{19,}\b")
 _AWS_AKID_RE = re.compile(r"\bAKIA[0-9A-Z]{16}\b")
 _GITHUB_PAT_RE = re.compile(r"\bghp_[A-Za-z0-9]{30,}\b")
 _SLACK_TOKEN_RE = re.compile(r"\bxox[abpr]-[A-Za-z0-9-]{10,}\b")
 _JWT_RE = re.compile(r"\beyJ[A-Za-z0-9_\-]+\.eyJ[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+\b")
+_PRIVATE_KEY_BLOCK_RE = re.compile(
+    r"-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----.*?-----END [A-Z0-9 ]*PRIVATE KEY-----",
+    re.DOTALL,
+)
 
 SECRET_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
-    ("secret_kv", _SECRET_KV_RE),
+    ("private_key_block", _PRIVATE_KEY_BLOCK_RE),
     ("openai_sk", _OPENAI_SK_RE),
     ("aws_access_key", _AWS_AKID_RE),
     ("github_pat", _GITHUB_PAT_RE),
     ("slack_token", _SLACK_TOKEN_RE),
     ("jwt", _JWT_RE),
+    ("secret_kv", _SECRET_KV_RE),
 )
 
 REDACTED_TEXT = "<REDACTED>"
@@ -206,7 +212,11 @@ def _split_toml_array(inner: str) -> list[str]:
 
 
 def redact_text(text: str) -> tuple[str, tuple[str, ...]]:
-    """Apply secret patterns. Return (redacted_text, applied_rule_names)."""
+    """Apply deterministic secret patterns to text.
+
+    This is used for both event fields and bounded source snapshots. Keep the
+    replacement stable so downstream hashes and audit records remain useful.
+    """
 
     applied: list[str] = []
     redacted = text

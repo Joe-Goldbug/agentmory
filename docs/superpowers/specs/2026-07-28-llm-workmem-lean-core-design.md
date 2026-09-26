@@ -8,6 +8,17 @@
 
 Keep LLM-WorkMem as one small, source-backed auxiliary memory center for local IDEs and shell. It must retain verified project decisions, changes, verification results, risks, and open loops without collecting full conversations or creating repeated daily pages.
 
+## Design Precedence
+
+This Lean Core document is the current architecture boundary. The V2 control
+plane document dated 2026-07-18 is historical rationale only. It may
+contribute non-conflicting privacy, identity, provenance, retention, and
+verification requirements, but its second control-plane authority,
+`projects/<id>/STATE.md` hierarchy, and any conflicting source-of-truth rule
+are superseded. New implementation work must follow Lean Core, the approved
+goal-completion requirements, and their derived HLD/LLD rather than reviving
+the historical V2 hierarchy.
+
 ## Non-goals
 
 - No second database, vector store, resident LLM, or new memory service.

@@ -13,10 +13,6 @@ If the file is missing, the adapter is a no-op.
 
 from __future__ import annotations
 
-import sys as _sys
-from pathlib import Path as _Path
-_sys.path.insert(0, str(_Path(__file__).resolve().parent.parent.parent))
-
 import argparse
 import json
 import sys
@@ -49,19 +45,15 @@ def _event_log_path(project_dir: Path) -> Path:
     return project_dir / ".llm-workmem" / "events.jsonl"
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser(prog="vscode-tasks")
-    parser.add_argument("--root", required=True, help="Wiki/WorkMem root.")
-    parser.add_argument(
-        "--project",
-        required=True,
-        help="Project directory that owns .llm-workmem/events.jsonl.",
-    )
-    args = parser.parse_args()
+def process_project(root: Path, project: Path, *, tool: str = "vscode") -> int:
+    """Tail one project's explicit companion event log for a named tool.
 
-    root = Path(args.root).expanduser().resolve()
-    project = Path(args.project).expanduser().resolve()
-    if project.is_dir() and not project.exists():
+    VS Code and Cursor do not expose a shared public lifecycle hook. The
+    project companion file is therefore an explicit integration surface, not
+    proof that the IDE emitted a native callback.
+    """
+
+    if not project.is_dir():
         return 0
     log = _event_log_path(project)
     if not log.is_file():
@@ -87,18 +79,34 @@ def main() -> int:
         except ImportError:
             return 1
         event.setdefault("project_path", str(project))
-        event.setdefault("tool", "vscode")
+        event.setdefault("tool", tool)
         event.setdefault("importance", "project")
         event.setdefault("privacy", "sanitized")
-        event.setdefault("source", {"kind": "vscode-tasks", "path": str(log)})
+        event.setdefault("source", {"kind": f"{tool}-tasks", "path": str(log)})
         event.setdefault(
             "event_type",
             str(event.get("event_type") or "workflow_observation"),
         )
-        event.setdefault("tags", ["vscode"])
+        event.setdefault("tags", [tool])
         rc |= emit(root, event)
     _save_cursor(project, len(lines))
     return rc
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(prog="vscode-tasks")
+    parser.add_argument("--root", required=True, help="Wiki/WorkMem root.")
+    parser.add_argument(
+        "--project",
+        required=True,
+        help="Project directory that owns .llm-workmem/events.jsonl.",
+    )
+    args = parser.parse_args()
+
+    return process_project(
+        Path(args.root).expanduser().resolve(),
+        Path(args.project).expanduser().resolve(),
+    )
 
 
 if __name__ == "__main__":

@@ -9,15 +9,19 @@ import re
 import shlex
 import shutil
 import subprocess
+import sys
+import tempfile
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path, PurePosixPath
 from typing import Iterable
 
 from lwm.analysis import analyze_wiki, write_analysis_report
+from lwm.behavior_contract import write_snapshot as write_behavior_snapshot
 from lwm.compile import compile_raw_sources
 from lwm.dashboard import write_dashboard_html
 from lwm.export import write_ai_exports
+from lwm.privacy import redact_text
 from lwm.raw_tracker import run_raw_sync
 
 
@@ -33,6 +37,7 @@ SNAPSHOT_SKIP_DIR_NAMES = frozenset(
     }
 )
 HISTORICAL_HARVEST_PAGE_MAX_BYTES = 128 * 1024
+SCHEDULER_OWNER_PATH = Path("state/scheduler-owner.json")
 
 
 @dataclass(frozen=True)
@@ -78,6 +83,31 @@ class ScheduleOutcome:
     launch_agents_plist_path: Path
 
 
+@dataclass(frozen=True)
+class RuntimePaths:
+    """The executable/data split used by the installed runtime."""
+
+    runtime_base: Path
+    app_venv: Path
+    lwm_bin: Path
+    data_root: Path
+    state_root: Path
+
+
+@dataclass(frozen=True)
+class RuntimeInstallReport:
+    """A staged install report; no live runtime path is changed."""
+
+    paths: RuntimePaths
+    staging_root: Path
+    staged_venv: Path
+    manifest_path: Path
+    source_revision: str
+    package_version: str
+    file_hashes: dict[str, str]
+    import_probe: dict[str, object]
+
+
 def _home() -> Path:
     return Path(os.environ.get("HOME", str(Path.home()))).expanduser()
 
@@ -87,8 +117,238 @@ def _downloads_root() -> Path:
 
 
 def _runtime_root(root: Path, *, home: Path | None = None) -> Path:
+    # Keep all mutable data under the one canonical DATA_ROOT. The previous
+    # slugged checkout path created a second data owner beside `llm-workmem`.
+    return runtime_paths(root, home=home).data_root
+
+
+def runtime_paths(root: Path, *, home: Path | None = None) -> RuntimePaths:
+    """Return canonical app/data paths without creating or changing them."""
+
     base = home if home is not None else _home()
-    return base / "Library" / "Application Support" / "llm-workmem-runtime" / _slugify(root.name)
+    runtime_base = base / "Library" / "Application Support" / "llm-workmem-runtime"
+    data_root = runtime_base / "llm-workmem"
+    app_venv = runtime_base / "app" / "venv"
+    return RuntimePaths(
+        runtime_base=runtime_base,
+        app_venv=app_venv,
+        lwm_bin=app_venv / "bin" / "lwm",
+        data_root=data_root,
+        state_root=data_root / "state",
+    )
+
+
+def canonical_data_root(root: Path) -> Path:
+    """Resolve a repository access path to its single mutable data owner.
+
+    After the approved ownership migration, repository ``state/`` is a
+    symlink into the runtime data root. Installers must not preserve the
+    repository path in generated commands, because that changes behavior
+    contract resolution even when the symlink currently reaches the same
+    bytes. Ordinary checkouts and temporary roots remain unchanged.
+    """
+
+    resolved = root.expanduser().resolve()
+    state_link = resolved / "state"
+    if not state_link.is_symlink():
+        return resolved
+    target_state = state_link.resolve()
+    owner = target_state.parent
+    if owner == resolved or not (owner / "raw").exists() or not (owner / "wiki").exists():
+        return resolved
+    return owner
+
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def verify_runtime_import(python_path: Path) -> tuple[bool, dict[str, object]]:
+    """Probe an installed interpreter and reject iCloud/source imports."""
+
+    command = [
+        str(python_path),
+        "-I",
+        "-c",
+        (
+            "import json,lwm,sys; "
+            "print(json.dumps({'module': lwm.__file__, 'path': sys.path}))"
+        ),
+    ]
+    try:
+        completed = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=30,
+        )
+        payload = json.loads(completed.stdout)
+    except (OSError, subprocess.SubprocessError, json.JSONDecodeError) as exc:
+        return False, {"error": str(exc), "command": command}
+    module = str(payload.get("module") or "")
+    paths = payload.get("path")
+    path_values = [str(item) for item in paths] if isinstance(paths, list) else []
+    forbidden = [value for value in [module, *path_values] if "Mobile Documents" in value]
+    payload["icloud_on_path"] = forbidden
+    payload["independent"] = not forbidden and str(python_path.parent.parent) in module
+    return bool(payload["independent"]), payload
+
+
+def build_runtime_app_staging(root: Path, *, home: Path | None = None) -> RuntimeInstallReport:
+    """Build and install a wheel into an isolated temporary app directory.
+
+    This is deliberately a staging operation. It never replaces
+    ``runtime_paths(root).app_venv`` and never touches launchd.
+    """
+
+    root = root.resolve()
+    paths = runtime_paths(root, home=home)
+    staging_parent = Path(tempfile.mkdtemp(prefix="lwm-runtime-staging-"))
+    staging_root = staging_parent / "app"
+    staged_venv = staging_root / "venv"
+    wheel_dir = staging_parent / "wheel"
+    wheel_dir.mkdir(parents=True, exist_ok=True)
+
+    if shutil.which("uv"):
+        build_command = ["uv", "build", "--wheel", "--out-dir", str(wheel_dir)]
+    else:
+        build_command = [
+            sys.executable,
+            "-m",
+            "pip",
+            "wheel",
+            "--no-deps",
+            "--no-build-isolation",
+            "-w",
+            str(wheel_dir),
+            ".",
+        ]
+    subprocess.run(build_command, cwd=str(root), check=True, capture_output=True, text=True)
+    wheels = sorted(wheel_dir.glob("*.whl"))
+    if not wheels:
+        raise RuntimeError("wheel build produced no wheel")
+    wheel = wheels[-1]
+    staged_root = staging_root
+    staged_root.mkdir(parents=True, exist_ok=True)
+    subprocess.run([sys.executable, "-m", "venv", str(staged_venv)], check=True)
+    staged_python = staged_venv / "bin" / "python"
+    subprocess.run(
+        [str(staged_python), "-m", "pip", "install", "--quiet", str(wheel)],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    independent, probe = verify_runtime_import(staged_python)
+    if not independent:
+        raise RuntimeError(f"staged runtime is not independent: {probe}")
+
+    source_revision = "unknown"
+    try:
+        source_revision = subprocess.run(
+            ["git", "-C", str(root), "rev-parse", "HEAD"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        pass
+    package_version = "unknown"
+    project_file = root / "pyproject.toml"
+    if project_file.is_file():
+        match = re.search(
+            r"^version\s*=\s*['\"]([^'\"]+)['\"]",
+            project_file.read_text(encoding="utf-8"),
+            re.MULTILINE,
+        )
+        if match:
+            package_version = match.group(1)
+    resource_path = root / "lwm" / "resources" / "eval-suite.txt"
+    file_hashes = {"wheel": _sha256_file(wheel)}
+    if resource_path.is_file():
+        file_hashes["lwm/resources/eval-suite.txt"] = _sha256_file(resource_path)
+    manifest = {
+        "source_revision": source_revision,
+        "package_version": package_version,
+        "staging_root": str(staging_root),
+        "wheel": str(wheel),
+        "file_hashes": file_hashes,
+        "import_probe": probe,
+        "live_paths_unchanged": True,
+    }
+    manifest_path = staging_root / "runtime-manifest.json"
+    manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return RuntimeInstallReport(
+        paths=paths,
+        staging_root=staging_root,
+        staged_venv=staged_venv,
+        manifest_path=manifest_path,
+        source_revision=source_revision,
+        package_version=package_version,
+        file_hashes=file_hashes,
+        import_probe=probe,
+    )
+
+
+def plan_mutable_ownership_migration(root: Path, *, home: Path | None = None) -> dict[str, object]:
+    """Describe ownership changes without touching either side of a link."""
+
+    root = root.resolve()
+    paths = runtime_paths(root, home=home)
+    mutable = ("wiki", "raw", "automation", "state", "llms.txt", "llms-full.txt", "llms.json")
+    observed: dict[str, dict[str, object]] = {}
+    for name in mutable:
+        source = root / name
+        target = paths.data_root / name
+        observed[name] = {
+            "source": str(source),
+            "source_exists": source.exists() or source.is_symlink(),
+            "source_is_symlink": source.is_symlink(),
+            "source_target": os.readlink(source) if source.is_symlink() else None,
+            "runtime_target": str(target),
+            "runtime_exists": target.exists() or target.is_symlink(),
+            "runtime_is_symlink": target.is_symlink(),
+        }
+    return {
+        "root": str(root),
+        "runtime_base": str(paths.runtime_base),
+        "data_root": str(paths.data_root),
+        "changes_applied": False,
+        "observed": observed,
+        "planned_actions": [
+            "make DATA_ROOT mutable paths the sole physical owners",
+            "point repository access paths into DATA_ROOT",
+            "remove legacy DATA_ROOT/lwm code mirror after import proof",
+        ],
+    }
+
+
+def mutable_ownership_issues(root: Path) -> tuple[str, ...]:
+    """Return mutable paths that would write outside the selected data root."""
+
+    root = root.resolve()
+    expected_owner = runtime_paths(root).data_root.resolve()
+    issues: list[str] = []
+    for name in ("wiki", "raw", "automation", "state", "llms.txt", "llms-full.txt", "llms.json"):
+        path = root / name
+        if not path.is_symlink():
+            continue
+        try:
+            target = path.resolve(strict=False)
+            target.relative_to(expected_owner)
+        except (OSError, ValueError):
+            issues.append(f"{name}: outside data root ({target})")
+            continue
+        expected_target = expected_owner / name
+        if target != expected_target:
+            issues.append(
+                f"{name}: unexpected data owner ({target}); expected {expected_target}"
+            )
+    return tuple(issues)
 
 
 def _ensure_runtime_target(path: Path, *, is_dir: bool) -> None:
@@ -142,6 +402,14 @@ def _mirror_runtime_tree(source: Path, target: Path) -> None:
 
 
 def materialize_runtime_layout(root: Path, *, home: Path | None = None) -> Path:
+    """Compatibility-only legacy layout helper.
+
+    New schedule generation uses :func:`materialize_data_layout` and never
+    mirrors executable source into DATA_ROOT. This function remains only for
+    callers that explicitly request the historical staging layout; it is not
+    a scheduler or runtime authority and must not be used for cutover.
+    """
+
     root = root.resolve()
     runtime_root = _runtime_root(root, home=home)
     runtime_root.mkdir(parents=True, exist_ok=True)
@@ -175,9 +443,166 @@ def materialize_runtime_layout(root: Path, *, home: Path | None = None) -> Path:
     if package_source.is_dir():
         _mirror_runtime_tree(package_source, package_target)
     adapters_source = root / "adapters"
+    adapters_target = runtime_root / "adapters"
+    if adapters_source.is_dir() and adapters_source.resolve() != adapters_target.resolve():
+        _mirror_runtime_tree(adapters_source, adapters_target)
+    return runtime_root
+
+
+def materialize_data_layout(
+    root: Path, *, home: Path | None = None, approved: bool = False
+) -> Path:
+    """Move mutable data ownership after an explicit migration approval."""
+
+    if not approved:
+        raise RuntimeError(
+            "mutable data migration requires approved=True; "
+            "use prepare_runtime_layout() for schedule preparation"
+        )
+
+    root = root.resolve()
+    runtime_root = _runtime_root(root, home=home)
+    runtime_root.mkdir(parents=True, exist_ok=True)
+    mutable_paths = (
+        ("raw", True),
+        ("wiki", True),
+        ("automation", True),
+        ("knowledge-digest.pages", True),
+        ("knowledge-digest.html", False),
+        ("llms.txt", False),
+        ("llms-full.txt", False),
+        ("llms.json", False),
+        ("lwm-sources.json", False),
+    )
+    for rel_path, is_dir in mutable_paths:
+        source = root / rel_path
+        target = runtime_root / rel_path
+        _ensure_runtime_target(target, is_dir=is_dir)
+        _replace_with_symlink(source, target)
+
+    source_state = root / "state"
+    runtime_state = runtime_root / "state"
+    source_state.mkdir(parents=True, exist_ok=True)
+    if runtime_state.is_symlink():
+        if runtime_state.resolve() != source_state.resolve():
+            raise RuntimeError(
+                f"runtime state points to an unexpected owner: {runtime_state.resolve()}"
+            )
+        staged_state = runtime_root / f".state-migration-{os.getpid()}"
+        if staged_state.exists() or staged_state.is_symlink():
+            raise RuntimeError(f"state migration staging path already exists: {staged_state}")
+        shutil.copytree(source_state, staged_state, symlinks=True)
+        runtime_state.unlink()
+        os.replace(staged_state, runtime_state)
+    else:
+        _ensure_runtime_target(runtime_state, is_dir=True)
+    _replace_with_symlink(source_state, runtime_state)
+
+    source_config = root / "lwm-sources.json"
+    runtime_config = runtime_root / "lwm-sources.json"
+    _ensure_runtime_target(runtime_config, is_dir=False)
+    _replace_with_symlink(source_config, runtime_config)
+    return runtime_root
+
+
+def prepare_runtime_layout(root: Path, *, home: Path | None = None) -> Path:
+    """Prepare runtime directories without changing repository ownership.
+
+    Schedule generation must be safe to run before the approved ownership
+    migration.  It may create the runtime-side directories and generated
+    adapter copy, but it must not turn repository paths into links or reverse
+    an existing link.  ``materialize_data_layout`` remains the explicit
+    migration primitive for the approved migration step.
+    """
+
+    root = root.resolve()
+    runtime_root = _runtime_root(root, home=home)
+    runtime_root.mkdir(parents=True, exist_ok=True)
+    for rel_path, is_dir in (
+        ("raw", True),
+        ("wiki", True),
+        ("automation", True),
+        ("knowledge-digest.pages", True),
+        ("knowledge-digest.html", False),
+        ("llms.txt", False),
+        ("llms-full.txt", False),
+        ("llms.json", False),
+    ):
+        _ensure_runtime_target(runtime_root / rel_path, is_dir=is_dir)
+
+    source_config = root / "lwm-sources.json"
+    runtime_config = runtime_root / "lwm-sources.json"
+    if source_config.is_file() and not runtime_config.exists():
+        runtime_config.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source_config, runtime_config)
+
+    adapters_source = root / "adapters"
     if adapters_source.is_dir():
         _mirror_runtime_tree(adapters_source, runtime_root / "adapters")
     return runtime_root
+
+
+def _claim_scheduler_owner(
+    runtime_root: Path,
+    *,
+    label: str,
+    source_root: Path,
+    launch_agents_plist_path: Path,
+) -> None:
+    """Atomically reserve one scheduled writer for a runtime data root.
+
+    This is a forward-looking guard: it cannot discover an already-loaded
+    launchd job that predates the marker, but it prevents future schedule
+    commands from silently introducing a second label for the same owner.
+    """
+
+    clean_label = label.strip()
+    if not clean_label:
+        raise ValueError("scheduler label must be non-empty")
+
+    owner_path = runtime_root / SCHEDULER_OWNER_PATH
+    owner_path.parent.mkdir(parents=True, exist_ok=True)
+    expected = {
+        "schema_version": 1,
+        "label": clean_label,
+        "runtime_root": str(runtime_root.resolve()),
+        "source_root": str(source_root.resolve()),
+        "launch_agents_plist": str(launch_agents_plist_path.resolve()),
+    }
+
+    def check_existing() -> None:
+        try:
+            current = json.loads(owner_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise RuntimeError(
+                f"scheduler owner marker is unreadable; refusing a second writer: {owner_path}"
+            ) from exc
+        if not isinstance(current, dict):
+            raise RuntimeError(
+                f"scheduler owner marker is invalid; refusing a second writer: {owner_path}"
+            )
+        if current != expected:
+            raise RuntimeError(
+                "scheduler owner already claimed by "
+                f"{current.get('label', '<unknown>')!r}; refusing writer {clean_label!r}"
+            )
+
+    try:
+        fd = os.open(owner_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+    except FileExistsError:
+        check_existing()
+        return
+
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            json.dump(expected, handle, ensure_ascii=False, indent=2)
+            handle.write("\n")
+    except Exception:
+        try:
+            owner_path.unlink()
+        except OSError:
+            pass
+        raise
 
 
 def default_source_groups() -> tuple[SourceGroupSpec, ...]:
@@ -231,6 +656,15 @@ def default_source_groups() -> tuple[SourceGroupSpec, ...]:
             tags=("entity", "tool", "opencode", "cli"),
             sources=(
                 SourceFileSpec(home / ".config" / "opencode" / "AGENTS.md", "AGENTS.md"),
+                SourceFileSpec(home / ".config" / "opencode" / "memory" / "MEMORY.md", "MEMORY.md"),
+                SourceFileSpec(
+                    home / ".config" / "opencode" / "memory" / "user-profile.md",
+                    "user-profile.md",
+                ),
+                SourceFileSpec(
+                    home / ".config" / "opencode" / "memory" / "patterns.md",
+                    "patterns.md",
+                ),
                 SourceFileSpec(home / ".config" / "opencode" / "commands", "commands"),
                 SourceFileSpec(home / ".config" / "opencode" / "README.md", "README.md"),
                 SourceFileSpec(home / ".config" / "opencode" / "VALIDATION_REPORT.md", "VALIDATION_REPORT.md"),
@@ -322,6 +756,18 @@ def default_source_groups() -> tuple[SourceGroupSpec, ...]:
                 SourceFileSpec(home / ".config" / "shell", "shell-config"),
                 SourceFileSpec(home / ".config" / "zsh", "zsh-config"),
                 SourceFileSpec(home / ".shell-memory.md", "shell-memory.md"),
+            ),
+        ),
+        SourceGroupSpec(
+            key="gemini-cli",
+            title="Gemini CLI",
+            target_page="wiki/entities/gemini-cli.md",
+            tags=("entity", "tool", "gemini-cli", "cli"),
+            sources=(
+                # Keep the default source bounded to the user-maintained
+                # instruction contract; conversation databases stay out of
+                # automatic harvesting.
+                SourceFileSpec(home / ".gemini" / "GEMINI.md", "GEMINI.md"),
             ),
         ),
     )
@@ -448,6 +894,13 @@ def _read_text(path: Path) -> str:
         return ""
 
 
+def _redact_snapshot_text(text: str) -> str:
+    """Keep credential values out of bounded source snapshots."""
+
+    redacted, _applied = redact_text(text)
+    return redacted
+
+
 def _strip_frontmatter(text: str) -> str:
     if text.startswith("---"):
         match = re.match(r"^---\n.*?\n---\n", text, re.DOTALL)
@@ -537,6 +990,8 @@ This page defines the working memory lifecycle for the llm-workmem-first setup.
 - [[overview]]
 - [[workflow-policy]]
 - [[memory-policy]]
+- [[workflow-memory]]
+- [[conflicts]]
 """
 
 
@@ -747,12 +1202,30 @@ def _launch_runner_path(label: str, root: Path) -> Path:
 
 
 def _installed_lwm_path(*, home: Path | None = None) -> Path:
-    """Return the one runtime used by launchd and all generated schedules."""
+    """Return the non-editable runtime used by launchd and schedules.
+
+    Prefer the concrete runtime executable over the global convenience
+    wrapper. The wrapper has a development-only fallback to the checkout
+    venv, which must never become an implicit launchd dependency.
+    """
     base = home if home is not None else _home()
-    global_launcher = base / ".local" / "bin" / "lwm"
-    if global_launcher.is_file():
-        return global_launcher
-    return base / "Library" / "Application Support" / "llm-workmem-runtime" / "app" / "venv" / "bin" / "lwm"
+    runtime_launcher = (
+        base
+        / "Library"
+        / "Application Support"
+        / "llm-workmem-runtime"
+        / "app"
+        / "venv"
+        / "bin"
+        / "lwm"
+    )
+    if runtime_launcher.is_file():
+        return runtime_launcher
+
+    # Keep the expected path when the runtime is absent so the generated
+    # bundle is visibly unusable instead of silently falling back to source
+    # checkout code through a convenience wrapper.
+    return runtime_launcher
 
 
 def _render_launchd_plist(
@@ -782,8 +1255,6 @@ def _render_launchd_plist(
   <true/>
   <key>StartInterval</key>
   <integer>{interval_seconds}</integer>
-  <key>FullCycleInterval</key>
-  <integer>43200</integer>
   <key>StandardOutPath</key>
   <string>{stdout_path}</string>
   <key>StandardErrorPath</key>
@@ -793,32 +1264,32 @@ def _render_launchd_plist(
 """
 
 
-def _render_schedule_runner(runtime_root: Path, *, label: str, source_root: Path) -> str:
-    launch_base = _launch_runner_path(label, runtime_root).parent
-    return f'''"""15-minute supervisor for the 12-hour llm-workmem full cycle.
+def _render_schedule_runner(
+    runtime_root: Path,
+    *,
+    label: str,
+    installed_lwm_path: Path,
+) -> str:
+    return f'''"""12-hour supervisor for the llm-workmem full cycle.
 
-Generated by `lwm schedule`. This script deliberately avoids `uv run` so
-launchd can keep working when network access or dependency downloads are unavailable.
+Generated by `lwm schedule`. It delegates to the installed non-editable
+runtime instead of importing source checkout code.
 """
-
-# ruff: noqa: E402
 
 from __future__ import annotations
 
-import sys
+import subprocess
 from pathlib import Path
 
 ROOT = Path({str(runtime_root)!r})
-LAUNCH_BASE = Path({str(launch_base)!r})
-sys.path.insert(0, str(ROOT))
-sys.path.insert(0, str(LAUNCH_BASE))
-
-from lwm.supervisor import run_supervisor
-# The full cycle still includes run_watch and render_watch_report via lwm.runner.
+LWM_BIN = Path({str(installed_lwm_path)!r})
 
 
 def main() -> int:
-    return run_supervisor(ROOT)
+    return subprocess.run(
+        [str(LWM_BIN), "hub", "run-supervisor", str(ROOT)],
+        check=False,
+    ).returncode
 
 
 if __name__ == "__main__":
@@ -830,12 +1301,17 @@ def write_schedule_bundle(
     root: Path,
     *,
     label: str,
-    interval_seconds: int = 900,
+    interval_seconds: int = 43200,
     home: Path | None = None,
 ) -> ScheduleOutcome:
     root = root.resolve()
     effective_home = (home if home is not None else _home()).expanduser().resolve()
-    runtime_root = materialize_runtime_layout(root, home=effective_home)
+    runtime_root = prepare_runtime_layout(root, home=effective_home)
+    behavior_source = root / "GLOBAL.md"
+    if behavior_source.is_file():
+        # Keep the executable app independent from the checkout while making
+        # the reviewed behavior contract available to the runtime Context.
+        write_behavior_snapshot(runtime_root, behavior_source)
     installed_lwm_path = _installed_lwm_path(home=effective_home)
     script_path = root / "automation" / "bin" / "run-harvest.sh"
     runner_path = root / "automation" / "bin" / "run-harvest.py"
@@ -843,6 +1319,13 @@ def write_schedule_bundle(
     launch_base = launch_runner_path.resolve().parent
     plist_path = root / "automation" / "launchd" / f"{label}.plist"
     launch_agents_plist_path = effective_home / "Library" / "LaunchAgents" / f"{label}.plist"
+
+    _claim_scheduler_owner(
+        runtime_root,
+        label=label,
+        source_root=root,
+        launch_agents_plist_path=launch_agents_plist_path,
+    )
 
     script_path.parent.mkdir(parents=True, exist_ok=True)
     plist_path.parent.mkdir(parents=True, exist_ok=True)
@@ -859,7 +1342,11 @@ set -euo pipefail
         encoding="utf-8",
     )
     script_path.chmod(0o755)
-    runner_text = _render_schedule_runner(runtime_root, label=label, source_root=root)
+    runner_text = _render_schedule_runner(
+        runtime_root,
+        label=label,
+        installed_lwm_path=installed_lwm_path,
+    )
     runner_path.write_text(runner_text, encoding="utf-8")
     runner_path.chmod(0o755)
     launch_runner_path.write_text(runner_text, encoding="utf-8")
@@ -933,7 +1420,10 @@ def harvest_sources(root: Path, *, compile_after_sync: bool = True) -> HarvestOu
                     rel = item.relative_to(source.path)
                     snapshot_path = raw_root / group.key / "current" / source.label / rel
                     snapshot_path.parent.mkdir(parents=True, exist_ok=True)
-                    snapshot_path.write_text(text, encoding="utf-8")
+                    snapshot_path.write_text(
+                        _redact_snapshot_text(text),
+                        encoding="utf-8",
+                    )
                     captured.append((group.key, source.label, str(snapshot_path.relative_to(root))))
                 continue
 
@@ -947,7 +1437,10 @@ def harvest_sources(root: Path, *, compile_after_sync: bool = True) -> HarvestOu
             snapshot_path = raw_root / group.key / "current" / _slugify(source.label)
             snapshot_path = snapshot_path.with_suffix(source.path.suffix or ".md")
             snapshot_path.parent.mkdir(parents=True, exist_ok=True)
-            snapshot_path.write_text(text, encoding="utf-8")
+            snapshot_path.write_text(
+                _redact_snapshot_text(text),
+                encoding="utf-8",
+            )
             captured.append((group.key, source.label, str(snapshot_path.relative_to(root))))
 
     governance_page = root / "wiki" / "concepts" / "memory-governance.md"

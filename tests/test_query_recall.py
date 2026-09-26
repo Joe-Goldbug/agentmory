@@ -1,3 +1,4 @@
+from datetime import date
 from pathlib import Path
 
 from lwm.query import _recall_plan, _tokenize, run_query
@@ -43,3 +44,43 @@ def test_chinese_query_returns_evidence_and_recall_plan(tmp_path: Path) -> None:
     assert report.hits[0].page.title == "工作流记忆"
     assert report.plan is not None
     assert "current_state" in report.plan.dimensions
+
+
+def test_specific_slug_beats_repeated_terms_in_synthesis_page(tmp_path: Path) -> None:
+    _page(tmp_path, "tool-harvest", "Tool harvest automation workflow.")
+    unified = tmp_path / "wiki" / "unified" / "workflow-memory.md"
+    unified.parent.mkdir(parents=True, exist_ok=True)
+    unified.write_text(
+        "---\n"
+        "title: Unified Workflow Memory\n"
+        "type: unified-memory\n"
+        "tags: [workflow, memory, unified-memory]\n"
+        "updated: 2026-08-16\n"
+        "---\n\n"
+        "# Unified Workflow Memory\n\n"
+        "tool harvest automation workflow tool harvest automation workflow\n",
+        encoding="utf-8",
+    )
+
+    report = run_query(tmp_path, "tool harvest automation workflow", limit=3)
+
+    assert report.hits[0].page.slug == "tool-harvest"
+
+
+def test_old_exact_slug_beats_fresh_generic_tool_page(tmp_path: Path) -> None:
+    _page(tmp_path, "tool-harvest", "Tool harvest automation workflow.")
+    generic = tmp_path / "wiki" / "concepts" / "github-copilot.md"
+    generic.write_text(
+        "---\n"
+        "title: GitHub Copilot\n"
+        "type: entity\n"
+        "tags: [tool, copilot, workflow]\n"
+        f"updated: {date.today().isoformat()}\n"
+        "---\n\n"
+        "Tool harvest automation workflow. Tool harvest automation workflow.\n",
+        encoding="utf-8",
+    )
+
+    report = run_query(tmp_path, "tool harvest automation workflow", limit=3)
+
+    assert report.hits[0].page.slug == "tool-harvest"

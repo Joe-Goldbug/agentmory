@@ -10,6 +10,8 @@ the matching bullet from its project memory page. The CLI exposes a
 from __future__ import annotations
 
 import json
+import re
+import warnings
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -23,6 +25,9 @@ class ForgetResult:
     index_updated: bool
     page_updated: bool
     page_path: Path | None
+    invalidated_pages: tuple[Path, ...] = ()
+    invalidated_candidates: tuple[Path, ...] = ()
+    requires_review: tuple[Path, ...] = ()
 
 
 def _load_index(root: Path) -> dict[str, dict]:
@@ -117,6 +122,58 @@ def _remove_bullet_from_project_page(
     return removed
 
 
+def _invalidate_derived_candidates(root: Path, event_id: str) -> tuple[Path, ...]:
+    """Withdraw candidates whose evidence or counterevidence uses this event."""
+
+    invalidated: list[Path] = []
+    for directory in (root / "state" / "candidates", root / "state" / "analysis" / "candidates"):
+        if not directory.is_dir():
+            continue
+        for path in directory.glob("*.json"):
+            try:
+                payload = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            if not isinstance(payload, dict):
+                continue
+            if any(
+                isinstance(payload.get(key), list) and event_id in payload[key]
+                for key in ("evidence_ids", "counterevidence_ids")
+            ):
+                if payload.get("state") != "rejected" or payload.get("withdrawal_reason") != "source_event_forgotten":
+                    payload["state"] = "rejected"
+                    payload["withdrawal_reason"] = "source_event_forgotten"
+                    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+                    invalidated.append(path)
+    return tuple(invalidated)
+
+
+def _invalidate_promoted_pages(root: Path, event_id: str) -> tuple[Path, ...]:
+    """Withdraw generated global pages backed by the forgotten event."""
+
+    base = root / "wiki" / "global"
+    if not base.is_dir():
+        return ()
+    invalidated: list[Path] = []
+    for path in base.glob("*.md"):
+        text = path.read_text(encoding="utf-8")
+        if not text.startswith("---\n"):
+            continue
+        parts = text.split("---", 2)
+        if len(parts) != 3 or not re.search(r"^claim_key:[ \t]*\S+", parts[1], re.MULTILINE):
+            continue
+        match = re.search(r"^event_ids:[ \t]*\[([^\]]*)\][ \t]*$", parts[1], re.MULTILINE)
+        if match is None or event_id not in {value.strip() for value in match.group(1).split(",")}:
+            continue
+        frontmatter, changed = re.subn(
+            r"^status:[ \t]*approved[ \t]*$", "status: source_withdrawn", parts[1], count=1, flags=re.MULTILINE
+        )
+        if changed:
+            path.write_text(f"---{frontmatter}---{parts[2]}", encoding="utf-8")
+            invalidated.append(path)
+    return tuple(invalidated)
+
+
 def forget_event(root: Path, event_id: str) -> ForgetResult:
     root = root.resolve()
 
@@ -124,7 +181,12 @@ def forget_event(root: Path, event_id: str) -> ForgetResult:
 
     # Remove the file itself under every bucket.
     target = _find_event_file(root, event_id)
+    raw_payload = None
     if target is not None:
+        try:
+            raw_payload = json.loads(target.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            pass
         target.unlink()
         deleted.append(target)
 
@@ -134,23 +196,33 @@ def forget_event(root: Path, event_id: str) -> ForgetResult:
     if index is not None and info is not None:
         _save_index(root, index)
 
+    invalidated_candidates = _invalidate_derived_candidates(root, event_id)
+    invalidated_pages = _invalidate_promoted_pages(root, event_id)
+
     page_updated = False
     page_path: Path | None = None
+    requires_review: list[Path] = list(invalidated_pages)
     if info and info.get("project_id"):
         from lwm import project_memory
 
         page_path = project_memory.project_page_path(root, str(info["project_id"]))
-        raw_payload = None
-        if target is not None and target.is_file():
-            try:
-                raw_payload = json.loads(target.read_text(encoding="utf-8"))
-            except json.JSONDecodeError:
-                raw_payload = None
-        page_updated = _remove_bullet_from_project_page(
+        reconciled = project_memory.reconcile_forgotten_event(
+            root, str(info["project_id"]), event_id
+        )
+        legacy_cleaned = _remove_bullet_from_project_page(
             page_path,
             event_id,
             index_info=info,
             raw_payload=raw_payload,
+        )
+        page_updated = reconciled or legacy_cleaned
+        if page_path.is_file():
+            requires_review.append(page_path)
+    if requires_review:
+        warnings.warn(
+            "forgotten source may remain in pages requiring review: "
+            + ", ".join(str(path) for path in requires_review),
+            stacklevel=2,
         )
 
     return ForgetResult(
@@ -159,6 +231,9 @@ def forget_event(root: Path, event_id: str) -> ForgetResult:
         index_updated=info is not None,
         page_updated=page_updated,
         page_path=page_path,
+        invalidated_pages=invalidated_pages,
+        invalidated_candidates=invalidated_candidates,
+        requires_review=tuple(requires_review),
     )
 
 

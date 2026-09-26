@@ -1,4 +1,4 @@
-"""Global memory promotion logic.
+"""Compatibility helpers for the retired insight promotion surface.
 
 Promotion is gated by hard rules (no LLM needed):
 
@@ -9,20 +9,21 @@ Promotion is gated by hard rules (no LLM needed):
   ``once``, or any user-defined temporary marker.
 * It must not conflict with an existing global page (same title+tag).
 
-Approved candidates are written to ``wiki/global/<slug>.md`` with
-frontmatter; otherwise they remain in ``wiki/insights/candidate-*.md``
-for review.
+The current authoritative path is the stateful compiler candidate flow:
+``hub review-analysis`` followed by ``hub promote-analysis``. This module
+still reads and records legacy insight decisions, but it must never write a
+global page or create a second promotion authority.
 """
 
 from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from datetime import datetime
 from pathlib import Path
 from typing import Iterable
 
 from lwm.insights import CrossProjectInsight
+from lwm.project_memory import classify_event
 
 TEMP_TOKEN_RE = re.compile(r"\b(tmp|scratch|once|temporary)\b", re.IGNORECASE)
 
@@ -47,6 +48,8 @@ def gather_supporting_events(
         if tag not in (event.get("tags") or []):
             continue
         if event.get("project_id") not in ps:
+            continue
+        if classify_event(event).durability != "durable":
             continue
         out.append(event)
     return out
@@ -152,60 +155,22 @@ def promote(
     supporting_events: list[dict] | None = None,
     llm_summary: str | None = None,
 ) -> PromotionDecision:
-    """Decide whether an insight candidate may become a global rule."""
+    """Evaluate the retired insight shape without writing global memory.
 
-    reasons: list[str] = []
-    if len(insight.project_ids) < 2:
-        reasons.append("needs >=2 distinct project_ids")
+    The old insight object has no candidate state, explicit evidence IDs, or
+    human approval transition. Keeping its former write behavior would leave
+    a second authority beside ``hub promote-analysis``. The arguments remain
+    accepted for compatibility, but promotion is deliberately fail-closed.
+    """
 
-    supporting = supporting_events or []
-    if not _has_verification(supporting):
-        reasons.append("needs at least one verification across supporting events")
-
-    body = "\n".join([insight.title, insight.summary, *insight.evidence])
-    if _has_temp_token(body):
-        reasons.append("body contains temp marker (tmp/scratch/once/temporary)")
-
-    existing_titles = existing_global_titles(root)
-    if insight.title in existing_titles:
-        reasons.append("title already exists in wiki/global/")
-
-    if reasons:
-        return PromotionDecision(
-            insight_title=insight.title,
-            approved=False,
-            reasons=tuple(reasons),
-            target_path=None,
-        )
-
-    slug = re.sub(r"[^a-z0-9]+", "-", insight.title.lower()).strip("-")[:80]
-    target = (root / "wiki" / "global" / f"{slug}.md").resolve()
-    target.parent.mkdir(parents=True, exist_ok=True)
-    now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
-    summary = llm_summary or insight.summary
-    frontmatter = (
-        "---\n"
-        f"title: {insight.title}\n"
-        "type: principle\n"
-        f"tags: [global, {insight.tag}]\n"
-        "sources: []\n"
-        f"updated: {now}\n"
-        "---\n\n"
-    )
-    body_md = (
-        f"# {insight.title}\n\n"
-        f"{summary}\n\n"
-        f"Projects: {', '.join(insight.project_ids) or 'n/a'}\n\n"
-        "## Evidence\n\n"
-        + "\n".join(f"- {line}" for line in insight.evidence)
-        + "\n"
-    )
-    target.write_text(frontmatter + body_md, encoding="utf-8")
     return PromotionDecision(
         insight_title=insight.title,
-        approved=True,
-        reasons=(),
-        target_path=target,
+        approved=False,
+        reasons=(
+            "legacy_auto_promotion_disabled: use hub review-analysis and "
+            "hub promote-analysis",
+        ),
+        target_path=None,
     )
 
 
@@ -214,7 +179,12 @@ def auto_promote_all(
     insights: list[CrossProjectInsight],
     events: list[dict],
 ) -> tuple[list[PromotionDecision], list[CrossProjectInsight]]:
-    """Promote all eligible insights and return decisions + leftovers."""
+    """Record legacy decisions without writing any global page.
+
+    This compatibility function is intentionally observation-only. It lets
+    old callers inspect why a candidate was withheld while forcing all new
+    global writes through the stateful, evidence-bound review path.
+    """
 
     decisions: list[PromotionDecision] = []
     leftovers: list[CrossProjectInsight] = []

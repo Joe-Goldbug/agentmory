@@ -1,4 +1,4 @@
-"""Tests for promotion rules (acceptance: scratch → not global; ≥2 project → can)."""
+"""Tests for the retired insight path and explicit promotion boundary."""
 
 from __future__ import annotations
 
@@ -17,6 +17,7 @@ def _seed_event(*, root: Path, pid: str, task: str, tag: str = "ops", temp: bool
         event_type="bugfix",
         task=task,
         decisions=[f"fix {pid}"],
+        changes=[f"changed {pid}"],
         verification=["smoke-ok"],
         tags=[tag],
         importance="scratch" if temp else "project",
@@ -39,15 +40,17 @@ def test_scratch_rejected_from_global(tmp_path: Path) -> None:
     assert leftovers == candidates
 
 
-def test_two_projects_promote_to_global(tmp_path: Path) -> None:
+def test_legacy_two_projects_do_not_bypass_explicit_promotion(tmp_path: Path) -> None:
     _seed_event(root=tmp_path, pid="aa", task="commit-1")
     _seed_event(root=tmp_path, pid="bb", task="commit-2")
     events = insights.load_processed_events(tmp_path)
     candidates = insights.collect_candidates(events)
     decisions, leftovers = promote.auto_promote_all(tmp_path, candidates, events)
-    assert any(d.approved for d in decisions)
-    global_pages = list((tmp_path / "wiki" / "global").glob("*.md"))
-    assert global_pages
+    assert decisions
+    assert leftovers == candidates
+    assert all(not d.approved for d in decisions)
+    assert all("legacy_auto_promotion_disabled" in d.reasons[0] for d in decisions)
+    assert not (tmp_path / "wiki" / "global").exists()
     assert schema.validate_schema(tmp_path).issues == ()
 
 

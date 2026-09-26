@@ -76,6 +76,28 @@ def finish(receipt: CycleReceipt, *, status: str, **counts: int | str | None) ->
 
 def is_due(root: Path, interval_seconds: int = 43200, now: float | None = None) -> bool:
     current = time.time() if now is None else now
+    # v2 is the authoritative full-cycle clock. Keep the v1 fallback so old
+    # installations can finish their migration without losing scheduling.
+    from lwm.cycle_receipt import load_last_attempt, load_latest
+
+    latest = load_latest(root)
+    attempt = load_last_attempt(root)
+    candidates = [
+        receipt
+        for receipt in (latest, attempt)
+        if isinstance(receipt, dict) and receipt.get("schema_version") == 2
+    ]
+    v2 = max(candidates, key=lambda receipt: str(receipt.get("finished_at") or ""), default=None)
+    if v2 and v2.get("schema_version") == 2:
+        if v2.get("core_status") not in {"success", "success_with_warnings"}:
+            return True
+        finished = str(v2.get("finished_at") or "")
+        try:
+            parsed = datetime.fromisoformat(finished.replace("Z", "+00:00")).timestamp()
+        except ValueError:
+            return True
+        return current - parsed >= interval_seconds
+
     receipt = read_receipt(root)
     if not receipt or receipt.get("status") != "success":
         return True

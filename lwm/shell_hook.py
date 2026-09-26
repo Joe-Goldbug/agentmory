@@ -3,7 +3,7 @@
 The hook file at ``lwm/lwm_shell_hook.zsh`` is a pure-zsh preexec+precmd
 pair that drops a sanitized JSONL record of each non-trivial command into
 ``$LWM_ROOT/raw/shell/<date>.jsonl``.  It is opt-out via
-``LBM_SHELL_HOOK=0`` and never persists secrets.
+``LWM_SHELL_HOOK=0`` (or legacy ``LBM_SHELL_HOOK=0``) and never persists secrets.
 
 This module handles the **installation step only** — it appends a
 guarded block to ``~/.zshrc`` so the hook is sourced on every interactive
@@ -26,9 +26,12 @@ Design notes:
 from __future__ import annotations
 
 import hashlib
+import importlib.resources
 import re
 from dataclasses import dataclass
 from pathlib import Path
+
+from lwm.harvest import canonical_data_root
 
 
 MARKER_START = "# LBM-WIKI:SHELL-HOOK-START"
@@ -60,7 +63,23 @@ def _resolve_rc(rc_path: Path | None) -> Path:
 
 
 def _hook_path(lwm_root: Path) -> Path:
-    return (lwm_root / "lwm" / "lwm_shell_hook.zsh").resolve()
+    # A migrated DATA_ROOT may still contain a legacy ``lwm/`` code mirror.
+    # Only a real source checkout (identified by its project manifest) may
+    # supply executable code; runtime data must use the installed wheel.
+    checkout_hook = (lwm_root / "lwm" / "lwm_shell_hook.zsh").resolve()
+    if (lwm_root / "pyproject.toml").is_file() and checkout_hook.is_file():
+        return checkout_hook
+
+    # Installed wheels keep executable code in site-packages while DATA_ROOT
+    # contains only mutable state. Use the packaged hook instead of assuming
+    # that the data root also owns a source-code mirror.
+    try:
+        packaged_hook = Path(
+            str(importlib.resources.files("lwm").joinpath("lwm_shell_hook.zsh"))
+        ).resolve()
+    except (ModuleNotFoundError, OSError, TypeError):
+        packaged_hook = Path()
+    return packaged_hook if packaged_hook.is_file() else checkout_hook
 
 
 def _hook_fingerprint(hook: Path) -> str:
@@ -116,6 +135,7 @@ def install(
     * Creates the rcfile (and parent dir) when missing.
     """
 
+    lwm_root = canonical_data_root(lwm_root)
     rc = _resolve_rc(rc_path)
     hook = _hook_path(lwm_root)
     if not hook.is_file():
@@ -187,4 +207,3 @@ __all__ = [
     "is_installed",
     "uninstall",
 ]
-

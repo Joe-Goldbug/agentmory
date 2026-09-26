@@ -1,0 +1,64 @@
+{
+  "name": "llm-workmem-companion",
+  "displayName": "LLM-WorkMem Companion",
+  "description": "Bounded LLM-WorkMem context and lifecycle bridge for VS Code-compatible hosts.",
+  "version": "0.1.0",
+  "publisher": "ethan-lau",
+  "license": "MIT",
+  "engines": {
+    "vscode": ">=1.85.0"
+  },
+  "main": "extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "llm-workmem.startSession",
+        "title": "LLM-WorkMem: Start Session"
+      },
+      {
+        "command": "llm-workmem.stopSession",
+        "title": "LLM-WorkMem: Stop Session"
+      }
+    ],
+    "configuration": {
+      "title": "LLM-WorkMem Companion",
+      "properties": {
+        "llmWorkmem.binary": {
+          "type": "string",
+          "default": "",
+          "description": "Optional absolute path to the installed lwm executable."
+        },
+        "llmWorkmem.root": {
+          "type": "string",
+          "default": "",
+          "description": "Optional absolute LLM-WorkMem data root."
+        },
+        "llmWorkmem.toolId": {
+          "type": "string",
+          "default": "vscode",
+          "enum": [
+            "vscode",
+            "cursor",
+            "trae",
+            "kiro"
+          ],
+          "description": "Canonical registry tool id for this host."
+        },
+        "llmWorkmem.integration": {
+          "type": "string",
+          "default": "vscode-extension",
+          "enum": [
+            "vscode-extension",
+            "cursor-extension",
+            "trae-extension",
+            "kiro-extension"
+          ],
+          "description": "Proof binding selected for the host installation."
+        }
+      }
+    }
+  }
+}

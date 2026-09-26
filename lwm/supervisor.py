@@ -1,87 +1,74 @@
-"""15-minute supervisor with a separately enforced 12-hour full cycle."""
+"""Launchd supervisor for the boot-and-12-hour full cycle."""
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
-from typing import Any
 
-from lwm import inbox
-from lwm.cycle_state import begin, finish, is_due, write_receipt
+from lwm.cycle_state import is_due
+from lwm import lockfile
+from lwm.harvest import mutable_ownership_issues
 from lwm.loop_state import begin_loop, close_loop, record_evaluation, write_state
 
 
 FULL_INTERVAL_SECONDS = 43200
-
-
-def _reason_counts(root: Path) -> dict[str, int]:
-    counts: dict[str, int] = {}
-    for path in (inbox.events_root(root) / "rejected").rglob("*.json.reason"):
-        try:
-            reason = path.read_text(encoding="utf-8").strip()
-        except OSError:
-            continue
-        key = "privacy_blocked" if reason.startswith("privacy:") else "duplicate" if reason.startswith("duplicate:") else "invalid"
-        counts[key] = counts.get(key, 0) + 1
-    return counts
+SCHEDULE_GRACE_SECONDS = 600
 
 
 def run_supervisor(root: Path, *, interval_seconds: int = FULL_INTERVAL_SECONDS, force: bool = False) -> int:
-    """Leave a supervisor receipt and run a full cycle only when due."""
+    """Run the single v2 cycle writer only when the full cycle is due.
+
+    The lock surrounds both the not-due bookkeeping and the full cycle so
+    concurrent launchd/file-wake invocations cannot become a second writer.
+    """
 
     root = root.resolve()
-    supervisor = begin("supervisor", "scheduled")
-    if not force and not is_due(root, interval_seconds=interval_seconds):
-        loop = begin_loop(
-            "scheduled memory refresh",
-            success_criteria=("full cycle runs when due",),
-            expected_observation="the previous successful cycle is still within its interval",
-            expected_outcome="wait without overwriting the previous full-cycle evidence",
-        )
-        loop = record_evaluation(
-            loop,
-            actual_observation="full cycle not due",
-            actual_outcome="previous full-cycle evidence remains current",
-            evidence=("state/last-cycle.json",),
-            criteria_met=True,
-            next_action="wait for the next due window",
-        )
-        write_state(root, close_loop(loop, exit_state="continue", human_gate=False))
-        write_receipt(root, finish(supervisor, status="success", reason="not_due"))
-        from lwm.health import collect_and_write
-
-        collect_and_write(root, strict=True)
-        return 0
-
-    write_receipt(root, finish(supervisor, status="success", reason="full_cycle_due"))
-    full = begin("full", "due")
-    write_receipt(root, full)
-    before = inbox.inbox_status(root)
-    before_reasons = _reason_counts(root)
+    # Never let a scheduled write silently cross the data-owner boundary.
+    # Task 9B must migrate and verify this path before a real cycle can run.
+    if mutable_ownership_issues(root):
+        return 2
     try:
-        from lwm.runner import run_cycle
+        with lockfile.cycle_lock(root):
+            # launchd wakes from the previous start; the last receipt is
+            # timestamped at completion. Allow for a bounded cycle duration.
+            due_interval = max(0, interval_seconds - SCHEDULE_GRACE_SECONDS)
+            if not force and not is_due(root, interval_seconds=due_interval):
+                loop = begin_loop(
+                    "scheduled memory refresh",
+                    success_criteria=("full cycle runs when due",),
+                    expected_observation="the previous successful cycle is still within its interval",
+                    expected_outcome="wait without overwriting the previous full-cycle evidence",
+                )
+                loop = record_evaluation(
+                    loop,
+                    actual_observation="full cycle not due",
+                    actual_outcome="previous full-cycle evidence remains current",
+                    evidence=("state/last-cycle.json",),
+                    criteria_met=True,
+                    next_action="wait for the next due window",
+                )
+                write_state(root, close_loop(loop, exit_state="continue", human_gate=False))
+                # The latest cycle receipt binds health.json by hash. A
+                # not-due wake must not invalidate that verified snapshot.
+                return 0
 
-        code = run_cycle(root)
-    except Exception as exc:  # noqa: BLE001
-        write_receipt(root, finish(full, status="failed", error=str(exc)))
-        return 1
-    status = "success" if code == 0 else "failed"
-    after = inbox.inbox_status(root)
-    after_reasons = _reason_counts(root)
-    def delta(key: str) -> int:
-        return max(getattr(after, key) - getattr(before, key), 0)
-    counts: dict[str, Any] = {
-        "processed": delta("processed"),
-        "accepted": delta("processed"),
-        "duplicate": max(after_reasons.get("duplicate", 0) - before_reasons.get("duplicate", 0), 0),
-        "privacy_blocked": max(after_reasons.get("privacy_blocked", 0) - before_reasons.get("privacy_blocked", 0), 0),
-        "invalid": max(after_reasons.get("invalid", 0) - before_reasons.get("invalid", 0), 0),
-        "failed": delta("failed"),
-    }
-    write_receipt(root, finish(full, status=status, error=None if code == 0 else f"exit {code}", **counts))
-    from lwm.health import collect_and_write
+            try:
+                from lwm.runner import run_cycle
 
-    collect_and_write(root, strict=True)
-    return code
+                code = run_cycle(root)
+            except Exception:  # noqa: BLE001
+                return 1
+            # run_cycle owns the health snapshot for a full cycle and hashes
+            # that exact file into the immutable receipt. Rewriting health
+            # here would invalidate the receipt immediately after commit.
+            return code
+    except lockfile.CycleLockBusyError as exc:
+        # A second scheduler wake is expected during a running cycle. It does
+        # no writes and exits cleanly so launchd does not retry it as a failure.
+        if exc.error:
+            print(f"supervisor cycle lock unavailable: {exc}", file=sys.stderr)
+            return 1
+        return 0
 
 
 __all__ = ["FULL_INTERVAL_SECONDS", "run_supervisor"]

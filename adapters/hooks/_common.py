@@ -7,7 +7,7 @@ import os
 import re
 import sys
 from pathlib import Path
-from typing import Any, Iterable, Optional
+from typing import Any, Iterable, Mapping, Optional
 
 _SENSITIVE_PATH_RE = re.compile(
     r"(^|/)(?:\.env(?:\.[^/]+)?|credentials|id_rsa|id_ed25519|secrets?(?:/|$)|tokens?(?:/|$))",
@@ -28,6 +28,21 @@ def redact_paths(paths: Iterable[str]) -> list[str]:
     return out
 
 
+def structured_handoff(payload: Mapping[str, Any]) -> dict[str, Any] | None:
+    """Return only an explicit structured handoff object from host input.
+
+    Ordinary task, prompt, and transcript fields are intentionally ignored;
+    lifecycle hooks may forward a handoff only when the host names one of the
+    supported structured fields.
+    """
+
+    for key in ("handoff", "handoff_summary", "task_summary"):
+        value = payload.get(key)
+        if isinstance(value, dict):
+            return value
+    return None
+
+
 def emit(
     root: Optional[Path],
     event: dict[str, Any],
@@ -44,6 +59,7 @@ def emit(
     payload = json.dumps(event, ensure_ascii=False)
     cmd = [
         sys.executable,
+        "-I",
         "-m",
         "lwm.cli",
         "hub",
@@ -57,10 +73,19 @@ def emit(
     except ImportError:
         return 1
     env = dict(os.environ)
-    source_root = str(Path(__file__).resolve().parent.parent.parent)
-    env.setdefault("PYTHONPATH", source_root)
-    if env.get("PYTHONPATH") and source_root not in env["PYTHONPATH"]:
-        env["PYTHONPATH"] = source_root + ":" + env["PYTHONPATH"]
+    # Hooks are shipped in the installed wheel. Never derive an import path
+    # from this helper's source location: on the development machine that
+    # location is the iCloud checkout and would break runtime independence.
+    python_path = env.get("PYTHONPATH")
+    if python_path:
+        safe_entries = [
+            entry for entry in python_path.split(os.pathsep)
+            if "Mobile Documents" not in entry
+        ]
+        if safe_entries:
+            env["PYTHONPATH"] = os.pathsep.join(safe_entries)
+        else:
+            env.pop("PYTHONPATH", None)
     completed = subprocess.run(cmd, capture_output=True, text=True, env=env)
     if completed.returncode == 0:
         return 0

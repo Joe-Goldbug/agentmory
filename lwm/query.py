@@ -109,6 +109,28 @@ def _page_excerpt(body: str, tokens: tuple[str, ...], limit: int = 2) -> str:
     return text if len(text) <= 220 else text[:220].rstrip() + "..."
 
 
+def _phrase_bonus(page: WikiPage, question: str, mode_bias: int) -> tuple[int, str | None]:
+    """Reward an exact multi-word page slug/title match.
+
+    Synthesis pages intentionally repeat many common terms.  A specific page
+    such as ``tool-harvest`` must therefore win when the question contains the
+    same phrase, even if the synthesis page mentions each word more often.
+    """
+    words = re.findall(r"[a-z0-9]+", question.lower())
+    if len(words) < 2:
+        return 0, None
+    slug = page.slug.lower()
+    title = page.title.lower()
+    for left, right in zip(words, words[1:]):
+        phrase = f"{left}-{right}"
+        spaced = f"{left} {right}"
+        if phrase in slug:
+            return 12 * mode_bias, f"phrase:{phrase}"
+        if spaced in title:
+            return 10 * mode_bias, f"phrase:{spaced}"
+    return 0, None
+
+
 def _score_page(page: WikiPage, body: str, tokens: tuple[str, ...], mode: str) -> tuple[int, list[str]]:
     if not tokens:
         return 0, []
@@ -147,6 +169,11 @@ def _score_page(page: WikiPage, body: str, tokens: tuple[str, ...], mode: str) -
             score += min(hits, 3) * mode_bias
             reasons.append(f"body:{token}x{min(hits, 3)}")
 
+    phrase_score, phrase_reason = _phrase_bonus(page, " ".join(tokens), mode_bias)
+    if phrase_score:
+        score += phrase_score
+        reasons.append(phrase_reason or "phrase:exact")
+
     if mode == "thesis":
         if page.page_type in {"conflict", "decision", "principle", "preference", "question"}:
             score += 4
@@ -154,9 +181,8 @@ def _score_page(page: WikiPage, body: str, tokens: tuple[str, ...], mode: str) -
         if page.page_type == "insight":
             score += 2
             reasons.append("type:insight")
-    # Apply spectral-stable factor (spectral-stable ρ(Ā)<1) — keeps
-    # well-trodden core pages from being drowned by new ones.
-    score = round(_apply_stability(score, page))
+    # Age should decay general relevance, not an explicit title/slug match.
+    score = round(_apply_stability(score - phrase_score, page)) + phrase_score
     return score, reasons
 
 
@@ -204,6 +230,11 @@ def _score_metadata_only(
         elif token in " ".join(page.sources).lower():
             score += 2 * mode_bias
             reasons.append(f"source:{token}")
+
+    phrase_score, phrase_reason = _phrase_bonus(page, " ".join(tokens), mode_bias)
+    if phrase_score:
+        score += phrase_score
+        reasons.append(phrase_reason or "phrase:exact")
 
     if mode == "thesis":
         if page.page_type in {"conflict", "decision", "principle", "preference", "question"}:

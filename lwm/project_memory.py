@@ -16,15 +16,193 @@ regenerates the page from a full snapshot.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import re
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable, Literal
 
 from lwm.events import (
     new_event_id,
 )
+from lwm.privacy import SECRET_PATTERNS
+
+
+# ---------------------------------------------------------------------------
+# Durable event admission contract
+#
+# Spec: docs/superpowers/specs/
+#       2026-07-31-llm-workmem-unified-behavior-memory-interface.md
+#       -> Implementation Changes / 2. Truthful Core
+#
+# Only structured decisions, changes, verifications, risks, project status and
+# open questions may enter long-term memory. Commands, complete prompts,
+# environment blocks, session lifecycle receipts and watcher observations stay
+# ``operational`` or become ``rejected``. Raw evidence is never mutated.
+# ---------------------------------------------------------------------------
+
+Durability = Literal["durable", "operational", "rejected"]
+
+DURABLE_EVENT_TYPES = frozenset(
+    {"decision", "bugfix", "verification", "project_status"}
+)
+
+OPERATIONAL_EVENT_TYPES = frozenset(
+    {
+        "session_start",
+        "session_idle",
+        "session_summary",
+        "session_deleted",
+        "adapter_probe",
+        "workflow_observation",
+    }
+)
+
+#: Structured fields that may carry durable work evidence.
+DURABLE_FIELDS = ("decisions", "changes", "verification", "risks", "open_questions")
+
+MAX_TASK_CHARS = 240
+MAX_ENTRY_CHARS = 480
+MAX_ITEMS_PER_FIELD = 8
+MAX_ITEM_CHARS = 240
+
+#: High-signal markers for complete prompts / instruction blocks / environment
+#: dumps. Matched case-insensitively against task plus every durable field.
+NOISE_MARKERS = (
+    "<environment_context>",
+    "</environment_context>",
+    "<permissions instructions>",
+    "<user_instructions>",
+    "<system-reminder>",
+    "# agents.md instructions",
+    "you are codex",
+    "you are claude code",
+    "command timed out",
+)
+
+#: Placeholder tasks emitted by lifecycle hooks that carry no work evidence.
+EMPTY_TASK_MARKERS = frozenset(
+    {
+        "",
+        "(no task)",
+        "(no task recorded)",
+        "(no user text)",
+        "(no user prompt)",
+        "no user text",
+        "no user prompt",
+    }
+)
+
+#: A bare shell command transcript is operational, never durable.
+_COMMAND_ONLY_RE = re.compile(
+    r"^(sudo\s+)?(git|npm|npx|uv|pip|python3?|ls|cd|cat|rg|grep|find|make|"
+    r"pytest|ruff|brew|launchctl|shasum|curl|echo|mkdir|cp|mv|chmod|open)\b"
+)
+
+
+@dataclass(frozen=True)
+class EventAdmission:
+    """Result of classifying one source event for durable memory."""
+
+    durability: Durability
+    reason: str
+    section: str | None
+
+
+def _bounded_items(value: Any) -> tuple[str, ...]:
+    """Normalize a structured field into bounded, non-empty text items."""
+
+    if value is None:
+        return ()
+    if isinstance(value, str):
+        raw: list[Any] = [value]
+    elif isinstance(value, (list, tuple)):
+        raw = list(value)
+    else:
+        return ()
+    items: list[str] = []
+    for entry in raw[:MAX_ITEMS_PER_FIELD]:
+        if not isinstance(entry, (str, int, float)):
+            # Malformed nested structures never reach durable memory.
+            continue
+        text = " ".join(str(entry).split()).strip()
+        if not text:
+            continue
+        items.append(text[:MAX_ITEM_CHARS])
+    return tuple(items)
+
+
+def _bounded_task(value: Any) -> str:
+    if not isinstance(value, str):
+        return ""
+    return " ".join(value.split()).strip()[:MAX_TASK_CHARS]
+
+
+def _contains_noise_marker(text: str) -> bool:
+    lowered = text.lower()
+    return any(marker in lowered for marker in NOISE_MARKERS)
+
+
+def _contains_secret(text: str) -> bool:
+    return any(pattern.search(text) for _, pattern in SECRET_PATTERNS)
+
+
+def _is_command_only(task: str) -> bool:
+    if not task or "\n" in task.strip():
+        return False
+    return bool(_COMMAND_ONLY_RE.match(task.strip()))
+
+
+def classify_event(event: object) -> EventAdmission:
+    """Classify one event as ``durable``, ``operational`` or ``rejected``.
+
+    ``durable`` events materialize into project memory. ``operational`` events
+    stay in raw evidence and may inform recent-activity views only.
+    ``rejected`` events must never be rendered anywhere.
+
+    ``event`` is intentionally typed as ``object``: raw JSON on disk may be any
+    shape, and malformed payloads must be rejected rather than crash a rebuild.
+    """
+
+    if not isinstance(event, dict):
+        return EventAdmission("rejected", "malformed_event", None)
+
+    event_type = str(event.get("event_type") or "").strip()
+    task = _bounded_task(event.get("task"))
+    fields = {key: _bounded_items(event.get(key)) for key in DURABLE_FIELDS}
+    combined = "\n".join(
+        [task, *(item for values in fields.values() for item in values)]
+    )
+
+    if _contains_noise_marker(combined):
+        return EventAdmission("rejected", "instruction_or_environment_dump", None)
+    if _contains_secret(combined):
+        return EventAdmission("rejected", "secret_material", None)
+
+    if event_type not in DURABLE_EVENT_TYPES:
+        reason = (
+            "non_durable_event_type"
+            if event_type in OPERATIONAL_EVENT_TYPES
+            else "unknown_event_type"
+        )
+        return EventAdmission("operational", reason, None)
+
+    if task.lower() in EMPTY_TASK_MARKERS and not any(fields.values()):
+        return EventAdmission("operational", "placeholder_task", None)
+    if _is_command_only(task) and not any(fields.values()):
+        return EventAdmission("operational", "command_transcript_only", None)
+
+    if event_type == "decision" and fields["decisions"]:
+        return EventAdmission("durable", "structured_decision", "decisions")
+    if event_type == "bugfix" and fields["changes"] and fields["verification"]:
+        return EventAdmission("durable", "verified_bugfix", "bugfixes")
+    if event_type == "verification" and fields["verification"]:
+        return EventAdmission("durable", "structured_verification", "verifications")
+    if event_type == "project_status" and task and any(fields.values()):
+        return EventAdmission("durable", "structured_project_status", "status")
+    return EventAdmission("operational", "insufficient_durable_fields", None)
 
 
 PAGE_TEMPLATE = """---
@@ -70,9 +248,28 @@ class ProjectMemoryEntry:
     text: str
     timestamp: str
     event_id: str
+    tool: str = ""
+    evidence_path: str = ""
 
     def render(self) -> str:
-        return f"- {self.timestamp} — {self.text}"
+        """Render one bullet plus its provenance line.
+
+        Spec requires every durable memory line to keep ``event_id``, the
+        originating tool and the evidence path. The provenance line starts with
+        ``↳`` so it is never re-parsed as a memory bullet.
+        """
+
+        head = f"- {self.timestamp} — {self.text}"
+        if not self.tool and not self.evidence_path:
+            return head
+        provenance = " · ".join(
+            part
+            for part in (self.tool, self.event_id, self.evidence_path)
+            if part and part != "legacy"
+        )
+        if not provenance:
+            return head
+        return f"{head}\n  ↳ {provenance}"
 
 
 def _split_section(body: str, section_name: str) -> tuple[str, str, str]:
@@ -117,35 +314,51 @@ def project_section_for_event(event: dict[str, Any]) -> str:
     return "status"
 
 
-def event_entry(event: dict[str, Any]) -> tuple[str, ProjectMemoryEntry]:
-    section = project_section_for_event(event)
-    text = str(event.get("task") or event.get("event_type") or "").strip()
-    if not text:
-        text = str(event.get("event_type") or "(no task)")
-    decisions = event.get("decisions") or []
-    if section == "decisions" and decisions:
-        text = "; ".join(str(d) for d in decisions)
-    changes = event.get("changes") or []
-    if section == "status" and changes:
-        text = f"{text} — changes: {'; '.join(str(c) for c in changes)}"
-    verification = event.get("verification") or []
-    if section == "bugfixes" and verification:
-        text = f"{text} — verified: {'; '.join(str(v) for v in verification)}"
-    if section == "verifications":
-        if isinstance(verification, list) and verification:
-            text = "; ".join(str(v) for v in verification)
-        elif not text:
-            text = "(verification recorded)"
-    if section == "status" and isinstance(verification, list) and verification:
-        text = f"{text} — verified: {'; '.join(str(v) for v in verification)}"
-    open_questions = event.get("open_questions") or []
-    if open_questions:
-        text = f"{text} — open: {'; '.join(str(q) for q in open_questions)}"
+def _durable_text(event: dict[str, Any], section: str) -> str:
+    """Build the bounded, human-readable text for one durable entry."""
+
+    task = _bounded_task(event.get("task"))
+    fields = {key: _bounded_items(event.get(key)) for key in DURABLE_FIELDS}
+
+    if section == "decisions" and fields["decisions"]:
+        text = "; ".join(fields["decisions"])
+    elif section == "verifications" and fields["verification"]:
+        text = "; ".join(fields["verification"])
+    elif section == "bugfixes":
+        text = task or "(bugfix)"
+        if fields["changes"]:
+            text = f"{text} — changes: {'; '.join(fields['changes'])}"
+        if fields["verification"]:
+            text = f"{text} — verified: {'; '.join(fields['verification'])}"
+    else:
+        text = task or str(event.get("event_type") or "(no task)")
+        if fields["changes"]:
+            text = f"{text} — changes: {'; '.join(fields['changes'])}"
+        if fields["verification"]:
+            text = f"{text} — verified: {'; '.join(fields['verification'])}"
+        if fields["risks"]:
+            text = f"{text} — risks: {'; '.join(fields['risks'])}"
+
+    return text[:MAX_ENTRY_CHARS]
+
+
+def event_entry(
+    event: dict[str, Any],
+    *,
+    evidence_path: str = "",
+    admission: EventAdmission | None = None,
+) -> tuple[str, ProjectMemoryEntry]:
+    """Build the project-memory entry for one admitted event."""
+
+    admission = admission or classify_event(event)
+    section = admission.section or project_section_for_event(event)
     entry = ProjectMemoryEntry(
         section=section,
-        text=text,
+        text=_durable_text(event, section),
         timestamp=str(event.get("timestamp") or ""),
         event_id=str(event.get("event_id") or new_event_id()),
+        tool=str(event.get("tool") or ""),
+        evidence_path=evidence_path,
     )
     return section, entry
 
@@ -181,19 +394,51 @@ def _read_existing_entries(body: str) -> dict[str, list[ProjectMemoryEntry]]:
     return sections
 
 
+#: Bounded per-section history kept on a project page. Raw evidence under
+#: ``raw/events/processed/`` remains the full, unbounded history.
+SECTION_LIMITS = {
+    "status": 12,
+    "decisions": 20,
+    "bugfixes": 20,
+    "verifications": 20,
+    "open_questions": 20,
+}
+
+
 def render_project_page(
     project_id: str,
     entries: dict[str, list[ProjectMemoryEntry]],
     last_event: dict[str, Any] | None,
+    *,
+    updated: str | None = None,
 ) -> str:
-    timestamp_now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+    """Render one project page.
+
+    ``updated`` is supplied by deterministic rebuilds (newest admitted event
+    timestamp) so that re-running an unchanged rebuild produces a byte-identical
+    file. When omitted the current UTC time is used for incremental appends.
+    """
+
+    if updated:
+        timestamp_now = updated
+    else:
+        timestamp_now = (
+            datetime.now(timezone.utc).replace(tzinfo=None).isoformat(timespec="seconds")
+            + "Z"
+        )
     last_event_text = str((last_event or {}).get("event_type") or "n/a")
     last_event_ts = str((last_event or {}).get("timestamp") or "n/a")
-    last_task = str((last_event or {}).get("task") or "(no task recorded)")
+    last_task = _bounded_task((last_event or {}).get("task")) or "(no task recorded)"
 
     def render_section(name: str, label: str, *, reverse: bool = True) -> str:
         items = entries.get(name) or []
-        ordered = sorted(items, key=lambda e: e.timestamp, reverse=reverse)
+        # Deterministic ordering: timestamp first, event_id as tiebreaker.
+        ordered = sorted(
+            items, key=lambda e: (e.timestamp, e.event_id), reverse=reverse
+        )
+        limit = SECTION_LIMITS.get(name)
+        if limit is not None:
+            ordered = ordered[:limit]
         if not ordered:
             return f"(no {name} yet)"
         return "\n".join(e.render() for e in ordered)
@@ -213,23 +458,13 @@ def render_project_page(
 
 
 def _is_meaningful_event(event: dict[str, Any]) -> bool:
-    """Keep lifecycle receipts operational unless they carry real work."""
+    """Backwards-compatible wrapper over :func:`classify_event`.
 
-    event_type = str(event.get("event_type") or "")
-    if event_type == "session_start" or event_type == "adapter_probe":
-        return False
-    has_details = any(
-        event.get(key) for key in ("decisions", "changes", "verification", "open_questions")
-    )
-    if has_details:
-        return True
-    task = str(event.get("task") or "").strip()
-    if task.lower() in {"", "(no user text)", "(no task recorded)", "no user text"}:
-        return False
-    tags = {str(tag).strip().lower() for tag in event.get("tags") or []}
-    if "lifecycle" in tags and event_type in {"session_summary", "session_idle", "session_deleted"}:
-        return False
-    return True
+    Retained so existing callers keep working; durable admission is now decided
+    exclusively by :func:`classify_event`.
+    """
+
+    return classify_event(event).durability == "durable"
 
 
 def _is_lifecycle_only_page(text: str) -> bool:
@@ -391,10 +626,321 @@ def normalize_existing_pages(root: Path) -> list[Path]:
     return rewritten
 
 
+@dataclass(frozen=True)
+class RebuildReport:
+    """Outcome of a deterministic project-memory rebuild."""
+
+    scanned_events: int = 0
+    admitted_events: int = 0
+    operational_events: int = 0
+    rejected_events: int = 0
+    pages_written: int = 0
+    pages_removed: int = 0
+    written_paths: tuple[str, ...] = ()
+    removed_paths: tuple[str, ...] = ()
+    unchanged_paths: tuple[str, ...] = ()
+    dry_run: bool = False
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "scanned_events": self.scanned_events,
+            "admitted_events": self.admitted_events,
+            "operational_events": self.operational_events,
+            "rejected_events": self.rejected_events,
+            "pages_written": self.pages_written,
+            "pages_removed": self.pages_removed,
+            "written_paths": list(self.written_paths),
+            "removed_paths": list(self.removed_paths),
+            "unchanged_paths": list(self.unchanged_paths),
+            "dry_run": self.dry_run,
+        }
+
+
+def processed_events_dir(root: Path) -> Path:
+    return root / "raw" / "events" / "processed"
+
+
+def _stable_event_id(event: dict[str, Any]) -> str:
+    """Stable identity for legacy events that predate ``event_id``."""
+
+    existing = str(event.get("event_id") or "").strip()
+    if existing:
+        return existing
+    material = "".join(
+        [
+            str(event.get("project_id") or ""),
+            str(event.get("timestamp") or ""),
+            str(event.get("event_type") or ""),
+            _bounded_task(event.get("task")),
+            *(
+                item
+                for key in DURABLE_FIELDS
+                for item in _bounded_items(event.get(key))
+            ),
+        ]
+    )
+    return "legacy-" + hashlib.sha256(material.encode("utf-8")).hexdigest()[:16]
+
+
+def load_processed_events(
+    root: Path,
+) -> tuple[tuple[Path, dict[str, Any]], ...]:
+    """Load every valid processed event, sorted deterministically.
+
+    Invalid JSON is skipped, never deleted or rewritten: ``raw/`` is the
+    append-only source of truth.
+    """
+
+    base = processed_events_dir(root)
+    if not base.is_dir():
+        return ()
+    loaded: list[tuple[Path, dict[str, Any]]] = []
+    for path in sorted(base.rglob("*.json")):
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if not isinstance(payload, dict):
+            continue
+        loaded.append((path, payload))
+    loaded.sort(
+        key=lambda item: (
+            str(item[1].get("timestamp") or ""),
+            _stable_event_id(item[1]),
+        )
+    )
+    return tuple(loaded)
+
+
+def _relative_evidence_path(root: Path, path: Path) -> str:
+    try:
+        return path.resolve().relative_to(root.resolve()).as_posix()
+    except ValueError:
+        return path.name
+
+
+def aggregate_project_pages(
+    root: Path,
+    admitted: Iterable[tuple[Path, dict[str, Any], EventAdmission]],
+) -> dict[str, tuple[dict[str, list[ProjectMemoryEntry]], dict[str, Any], str]]:
+    """Aggregate admitted events into in-memory project pages.
+
+    Returns ``project_id -> (sections, newest_event, newest_timestamp)``.
+    """
+
+    pages: dict[
+        str, tuple[dict[str, list[ProjectMemoryEntry]], dict[str, Any], str]
+    ] = {}
+    seen_ids: dict[str, set[str]] = {}
+
+    for path, event, admission in admitted:
+        project_id = str(event.get("project_id") or "").strip()
+        if not project_id:
+            continue
+        event_id = _stable_event_id(event)
+        if event_id in seen_ids.setdefault(project_id, set()):
+            continue
+        seen_ids[project_id].add(event_id)
+
+        sections, _newest, _ts = pages.setdefault(
+            project_id,
+            (
+                {
+                    "status": [],
+                    "decisions": [],
+                    "bugfixes": [],
+                    "verifications": [],
+                    "open_questions": [],
+                },
+                {},
+                "",
+            ),
+        )
+        evidence = _relative_evidence_path(root, path)
+        normalized = dict(event)
+        normalized["event_id"] = event_id
+        section, entry = event_entry(
+            normalized, evidence_path=evidence, admission=admission
+        )
+        sections.setdefault(section, []).append(entry)
+
+        for question in _bounded_items(event.get("open_questions")):
+            sections["open_questions"].append(
+                ProjectMemoryEntry(
+                    section="open_questions",
+                    text=question,
+                    timestamp=entry.timestamp,
+                    event_id=event_id,
+                    tool=entry.tool,
+                    evidence_path=evidence,
+                )
+            )
+
+        timestamp = str(event.get("timestamp") or "")
+        if timestamp >= pages[project_id][2]:
+            pages[project_id] = (sections, normalized, timestamp)
+
+    return pages
+
+
+def _is_generated_project_page(text: str) -> bool:
+    """Only pages this module generated may be reconciled away."""
+
+    head = text[:400]
+    return "type: project" in head and "project_id:" in head
+
+
+def reconcile_forgotten_event(root: Path, project_id: str, event_id: str) -> bool:
+    """Remove source-backed page text without replacing human-authored content."""
+
+    target = project_page_path(root, project_id)
+    if not target.is_file():
+        return False
+    original = target.read_text(encoding="utf-8")
+    if not _is_generated_project_page(original):
+        return False
+
+    surviving = [
+        event
+        for _, event in load_processed_events(root)
+        if event.get("project_id") == project_id
+        and event.get("event_id") != event_id
+        and classify_event(event).durability == "durable"
+    ]
+    newest = max(
+        surviving,
+        key=lambda event: (str(event.get("timestamp") or ""), str(event.get("event_id") or "")),
+        default=None,
+    )
+    last_task = _bounded_task((newest or {}).get("task")) or "(no task recorded)"
+    last_type = str((newest or {}).get("event_type") or "n/a")
+    last_timestamp = str((newest or {}).get("timestamp") or "n/a")
+
+    lines: list[str] = []
+    in_section = False
+    for line in original.splitlines(keepends=True):
+        if line.startswith("## "):
+            in_section = True
+        if in_section and line.lstrip().startswith("↳ "):
+            provenance = {part.strip() for part in line.strip()[2:].split(" · ")}
+            if event_id in provenance:
+                if lines and lines[-1].startswith("- "):
+                    lines.pop()
+                continue
+        if not in_section and line.startswith("Last task: "):
+            line = f"Last task: {last_task}\n"
+        elif not in_section and line.startswith("Last event: "):
+            line = f"Last event: {last_type} @ {last_timestamp}\n"
+        lines.append(line)
+    updated = "".join(lines)
+    if updated == original:
+        return False
+    target.write_text(updated, encoding="utf-8")
+    return True
+
+
+def rebuild_project_pages(
+    root: Path,
+    project_id: str | None = None,
+    dry_run: bool = False,
+) -> RebuildReport:
+    """Deterministically rebuild project pages from admitted raw events.
+
+    Raw evidence is only read. Pages are built fully in memory and written once.
+    A previously generated page is removed only when no durable event remains
+    for that project.
+    """
+
+    events = load_processed_events(root)
+    scanned = admitted_count = operational = rejected = 0
+    admitted: list[tuple[Path, dict[str, Any], EventAdmission]] = []
+
+    for path, event in events:
+        if project_id and str(event.get("project_id") or "") != project_id:
+            continue
+        scanned += 1
+        admission = classify_event(event)
+        if admission.durability == "durable":
+            admitted_count += 1
+            admitted.append((path, event, admission))
+        elif admission.durability == "operational":
+            operational += 1
+        else:
+            rejected += 1
+
+    pages = aggregate_project_pages(root, admitted)
+
+    written: list[str] = []
+    unchanged: list[str] = []
+    removed: list[str] = []
+
+    for pid, (sections, newest_event, newest_ts) in sorted(pages.items()):
+        target = project_page_path(root, pid)
+        body = render_project_page(
+            pid, sections, newest_event, updated=newest_ts or None
+        )
+        rel = _relative_evidence_path(root, target)
+        if target.is_file() and target.read_text(encoding="utf-8") == body:
+            unchanged.append(rel)
+            continue
+        written.append(rel)
+        if not dry_run:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(body, encoding="utf-8")
+
+    projects_dir = root / "wiki" / "projects"
+    if projects_dir.is_dir():
+        for target in sorted(projects_dir.glob("*.md")):
+            pid = target.stem
+            if project_id and pid != project_id:
+                continue
+            if pid in pages:
+                continue
+            try:
+                text = target.read_text(encoding="utf-8")
+            except OSError:
+                continue
+            if not _is_generated_project_page(text):
+                continue
+            removed.append(_relative_evidence_path(root, target))
+            if not dry_run:
+                target.unlink()
+
+    return RebuildReport(
+        scanned_events=scanned,
+        admitted_events=admitted_count,
+        operational_events=operational,
+        rejected_events=rejected,
+        pages_written=len(written),
+        pages_removed=len(removed),
+        written_paths=tuple(written),
+        removed_paths=tuple(removed),
+        unchanged_paths=tuple(unchanged),
+        dry_run=dry_run,
+    )
+
+
 __all__ = [
+    "DURABLE_EVENT_TYPES",
+    "DURABLE_FIELDS",
+    "EventAdmission",
+    "MAX_ENTRY_CHARS",
+    "MAX_ITEMS_PER_FIELD",
+    "MAX_ITEM_CHARS",
+    "MAX_TASK_CHARS",
+    "NOISE_MARKERS",
+    "OPERATIONAL_EVENT_TYPES",
     "ProjectMemoryEntry",
+    "RebuildReport",
+    "SECTION_LIMITS",
+    "aggregate_project_pages",
     "append_event",
-    "prune_empty_pages",
+    "classify_event",
+    "event_entry",
+    "load_processed_events",
     "project_page_path",
+    "reconcile_forgotten_event",
+    "prune_empty_pages",
+    "rebuild_project_pages",
     "render_project_page",
 ]

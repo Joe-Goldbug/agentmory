@@ -5,11 +5,11 @@ from __future__ import annotations
 import json
 import os
 import subprocess
-import sys
 from dataclasses import dataclass
 from pathlib import Path
 
 from lwm.cycle_state import read_receipt
+from lwm.cycle_receipt import load_latest
 from lwm.loop_state import read_active, read_last
 
 
@@ -18,6 +18,7 @@ class ClosureReport:
     status: str
     checks: dict[str, str]
     failed_checks: tuple[str, ...]
+    degraded_checks: tuple[str, ...]
 
 
 def _readable(path: Path) -> bool:
@@ -33,23 +34,54 @@ def _source_check(root: Path) -> str:
     return "pass" if package.is_dir() and _readable(package / "__init__.py") else "blocked"
 
 
+def _runtime_python(root: Path) -> Path | None:
+    """Resolve the installed runtime interpreter without using DATA_ROOT code."""
+
+    candidates = [
+        root if root.is_file() else None,
+        root / "bin" / "python",
+        root / "venv" / "bin" / "python",
+        root / "app" / "venv" / "bin" / "python",
+        root.parent / "app" / "venv" / "bin" / "python",
+    ]
+    return next(
+        (candidate for candidate in candidates if candidate and candidate.is_file()),
+        None,
+    )
+
+
 def _runtime_check(root: Path) -> str:
-    package = root / "lwm"
-    if not package.is_dir() or not _readable(package / "__init__.py"):
+    python = _runtime_python(root)
+    if python is None:
         return "blocked"
-    environment = {**os.environ, "PYTHONPATH": str(root)}
+    environment = dict(os.environ)
+    environment.pop("PYTHONPATH", None)
     try:
         result = subprocess.run(
-            [sys.executable, "-c", "import lwm"],
-            cwd=str(root),
+            [
+                str(python),
+                "-I",
+                "-c",
+                "import json,lwm; print(json.dumps({'module': lwm.__file__}))",
+            ],
+            cwd="/private/tmp",
             env=environment,
             capture_output=True,
             text=True,
             timeout=10,
         )
-    except (OSError, subprocess.TimeoutExpired):
+    except (OSError, subprocess.TimeoutExpired, json.JSONDecodeError):
         return "blocked"
-    return "pass" if result.returncode == 0 else "blocked"
+    if result.returncode != 0:
+        return "blocked"
+    try:
+        payload = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        return "blocked"
+    module = str(payload.get("module") or "") if isinstance(payload, dict) else ""
+    if not module or "Mobile Documents" in module:
+        return "blocked"
+    return "pass"
 
 
 def _export_check(root: Path) -> str:
@@ -80,8 +112,18 @@ def _loop_check(root: Path) -> str:
 
 
 def _receipt_check(root: Path) -> str:
+    v2 = load_latest(root)
+    if v2 is not None and v2.get("schema_version") == 2:
+        core_status = str(v2.get("core_status") or "")
+        if core_status == "success":
+            return "pass"
+        if core_status == "success_with_warnings":
+            return "degraded"
+        return "blocked"
     receipt = read_receipt(root)
-    return "pass" if receipt and receipt.get("status") == "success" else "blocked"
+    if receipt and receipt.get("status") == "success":
+        return "pass"
+    return "blocked"
 
 
 def _launchd_check(label: str) -> str:
@@ -128,9 +170,17 @@ def check_closure(
         "launchd": _launchd_check(launchd_label) if launchd_required else "skipped",
     }
     failed = tuple(name for name, status in checks.items() if status == "blocked")
+    degraded_checks = tuple(
+        name for name, status in checks.items() if status == "degraded"
+    )
     degraded = any(status == "degraded" for status in checks.values())
     status = "blocked" if failed else "degraded" if degraded else "pass"
-    return ClosureReport(status=status, checks=checks, failed_checks=failed)
+    return ClosureReport(
+        status=status,
+        checks=checks,
+        failed_checks=failed,
+        degraded_checks=degraded_checks,
+    )
 
 
 __all__ = ["ClosureReport", "check_closure"]

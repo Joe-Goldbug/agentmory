@@ -24,8 +24,13 @@ def build_review_report(root: Path) -> ReviewReport:
 
     for source, link in analysis.broken_links:
         items.add(f"broken-link | {source} -> [[{link}]]")
-    for page, source in analysis.missing_sources:
-        items.add(f"missing-source | {page} -> {source}")
+    for gap in analysis.source_gaps:
+        # Keep the stable ``missing-source`` prefix for compatible consumers,
+        # while making the repair boundary explicit to humans and tooling.
+        items.add(
+            f"missing-source | scope={gap.scope} | {gap.page} -> {gap.source}"
+            f" (resolved: {gap.resolved_path})"
+        )
     for page in analysis.orphan_pages:
         items.add(f"orphan-page | {page}")
     for slug, paths in analysis.duplicate_slugs:

@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from lwm.events import (
     ALLOWED_EVENT_TYPES,
+    EVENT_SCHEMA_VERSION,
     make_event,
     truncate_event_text,
     validate_event,
@@ -28,8 +29,39 @@ def test_make_event_minimal() -> None:
     event = _minimal_event()
     assert event["tool"] == "claude-code"
     assert event["event_type"] == "session_summary"
+    assert event["schema_version"] == EVENT_SCHEMA_VERSION
     assert "event_id" in event and len(event["event_id"]) >= 32
     assert "timestamp" in event
+
+
+def test_v2_event_carries_task_and_handoff_links() -> None:
+    event = make_event(
+        tool="codex",
+        project_path="/tmp/proj",
+        project_id="git-abc",
+        event_type="session_summary",
+        task_id="task-1",
+        handoff_id="handoff-1",
+        operation_id="write-1",
+        source_receipt_id="receipt-1",
+        risks=["needs review"],
+    )
+
+    report = validate_event(event)
+    assert report.ok
+    assert event["risks"] == ["needs review"]
+    assert event["task_id"] == "task-1"
+    assert event["handoff_id"] == "handoff-1"
+
+
+def test_v2_event_rejects_invalid_identity_fields() -> None:
+    event = _minimal_event(schema_version=3, task_id=123)
+    report = validate_event(event)
+
+    assert not report.ok
+    paths = {issue.path for issue in report.issues}
+    assert "$.schema_version" in paths
+    assert "$.task_id" in paths
 
 
 def test_validate_event_missing_required_keys() -> None:

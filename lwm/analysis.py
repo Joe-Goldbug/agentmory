@@ -7,7 +7,7 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, Literal
 
 
 LINK_RE = re.compile(r"\[\[([^\]|#]+)(?:\|[^\]]+)?\]\]")
@@ -33,6 +33,16 @@ class WikiPage:
 
 
 @dataclass(frozen=True)
+class SourceGap:
+    """A missing source with enough provenance to choose the right repair."""
+
+    page: str
+    source: str
+    resolved_path: str
+    scope: Literal["local", "external"]
+
+
+@dataclass(frozen=True)
 class WikiAnalysis:
     root: Path
     pages: tuple[WikiPage, ...]
@@ -41,6 +51,7 @@ class WikiAnalysis:
     broken_links: tuple[tuple[str, str], ...]
     duplicate_slugs: tuple[tuple[str, tuple[str, ...]], ...]
     missing_sources: tuple[tuple[str, str], ...]
+    source_gaps: tuple[SourceGap, ...]
     orphan_pages: tuple[str, ...]
     hub_pages: tuple[tuple[str, int, int], ...]
     connected_components: tuple[tuple[str, ...], ...]
@@ -74,11 +85,34 @@ def _parse_frontmatter(text: str) -> tuple[dict[str, str], str]:
     raw = match.group(1)
     rest = text[match.end() :]
     fields: dict[str, str] = {}
-    for line in raw.splitlines():
+    lines = raw.splitlines()
+    index = 0
+    while index < len(lines):
+        line = lines[index]
         if ":" not in line:
+            index += 1
             continue
         key, value = line.split(":", 1)
-        fields[key.strip()] = value.strip()
+        key = key.strip()
+        value = value.strip()
+        if not value:
+            items: list[str] = []
+            next_index = index + 1
+            while next_index < len(lines):
+                item = lines[next_index].strip()
+                if item.startswith("- "):
+                    items.append(item[2:].strip().strip("'\""))
+                    next_index += 1
+                    continue
+                if item:
+                    break
+                next_index += 1
+            if items:
+                value = ", ".join(items)
+            index = next_index
+        else:
+            index += 1
+        fields[key] = value
     return fields, rest
 
 
@@ -96,9 +130,25 @@ def _slug_for_path(path: Path) -> str:
     return path.stem.lower()
 
 
-def _is_ignored_page(path: Path) -> bool:
+def _is_ignored_page(path: Path, wiki_dir: Path | None = None) -> bool:
     if path.name in {"log.md"}:
         return True
+    # Archived review/output pages remain source history, but must not compete
+    # with active pages in the live graph.
+    if path.name in {"current-radar.md"}:
+        return True
+    if wiki_dir is not None:
+        try:
+            relative_parts = path.relative_to(wiki_dir).parts[:-1]
+        except ValueError:
+            relative_parts = ()
+        if any(part.startswith("_archive_") for part in relative_parts):
+            return True
+        # Generated source summaries are historical evidence, not active graph
+        # nodes. Curated reference pages may live in summaries and participate
+        # in links, so do not exclude the whole directory.
+        if "summaries" in relative_parts and path.name.startswith("source-"):
+            return True
     # Legacy releases compiled raw/events JSON into summary pages. Keep those
     # files as historical evidence, but exclude them from the live wiki graph.
     return path.parent.name == "summaries" and path.name.startswith("source-events-")
@@ -111,7 +161,7 @@ def collect_wiki_pages(root: Path) -> tuple[WikiPage, ...]:
 
     pages: list[WikiPage] = []
     for path in sorted(wiki_dir.rglob("*.md")):
-        if _is_ignored_page(path):
+        if _is_ignored_page(path, wiki_dir):
             continue
         text = path.read_text(encoding="utf-8")
         frontmatter, body = _parse_frontmatter(text)
@@ -171,7 +221,7 @@ def analyze_wiki(root: Path) -> WikiAnalysis:
         for link in page.outbound_links:
             # Legacy event-summary links may remain in generated index/radar
             # pages. Event JSON is operational data, not a wiki graph node.
-            if link.startswith("source-events-"):
+            if link.startswith("source-") or link == "current-radar":
                 continue
             targets = slug_map.get(link)
             if not targets:
@@ -183,12 +233,25 @@ def analyze_wiki(root: Path) -> WikiAnalysis:
             inbound_counts[targets[0].rel_path] += 1
 
     missing_sources: list[tuple[str, str]] = []
-    raw_dir = root / "raw"
+    source_gaps: list[SourceGap] = []
     for page in pages:
         for source in page.sources:
-            source_path = root / source if source.startswith("raw/") else raw_dir / source
+            source_value = Path(source).expanduser()
+            source_path = source_value if source_value.is_absolute() else root / source_value
             if not source_path.exists():
                 missing_sources.append((page.rel_path, source))
+                source_gaps.append(
+                    SourceGap(
+                        page=page.rel_path,
+                        source=source,
+                        resolved_path=str(source_path),
+                        scope=(
+                            "external"
+                            if source_path.is_absolute() and not source_path.is_relative_to(root)
+                            else "local"
+                        ),
+                    )
+                )
 
     ignored_orphans = {"wiki/index.md", "wiki/overview.md"}
     # Auto-generated project memory pages legitimately live without being
@@ -246,6 +309,9 @@ def analyze_wiki(root: Path) -> WikiAnalysis:
         broken_links=tuple(sorted(broken_links)),
         duplicate_slugs=duplicate_slugs,
         missing_sources=tuple(sorted(missing_sources)),
+        source_gaps=tuple(
+            sorted(source_gaps, key=lambda gap: (gap.scope, gap.page, gap.source))
+        ),
         orphan_pages=orphan_pages,
         hub_pages=hub_pages,
         connected_components=connected_components,
@@ -294,6 +360,10 @@ def render_analysis_report(analysis: WikiAnalysis) -> str:
     lines.append(f"- Pages: {len(analysis.pages)}")
     lines.append(f"- Broken links: {len(analysis.broken_links)}")
     lines.append(f"- Missing sources: {len(analysis.missing_sources)}")
+    local_gaps = sum(gap.scope == "local" for gap in analysis.source_gaps)
+    external_gaps = sum(gap.scope == "external" for gap in analysis.source_gaps)
+    lines.append(f"  - Local missing: {local_gaps}")
+    lines.append(f"  - External missing: {external_gaps}")
     lines.append(f"- Duplicate slugs: {len(analysis.duplicate_slugs)}")
     lines.append(f"- Orphans: {len(analysis.orphan_pages)}")
     lines.append("")
@@ -326,8 +396,11 @@ def render_analysis_report(analysis: WikiAnalysis) -> str:
 
     lines.append("## Missing Sources")
     if analysis.missing_sources:
-        for page, source in analysis.missing_sources:
-            lines.append(f"- {page}: {source}")
+        for gap in analysis.source_gaps:
+            lines.append(
+                f"- [{gap.scope}] {gap.page}: {gap.source}"
+                f" (resolved: {gap.resolved_path})"
+            )
     else:
         lines.append("*None.*")
     lines.append("")

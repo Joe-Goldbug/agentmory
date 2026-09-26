@@ -8,7 +8,8 @@
 #   session_id, command (truncated to 1 KiB).
 # - Skips lines that match the sensitive-keyword filter or the trivial-command
 #   filter — both are intentionally narrow to keep recall high.
-# - Respects the opt-out env var LBM_SHELL_HOOK=0.
+# - Respects the opt-out env var LWM_SHELL_HOOK=0 (legacy LBM_SHELL_HOOK is
+#   also accepted).
 #
 # This file is sourced at the end of ~/.zshrc inside an LBM-WIKI:SHELL-HOOK
 # marker block. Re-running `lwm install-shell-hook` is idempotent.
@@ -20,12 +21,12 @@
 # Opt-out. Must be checked on every call because the user can flip it per
 # session without re-sourcing the hook.
 _lbm_shell_hook_disabled() {
-  [[ "${LBM_SHELL_HOOK:-1}" == "0" ]]
+  [[ "${LWM_SHELL_HOOK:-${LBM_SHELL_HOOK:-1}}" == "0" ]]
 }
 
 # Resolve the wiki root once per session, fall back to the canonical location.
 _lbm_shell_hook_root() {
-  local root="${LWM_ROOT:-${XDG_DATA_HOME:-$HOME/.local/share}/llm-workmem}"
+  local root="${LWM_ROOT:-$HOME/Library/Application Support/llm-workmem-runtime/llm-workmem}"
   if [[ ! -d "$root" ]]; then
     # Best-effort discovery: walk up to find a wiki marker.
     local dir="$PWD"
@@ -38,6 +39,53 @@ _lbm_shell_hook_root() {
     done
   fi
   print -r -- "$root"
+}
+
+# Emit only host lifecycle metadata. Command text remains in the separate,
+# filtered shell-history observer below and is never passed to this bridge.
+_lbm_shell_hook_lifecycle() {
+  local phase="$1"
+  local host_event="$2"
+  _lbm_shell_hook_disabled && return 0
+
+  local root
+  root="$(_lbm_shell_hook_root)"
+  [[ -z "$root" ]] && return 0
+
+  local lwm_bin="${LWM_BIN:-lwm}"
+  if [[ "$lwm_bin" == */* ]]; then
+    [[ -x "$lwm_bin" ]] || return 0
+  else
+    command -v "$lwm_bin" >/dev/null 2>&1 || return 0
+  fi
+  command -v python3 >/dev/null 2>&1 || return 0
+
+  local session_id="${LBM_SHELL_SESSION:-shell-$$}"
+  LWM_HOST_BRIDGE=1 \
+  LBM_BRIDGE_PHASE="$phase" \
+  LBM_BRIDGE_EVENT="$host_event" \
+  LBM_BRIDGE_ROOT="$root" \
+  LBM_BRIDGE_PROJECT="$PWD" \
+  LBM_BRIDGE_SESSION="$session_id" \
+    python3 -c 'import json,os; print(json.dumps({
+      "phase": os.environ["LBM_BRIDGE_PHASE"],
+      "tool": "shell",
+      "project_path": os.environ["LBM_BRIDGE_PROJECT"],
+      "session_id": os.environ["LBM_BRIDGE_SESSION"],
+      "source": "native-hook",
+      "host_proof": {
+        "integration": "shell-hook",
+        "event": os.environ["LBM_BRIDGE_EVENT"],
+        "session_id": os.environ["LBM_BRIDGE_SESSION"]
+      }
+    }, ensure_ascii=False))' \
+    | LWM_HOST_BRIDGE=1 "$lwm_bin" hub bridge --root "$root" >/dev/null 2>&1 || true
+}
+
+_lbm_shell_hook_session_exit() {
+  [[ "${LBM_SHELL_LIFECYCLE_STARTED:-0}" == "1" ]] || return 0
+  LBM_SHELL_LIFECYCLE_STARTED=0
+  _lbm_shell_hook_lifecycle stop shell_session_end
 }
 
 # Sensitive command filter — if any token matches, drop the whole line.
@@ -87,6 +135,9 @@ _lbm_shell_hook_preexec() {
 }
 
 _lbm_shell_hook_precmd() {
+  # zsh exposes the previous command's status through `$?` at precmd entry.
+  # Capture it before any guard, test, or command substitution changes it.
+  local exit_code="$?"
   _lbm_shell_hook_disabled && return 0
   [[ -z "${LBM_LAST_CMD:-}" ]] && return 0
 
@@ -121,16 +172,23 @@ _lbm_shell_hook_precmd() {
   else
     duration_ms="0"
   fi
-  local exit_code="$?"
   LBM_LAST_START_MS=""
 
-  local ts iso pwd session_id cmd_escaped
+  local ts iso pwd pwd_escaped session_id session_escaped cmd_escaped
   ts=$(date +%s)
   iso=$(date -u +%Y-%m-%dT%H:%M:%SZ)
   pwd=$(print -Pn '%~')
   session_id="${LBM_SHELL_SESSION:-$$}"
-  # Truncate + escape for JSON. We are conservative: strip control chars,
-  # backslash-escape the JSON-mandatory ones, and cap at 1024 chars.
+  # Escape every string field for JSON. We are conservative: strip control
+  # chars, backslash-escape the JSON-mandatory ones, and cap commands at 1 KiB.
+  pwd_escaped="${pwd//\\/\\\\}"
+  pwd_escaped="${pwd_escaped//\"/\\\"}"
+  pwd_escaped="${pwd_escaped//	/ }"
+  pwd_escaped=$(print -r -- "$pwd_escaped" | tr -d '\000-\010\013-\037')
+  session_escaped="${session_id//\\/\\\\}"
+  session_escaped="${session_escaped//\"/\\\"}"
+  session_escaped="${session_escaped//	/ }"
+  session_escaped=$(print -r -- "$session_escaped" | tr -d '\000-\010\013-\037')
   cmd_escaped="${cmd:0:1024}"
   cmd_escaped="${cmd_escaped//\\/\\\\}"
   cmd_escaped="${cmd_escaped//\"/\\\"}"
@@ -140,7 +198,7 @@ _lbm_shell_hook_precmd() {
 
   local line
   line=$(printf '{"ts":%s,"iso":"%s","pwd":"%s","duration_ms":%s,"exit_code":%s,"session":"%s","command":"%s"}' \
-    "$ts" "$iso" "$pwd" "$duration_ms" "$exit_code" "$session_id" "$cmd_escaped")
+    "$ts" "$iso" "$pwd_escaped" "$duration_ms" "$exit_code" "$session_escaped" "$cmd_escaped")
 
   # Append, best-effort. Use a per-date lock to avoid two preexec racing.
   local lock="$raw_dir/.${date_part}.lock"
@@ -155,3 +213,11 @@ _lbm_shell_hook_precmd() {
 autoload -Uz add-zsh-hook 2>/dev/null
 add-zsh-hook preexec _lbm_shell_hook_preexec 2>/dev/null
 add-zsh-hook precmd  _lbm_shell_hook_precmd  2>/dev/null
+add-zsh-hook zshexit _lbm_shell_hook_session_exit 2>/dev/null
+
+# Source-time is the native shell session start. Keep the guard unexported so
+# a child shell gets its own lifecycle proof instead of inheriting the parent.
+if [[ "${LBM_SHELL_LIFECYCLE_STARTED:-0}" != "1" ]] && ! _lbm_shell_hook_disabled; then
+  LBM_SHELL_LIFECYCLE_STARTED=1
+  _lbm_shell_hook_lifecycle start shell_session_start
+fi

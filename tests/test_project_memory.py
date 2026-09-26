@@ -1,8 +1,14 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
-from lwm.project_memory import append_event, prune_empty_pages
+from lwm.project_memory import (
+    append_event,
+    prune_empty_pages,
+    rebuild_project_pages,
+    reconcile_forgotten_event,
+)
 
 
 def test_lifecycle_only_event_does_not_create_project_page(tmp_path: Path) -> None:
@@ -103,3 +109,65 @@ def test_prune_empty_lifecycle_page_keeps_durable_page(tmp_path: Path) -> None:
     assert removed == [empty]
     assert not empty.exists()
     assert durable.exists()
+
+
+def test_reconcile_forgotten_source_preserves_human_notes(tmp_path: Path) -> None:
+    base = tmp_path / "raw" / "events" / "processed" / "2026-07-31"
+    base.mkdir(parents=True)
+    for event_id, task, timestamp in (
+        ("keep", "keep this decision", "2026-07-30T10:00:00+00:00"),
+        ("forget", "forget this decision", "2026-07-31T10:00:00+00:00"),
+    ):
+        (base / f"{event_id}.json").write_text(
+            json.dumps(
+                {
+                    "event_id": event_id,
+                    "timestamp": timestamp,
+                    "tool": "codex",
+                    "project_id": "git-demo",
+                    "event_type": "decision",
+                    "task": task,
+                    "decisions": [task],
+                }
+            ),
+            encoding="utf-8",
+        )
+    rebuild_project_pages(tmp_path)
+    page = tmp_path / "wiki" / "projects" / "git-demo.md"
+    page.write_text(page.read_text(encoding="utf-8") + "\n## Human Notes\n\nKeep my manual note.\n", encoding="utf-8")
+    (base / "forget.json").unlink()
+
+    assert reconcile_forgotten_event(tmp_path, "git-demo", "forget")
+
+    text = page.read_text(encoding="utf-8")
+    assert "forget this decision" not in text
+    assert "Last task: keep this decision" in text
+    assert "keep this decision" in text
+    assert "## Human Notes\n\nKeep my manual note.\n" in text
+
+
+def test_reconcile_last_source_keeps_page_without_stale_summary(tmp_path: Path) -> None:
+    event = {
+        "event_id": "forget",
+        "timestamp": "2026-07-31T10:00:00+00:00",
+        "tool": "codex",
+        "project_id": "git-demo",
+        "event_type": "decision",
+        "task": "forget this decision",
+        "decisions": ["forget this decision"],
+    }
+    base = tmp_path / "raw" / "events" / "processed" / "2026-07-31"
+    base.mkdir(parents=True)
+    source = base / "forget.json"
+    source.write_text(json.dumps(event), encoding="utf-8")
+    rebuild_project_pages(tmp_path)
+    source.unlink()
+
+    assert reconcile_forgotten_event(tmp_path, "git-demo", "forget")
+
+    page = tmp_path / "wiki" / "projects" / "git-demo.md"
+    assert page.is_file()
+    text = page.read_text(encoding="utf-8")
+    assert "forget this decision" not in text
+    assert "Last task: (no task recorded)" in text
+    assert "Last event: n/a @ n/a" in text

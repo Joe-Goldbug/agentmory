@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import asdict, dataclass, replace
+from datetime import datetime, timezone
 from typing import Any, Iterable
 
 
@@ -76,11 +77,23 @@ def _initial_state(payload: dict[str, Any], statement: str) -> str:
     explicit = _text(payload.get("state"))
     if explicit in {"current", "historical", "conflicted", "unverified"}:
         return explicit
-    if payload.get("valid_to"):
+    if _expired(payload.get("valid_to")):
         return "historical"
     if statement:
         return "current"
     return "unverified"
+
+
+def _expired(valid_to: Any) -> bool:
+    if not isinstance(valid_to, str) or not valid_to.strip():
+        return False
+    try:
+        deadline = datetime.fromisoformat(valid_to.replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    if deadline.tzinfo is None:
+        deadline = deadline.replace(tzinfo=timezone.utc)
+    return deadline <= datetime.now(timezone.utc)
 
 
 def build_evidence_item(
@@ -181,13 +194,13 @@ def arbitrate_state(items: Iterable[EvidenceItem]) -> tuple[EvidenceItem, ...]:
     superseded_ids = {item.supersedes for item in unique if item.supersedes}
     current_groups: dict[tuple[str, str], list[EvidenceItem]] = {}
     for item in unique:
-        if item.fact_id in superseded_ids or item.valid_to:
+        if item.fact_id in superseded_ids or _expired(item.valid_to):
             continue
         current_groups.setdefault((item.project_id, item.subject_key), []).append(item)
 
     result: list[EvidenceItem] = []
     for item in unique:
-        state = "historical" if item.fact_id in superseded_ids or item.valid_to else item.state
+        state = "historical" if item.fact_id in superseded_ids or _expired(item.valid_to) else item.state
         group = current_groups.get((item.project_id, item.subject_key), [])
         statements = {candidate.normalized_statement for candidate in group}
         if len(statements) > 1 and item in group:

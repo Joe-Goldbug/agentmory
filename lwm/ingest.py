@@ -184,9 +184,14 @@ def run(
     root: Path,
     *,
     with_lock: bool = True,
-    auto_promote: bool = True,
+    auto_promote: bool = False,
 ) -> IngestReport:
-    """Process every event currently in the inbox."""
+    """Process events without allowing legacy global promotion writes.
+
+    ``auto_promote`` remains as a compatibility parameter for old callers,
+    but the retired insight path is observation-only. Global memory writes
+    must go through the reviewed compiler-candidate promotion service.
+    """
 
     root = root.resolve()
     if with_lock:
@@ -234,6 +239,8 @@ def _run_unlocked(root: Path, *, auto_promote: bool) -> IngestReport:
         if candidates:
             insights_written.extend(insights.write_candidates(root, candidates))
         if auto_promote:
+            # Keep the old call shape harmless: this records withheld legacy
+            # decisions, but the compatibility module cannot write globals.
             from lwm import promote as promote_mod
 
             events_all = insights.load_processed_events(root)

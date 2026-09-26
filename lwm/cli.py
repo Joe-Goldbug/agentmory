@@ -18,7 +18,7 @@ from lwm.harvest import (
 )
 from lwm.compile import compile_raw_sources, render_compile_report
 from lwm.query import QueryReport, render_query_report, run_query, save_query_report
-from lwm.eval import render_eval_report, run_eval
+from lwm.eval import packaged_eval_suite, render_eval_report, run_eval
 from lwm.audit import render_audit_report, run_audit
 from lwm.init_scaffold import DEFAULT_SOURCE_TYPES, init_wiki_tree
 from lwm.raw_tracker import run_raw_status, run_raw_sync
@@ -66,7 +66,7 @@ def cli(
     version: bool | None = typer.Option(
         None, "--version", "-V", callback=_version_callback, is_eager=True
     ),
-) -> None:
+    ) -> None:
     """lwm — LLM-WorkMem CLI"""
 
 
@@ -107,11 +107,11 @@ def install_global_cmd(
 ) -> None:
     """Install global Codex/Claude/Trae/Kiro/Antigravity/MiniMax/Cursor/Gemini/shell entrypoints for this user."""
     root = root.resolve()
-    write_global_adapters(root)
     if dry_run:
         typer.secho("dry-run: skipping install", fg=typer.colors.YELLOW)
         typer.echo(f"would install adapters from {root} under {home or Path.home()}")
         raise typer.Exit(0)
+    write_global_adapters(root)
     if home is None:
         report = install_global_adapters(root)
     else:
@@ -611,7 +611,7 @@ def watch_cmd(
 ) -> None:
     """Detect source drift, refresh the wiki if inputs changed, and audit the result."""
     root = root.resolve()
-    suite = eval_suite.resolve() if eval_suite else None
+    suite = eval_suite.resolve() if eval_suite else packaged_eval_suite()
     mode_value = eval_mode.lower()
     if mode_value not in {"quick", "standard", "deep", "thesis", "list"}:
         typer.secho("Invalid --eval-mode. Use quick, standard, deep, thesis, or list.", err=True, fg=typer.colors.RED)
@@ -669,7 +669,7 @@ def schedule_cmd(
         help="Install and load the LaunchAgent immediately after writing it",
     ),
 ) -> None:
-    """Write a launchd supervisor that checks every 15 minutes and runs the full cycle every 12 hours."""
+    """Write a launchd supervisor that runs at boot and every 12 hours."""
     root = root.resolve()
     bundle = write_schedule_bundle(root, label=label)
     typer.secho(f"Wrote schedule script to {bundle.script_path}", fg=typer.colors.GREEN)
@@ -783,9 +783,9 @@ def audit_cmd(
         help="Eval query mode: quick, standard, deep, thesis, list",
     ),
 ) -> None:
-    """Run unified health audit: analyze + schema + review (+ optional eval)."""
+    """Run unified health audit: analyze + schema + review + packaged eval."""
     root = root.resolve()
-    suite = eval_suite.resolve() if eval_suite else None
+    suite = eval_suite.resolve() if eval_suite else packaged_eval_suite()
     mode_value = eval_mode.lower()
     if mode_value not in {"quick", "standard", "deep", "thesis", "list"}:
         typer.secho("Invalid --eval-mode. Use quick, standard, deep, thesis, or list.", err=True, fg=typer.colors.RED)

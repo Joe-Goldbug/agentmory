@@ -7,6 +7,8 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 from lwm import health, ingest
+from lwm.audit import AuditReport
+from lwm.cycle_receipt import CycleReceiptV2, write_cycle_receipt
 from lwm.events import make_event
 
 
@@ -43,6 +45,50 @@ def test_health_with_empty_inbox(tmp_path: Path) -> None:
     snapshot = health.collect_and_write(tmp_path)
     assert snapshot.status in {"healthy", "degraded", "failed", "unknown"}
     assert snapshot.inbox_counts["inbox"] == 0
+
+
+def test_standalone_health_counts_its_own_eval_as_verified(tmp_path: Path, monkeypatch) -> None:
+    report = AuditReport(tmp_path, 0, 0, 0, 2, 2)
+    monkeypatch.setattr(health, "run_audit", lambda *args, **kwargs: report)
+
+    summary = health._audit_summary(tmp_path)
+
+    assert summary["eval_verified"] is True
+    assert summary["eval_pass"] == summary["eval_total"] == 2
+
+
+def test_standalone_health_restores_cycle_proof_from_receipt(tmp_path: Path) -> None:
+    receipt = CycleReceiptV2(
+        schema_version=2,
+        cycle_id="cycle-proof",
+        runtime_id="runtime-test",
+        started_at="2026-09-25T00:00:00+00:00",
+        finished_at="2026-09-25T00:01:00+00:00",
+        core_status="success",
+        overall_status="success",
+        quality={"context_ok": True},
+        runtime_import_independent=True,
+        exit_code=0,
+    )
+    write_cycle_receipt(receipt, tmp_path)
+
+    cycle = health.collect(tmp_path).cycle
+
+    assert cycle["context_smoke_ok"] is True
+    assert cycle["last_cycle_exit_code"] == 0
+    assert cycle["runtime_import_independent"] is True
+
+
+def test_strict_health_treats_review_items_as_degraded_not_core_failure() -> None:
+    snapshot = {
+        "infrastructure": {"stale_test_launch_agents": []},
+        "data_flow": {"last_cycle_failed": 0},
+        "quality": {"audit_ok": False, "error": None},
+        "cycle": {"core_status": "success_with_warnings"},
+        "inbox_counts": {"inbox": 0},
+    }
+
+    assert health._classify(snapshot, strict=True) == health.STATUS_DEGRADED
 
 
 def test_launchd_status_uses_print_history_for_idle_job(monkeypatch) -> None:

@@ -123,6 +123,17 @@ def test_lockfile_stale_recovery(tmp_path: Path) -> None:
     assert result.acquired is True
 
 
+def test_lockfile_does_not_reclaim_a_recent_incomplete_marker(tmp_path: Path) -> None:
+    lockfile_path = lockfile.lock_path(tmp_path)
+    lockfile_path.parent.mkdir(parents=True, exist_ok=True)
+    lockfile_path.write_text("", encoding="utf-8")
+
+    result = lockfile.try_acquire(tmp_path)
+
+    assert result.acquired is False
+    assert lockfile_path.is_file()
+
+
 def test_inbox_status_zero_on_empty(tmp_path: Path) -> None:
     status = inbox.inbox_status(tmp_path)
     assert status.inbox == 0

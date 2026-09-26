@@ -49,9 +49,9 @@ def test_codex_export_uses_current_schema_and_real_workspace(
     assert emitted[0]["project_path"] == str(project)
     assert emitted[0]["task"] == "Fix the real project"
     receipts = capabilities.load(tmp_path)
-    assert receipts["codex:read"]["project_id"] == receipts["codex:write"]["project_id"]
-    assert receipts["codex:read"]["source"] == "watcher-observed"
-    assert receipts["codex:write"]["source"] == "watcher-observed"
+    assert "project_id" in receipts["codex"]
+    assert receipts["codex"]["source"] == "watcher-observed"
+    assert receipts["codex"]["source"] == "watcher-observed"
 
     assert codex_export.emit_session(tmp_path, session, seen=seen) == 0
     assert len(emitted) == 1

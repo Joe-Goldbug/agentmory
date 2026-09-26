@@ -7,9 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from lwm import dedup, inbox
-from lwm.events import make_event
-from lwm.project_id import record_project
+from lwm import hub_service
 from lwm.recall import build_recall_packet
 
 
@@ -26,35 +24,27 @@ def retain(
     open_questions: list[str] | None = None,
     session_id: str | None = None,
 ) -> dict[str, Any]:
-    resolution = record_project(root, project_path)
-    event = make_event(
-        tool=tool,
-        project_path=project_path,
-        project_id=resolution.project_id,
-        event_type=event_type,
-        task=task,
-        decisions=decisions,
-        changes=changes,
-        verification=verification,
-        open_questions=open_questions,
-        session_id=session_id,
-        source={"kind": "retain"},
+    result = hub_service.retain_event(
+        root,
+        {
+            "tool": tool,
+            "project_path": project_path,
+            "event_type": event_type,
+            "task": task,
+            "decisions": decisions,
+            "changes": changes,
+            "verification": verification,
+            "open_questions": open_questions,
+            "session_id": session_id,
+            "source": {"kind": "retain"},
+        },
     )
-    duplicate = dedup.find_duplicate(root, event)
-    if duplicate.duplicate:
-        return {
-            "event": event,
-            "path": "",
-            "project_id": resolution.project_id,
-            "duplicate": True,
-            "existing_event_id": duplicate.existing_event_id,
-        }
-    target = inbox.submit_event(root, event)
     return {
-        "event": event,
-        "path": str(target),
-        "project_id": resolution.project_id,
-        "duplicate": False,
+        "event": result["event"],
+        "path": result["absolute_path"],
+        "project_id": result["event"]["project_id"],
+        "duplicate": result["duplicate"],
+        "existing_event_id": result.get("existing_event_id"),
     }
 
 

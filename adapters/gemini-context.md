@@ -1,7 +1,8 @@
 # LLM-WorkMem Context
 
-Use this llm-workmem as an auxiliary evidence source for this tool.
-Native instructions, skills, memory, planning, execution, and verification remain authoritative.
+Use `/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/GLOBAL.md` as the shared personal behavior contract for this tool.
+Project memory, handoffs, Recall and review candidates are auxiliary evidence; native platform safety rules, instructions, skills, memory, planning, execution and verification remain authoritative.
+Canonical personal behavior contract: `/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/GLOBAL.md` (version=1 sha256=f73d3a026fa3a213b763698b09cc1e698baa5aaa4e086f52b329ec722b18a29e status=verified).
 
 Read order:
 1. `/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/llms.txt` for compact context.
@@ -15,3 +16,9 @@ Rules:
 - Prefer `wiki/` pages that passed audit over raw snapshots.
 - Keep local project facts local unless they should be promoted through review.
 - After meaningful work, update or generate evidence that `lwm harvest`, `lwm watch`, or `lwm audit` can consume.
+
+On session start, refresh bounded context with:
+`printf '%s' "$PWD" | python3 -c 'import json,sys; print(json.dumps({'"'"'phase'"'"':'"'"'context'"'"','"'"'tool'"'"':"gemini-cli",'"'"'project_path'"'"':sys.stdin.read()}))' | lwm hub bridge --output markdown --root '/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem'`
+
+For completed work, use structured write-back rather than a transcript:
+`lwm hub bridge-stop --tool gemini-cli --project "$PWD" --task-id "$LWM_TASK_ID" --handoff-json '{"task_id":"...","objective":"...","current_state":"...","changes":["..."],"verifications":["..."],"risks":[],"open_questions":[],"next_action":"..."}' --root '/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem'`

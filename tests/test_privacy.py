@@ -13,6 +13,13 @@ def test_redact_openai_key() -> None:
     assert "openai_sk" in applied
 
 
+def test_redact_openai_key_with_delimiters() -> None:
+    text = "A free-form transcript contains sk-abcdefghijklmnop-qrstuv."
+    out, applied = redact_text(text)
+    assert "sk-abcdefghijklmnop-qrstuv" not in out
+    assert "openai_sk" in applied
+
+
 def test_redact_aws_access_key() -> None:
     text = "AWS AKIAIOSFODNN7EXAMPLE was here"
     out, applied = redact_text(text)

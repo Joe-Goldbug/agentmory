@@ -1,5 +1,10 @@
 # LLM-WorkMem V2 本机工作记忆控制中心技术规格
 
+> 历史文档：本规格不再是当前架构权威。2026-07-28 Lean Core、经批准的
+> goal-completion requirements 及其 HLD/LLD 已 supersede 本文的第二控制面、
+> `projects/<id>/STATE.md` 层级和冲突的 source-of-truth 规则。本文仅保留
+> 与当前架构不冲突的隐私、身份、来源、保留和验证要求供审计参考。
+
 - 状态：待技术评审
 - 日期：2026-07-18
 - 目标仓库：`/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem`

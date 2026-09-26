@@ -5,6 +5,7 @@ from pathlib import Path
 from typer.testing import CliRunner
 
 from lwm.cli import app
+from lwm.memory_compiler import Candidate, save_candidate
 
 runner = CliRunner()
 
@@ -18,6 +19,76 @@ def test_help() -> None:
     r = runner.invoke(app, ["--help"])
     assert r.exit_code == 0
     assert "lwm" in r.stdout.lower() or "LLM-WorkMem" in r.stdout
+
+
+def test_receipt_cli_cannot_forge_native_proof(tmp_path: Path) -> None:
+    result = runner.invoke(
+        app,
+        [
+            "hub",
+            "receipt",
+            "--tool",
+            "codex",
+            "--direction",
+            "read",
+            "--source",
+            "native-hook",
+            str(tmp_path),
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "refusing direct proof receipt" in result.output
+    assert not (tmp_path / "state" / "capability-receipts.json").exists()
+
+
+def test_legacy_auto_promotion_cli_is_disabled(tmp_path: Path) -> None:
+    result = runner.invoke(
+        app,
+        ["hub", "promote", str(tmp_path), "--auto"],
+    )
+
+    assert result.exit_code == 2
+    assert "legacy --auto is disabled" in result.output
+    assert not (tmp_path / "wiki" / "global").exists()
+
+
+def test_ingest_promote_help_is_observation_only() -> None:
+    result = runner.invoke(app, ["hub", "ingest", "--help"])
+
+    assert result.exit_code == 0
+    assert "never write" in result.output
+    assert "global memory" in result.output
+
+
+def test_review_analysis_command_accepts_candidate(tmp_path: Path) -> None:
+    save_candidate(
+        tmp_path,
+        Candidate(
+            candidate_id="cli-candidate",
+            kind="workflow",
+            claim="A verified loop repeats.",
+            scope=("p1",),
+            evidence_ids=("e1",),
+            state="analyzed",
+        ),
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "hub",
+            "review-analysis",
+            "cli-candidate",
+            "--decision",
+            "accept",
+            "--root",
+            str(tmp_path),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert '"state": "accepted"' in result.stdout
 
 
 def test_raw_status_help() -> None:
@@ -320,16 +391,21 @@ def test_schedule_command_writes_launchd_bundle(tmp_path: Path, monkeypatch) -> 
     assert "Application Support/llm-workmem-runtime/app/venv/bin/lwm" in script_content
     assert "hub run-cycle" in script_content
     runner_content = runner_script.read_text(encoding="utf-8")
-    assert "run_watch" in runner_content
-    assert "render_watch_report" in runner_content
+    assert "run-supervisor" in runner_content
+    assert "installed non-editable" in runner_content
     plist_content = plist.read_text(encoding="utf-8")
     assert "<key>RunAtLoad</key>" in plist_content
-    assert "<key>StartInterval</key>" in plist_content
-    assert "<integer>43200</integer>" in plist_content
+    assert "<key>StartInterval</key>\n  <integer>43200</integer>" in plist_content
+    assert "FullCycleInterval" not in plist_content
     assert "Application Support/llm-workmem-runtime" in plist_content
-    assert (target / "raw").is_symlink()
-    assert (target / "wiki").is_symlink()
-    assert (target / "automation").is_symlink()
+    # Schedule generation must not silently perform the ownership migration.
+    assert not (target / "raw").is_symlink()
+    assert not (target / "state").is_symlink()
+    runtime_data = home / "Library" / "Application Support" / "llm-workmem-runtime" / "llm-workmem"
+    assert (runtime_data / "raw").is_dir()
+    assert not (target / "wiki").is_symlink()
+    assert not (target / "automation").is_symlink()
+    assert (runtime_data / "wiki").is_dir()
 
 
 def test_schema_command_detects_missing_keys(tmp_path: Path) -> None:
@@ -486,8 +562,14 @@ def test_adapters_command_writes_tool_entrypoints(tmp_path: Path) -> None:
     assert (target / "adapters" / "llm-workmem-shell-context.sh").is_file()
     agents_text = (target / "adapters" / "AGENTS.md").read_text(encoding="utf-8")
     assert "llms.txt" in agents_text
-    assert f"lwm hub context --tool <your-tool-name> {target}" in agents_text
-    assert "lwm hub context --tool <your-tool-name> --root" not in agents_text
+    assert "lwm hub bridge" in agents_text
+    assert "--output markdown" in agents_text
+    assert "phase" in agents_text
+    assert '"codex"' in agents_text
+    assert "<your-tool-name>" not in agents_text
+    assert "lwm hub context --tool <your-tool-name>" not in agents_text
+    assert "lwm hub bridge-stop" in agents_text
+    assert "lwm hub lifecycle stop" not in agents_text
     shell_context = (target / "adapters" / "llm-workmem-shell-context.sh").read_text(encoding="utf-8")
     assert "printf '%s\\n'" in shell_context
 

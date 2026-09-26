@@ -10,9 +10,11 @@ from lwm.memory_api import reflect_project, retain
 
 def test_capability_requires_read_and_write_receipts(tmp_path: Path) -> None:
     assert summary(tmp_path)["codex"]["bidirectional"] is False
-    record(tmp_path, tool="codex", direction="read", source="test")
+    (tmp_path / "read.json").write_text("read evidence\n", encoding="utf-8")
+    (tmp_path / "write.json").write_text("write evidence\n", encoding="utf-8")
+    record(tmp_path, tool="codex", direction="read", source="native-hook", evidence_path="read.json", operation_id="read-1")
     assert summary(tmp_path)["codex"]["bidirectional"] is False
-    record(tmp_path, tool="codex", direction="write", source="test")
+    record(tmp_path, tool="codex", direction="write", source="native-hook", evidence_path="write.json", operation_id="write-1")
     assert summary(tmp_path)["codex"]["bidirectional"] is True
 
 

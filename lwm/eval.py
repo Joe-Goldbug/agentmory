@@ -4,11 +4,18 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from importlib.resources import files as resource_files
 from pathlib import Path
 import fnmatch
 
 from lwm.recall import RecallPacket, build_recall_packet
 from lwm.query import run_query
+
+
+def packaged_eval_suite():
+    """Return the authoritative eval suite bundled with the installed wheel."""
+
+    return resource_files("lwm.resources").joinpath("eval-suite.txt")
 
 
 @dataclass(frozen=True)
@@ -78,7 +85,7 @@ def matches_expected_slug(actual: str, expected: str) -> bool:
     return fnmatch.fnmatchcase(actual, expected)
 
 
-def parse_eval_suite(path: Path) -> tuple[EvalCase, ...]:
+def parse_eval_suite(path) -> tuple[EvalCase, ...]:
     cases: list[EvalCase] = []
     for raw in path.read_text(encoding="utf-8").splitlines():
         line = raw.strip()
@@ -102,13 +109,20 @@ def parse_eval_suite(path: Path) -> tuple[EvalCase, ...]:
     return tuple(cases)
 
 
-def run_eval(root: Path, suite_path: Path, *, mode: str = "standard", limit: int = 3) -> EvalReport:
+def run_eval(root: Path, suite_path, *, mode: str = "standard", limit: int = 3) -> EvalReport:
     root = root.resolve()
     suite = parse_eval_suite(suite_path)
     results: list[EvalResult] = []
     for case in suite:
         report = run_query(root, case.question, mode=mode, limit=limit)
-        top_slug = report.hits[0].page.slug if report.hits else ""
+        # Generated views are useful to readers, but they are not the stable
+        # durable page targeted by these slug-based regression cases.
+        durable_hits = tuple(
+            hit for hit in report.hits
+            if hit.page.page_type not in {"insight", "review", "unified-memory"}
+        )
+        top_hit = durable_hits[0] if durable_hits else (report.hits[0] if report.hits else None)
+        top_slug = top_hit.page.slug if top_hit else ""
         # Generated pages commonly include a date suffix. Allow eval suites
         # to express that contract without expiring every morning.
         passed = matches_expected_slug(top_slug, case.expected_slug)
@@ -144,7 +158,7 @@ def render_eval_report(report: EvalReport) -> str:
 
 def run_recall_eval(
     root: Path,
-    suite_path: Path,
+    suite_path,
     *,
     project_path: str | None = None,
     now: datetime | str | None = None,
@@ -164,7 +178,13 @@ def run_recall_eval(
         )
         statements = " ".join(item.statement.lower() for item in packet.evidence)
         fact_match = not case.expected_fact or case.expected_fact.lower() in statements
-        project_match = not case.expected_project or packet.project_id == case.expected_project
+        project_match = not case.expected_project or (
+            packet.project_id == case.expected_project
+            and all(
+                item.project_id == case.expected_project
+                for item in (*packet.evidence, *packet.conflicts)
+            )
+        )
         coverage_match = not case.expected_coverage or packet.coverage == case.expected_coverage
         conflict_match = bool(packet.conflicts) == case.expect_conflict
         results.append(

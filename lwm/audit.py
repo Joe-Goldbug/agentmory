@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from lwm.analysis import analyze_wiki
-from lwm.eval import run_eval
+from lwm.eval import packaged_eval_suite, run_eval
 from lwm.review import build_review_report
 from lwm.schema import validate_schema
 
@@ -22,6 +22,8 @@ class AuditReport:
     eval_total: int
     cbmem_indexed: int = 0
     cbmem_projects_total: int = 0
+    source_gaps_local: int = 0
+    source_gaps_external: int = 0
 
     @property
     def sections(self) -> tuple["AuditSection", ...]:
@@ -80,7 +82,21 @@ def _check_cbmem_indexed(root: Path) -> tuple[int, int]:
     return (indexed, len([p for p in projects if isinstance(p, str) and p.strip()]))
 
 
-def run_audit(root: Path, *, eval_suite: Path | None = None, eval_mode: str = "standard") -> AuditReport:
+_UNSET_EVAL_SUITE = object()
+
+
+def run_audit(
+    root: Path,
+    *,
+    eval_suite: Path | object = _UNSET_EVAL_SUITE,
+    eval_mode: str = "standard",
+) -> AuditReport:
+    """Run one audit using the wheel-owned eval suite by default.
+
+    Passing ``None`` remains an explicit structural-only compatibility mode.
+    The CLI, scheduled cycle, and health path never use that escape hatch.
+    """
+
     root = root.resolve()
     analysis = analyze_wiki(root)
     schema = validate_schema(root)
@@ -88,22 +104,35 @@ def run_audit(root: Path, *, eval_suite: Path | None = None, eval_mode: str = "s
 
     eval_pass = 0
     eval_total = 0
-    if eval_suite is not None and eval_suite.is_file():
-        eval_report = run_eval(root, eval_suite, mode=eval_mode, limit=3)
+    suite = packaged_eval_suite() if eval_suite is _UNSET_EVAL_SUITE else eval_suite
+    if suite is not None and suite.is_file():
+        eval_report = run_eval(root, suite, mode=eval_mode, limit=3)
         eval_pass = eval_report.pass_count
         eval_total = eval_report.total
 
     cbmem_indexed, cbmem_total = _check_cbmem_indexed(root)
 
+    # Missing sources are retained in ``analysis.errors`` for backwards
+    # compatibility, but they also become explicit review-queue items. Count
+    # them only in the review section so one provenance gap is not reported
+    # twice as two independent quality failures.
+    structural_analysis_errors = max(
+        0, len(analysis.errors) - len(analysis.source_gaps)
+    )
+
     return AuditReport(
         root=root,
-        analysis_errors=len(analysis.errors),
+        analysis_errors=structural_analysis_errors,
         schema_issues=len(schema.issues),
         review_items=len(review.items),
         eval_pass=eval_pass,
         eval_total=eval_total,
         cbmem_indexed=cbmem_indexed,
         cbmem_projects_total=cbmem_total,
+        source_gaps_local=sum(gap.scope == "local" for gap in analysis.source_gaps),
+        source_gaps_external=sum(
+            gap.scope == "external" for gap in analysis.source_gaps
+        ),
     )
 
 
@@ -114,6 +143,7 @@ def render_audit_report(report: AuditReport) -> str:
         f"- Analyze errors: {report.analysis_errors}",
         f"- Schema issues: {report.schema_issues}",
         f"- Review queue items: {report.review_items}",
+        f"- Source gaps: local={report.source_gaps_local}, external={report.source_gaps_external}",
         f"- Eval: {report.eval_pass}/{report.eval_total}" if report.eval_total else "- Eval: skipped",
         f"- CBMEM: {report.cbmem_indexed}/{report.cbmem_projects_total} projects indexed",
         "",

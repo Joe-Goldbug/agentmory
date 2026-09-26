@@ -35,6 +35,7 @@ def test_install_writes_marker_block(tmp_path: Path) -> None:
     rc = tmp_path / ".zshrc"
     lwm_root = tmp_path / "wiki"
     lwm_root.mkdir()
+    (lwm_root / "pyproject.toml").write_text("[project]\nname = 'test'\n", encoding="utf-8")
     (lwm_root / "lwm" / "lwm_shell_hook.zsh").parent.mkdir(parents=True, exist_ok=True)
     (lwm_root / "lwm" / "lwm_shell_hook.zsh").write_text("# stub", encoding="utf-8")
 
@@ -50,6 +51,8 @@ def test_install_writes_marker_block(tmp_path: Path) -> None:
 def test_install_is_idempotent_and_preserves_user_content(tmp_path: Path) -> None:
     rc = tmp_path / ".zshrc"
     lwm_root = tmp_path / "wiki"
+    (lwm_root / "pyproject.toml").parent.mkdir(parents=True, exist_ok=True)
+    (lwm_root / "pyproject.toml").write_text("[project]\nname = 'test'\n", encoding="utf-8")
     (lwm_root / "lwm").mkdir(parents=True)
     (lwm_root / "lwm" / "lwm_shell_hook.zsh").write_text("# stub", encoding="utf-8")
     _seed_rc(rc, "# user one\nexport PATH=foo\n# user two\n")
@@ -70,6 +73,8 @@ def test_install_refreshes_when_hook_bytes_change(tmp_path: Path) -> None:
 
     rc = tmp_path / ".zshrc"
     lwm_root = tmp_path / "wiki"
+    (lwm_root / "pyproject.toml").parent.mkdir(parents=True, exist_ok=True)
+    (lwm_root / "pyproject.toml").write_text("[project]\nname = 'test'\n", encoding="utf-8")
     (lwm_root / "lwm").mkdir(parents=True)
     hook = lwm_root / "lwm" / "lwm_shell_hook.zsh"
     hook.write_text("# stub v1", encoding="utf-8")
@@ -97,6 +102,8 @@ def test_install_does_not_rewrite_when_unchanged(tmp_path: Path) -> None:
 
     rc = tmp_path / ".zshrc"
     lwm_root = tmp_path / "wiki"
+    (lwm_root / "pyproject.toml").parent.mkdir(parents=True, exist_ok=True)
+    (lwm_root / "pyproject.toml").write_text("[project]\nname = 'test'\n", encoding="utf-8")
     (lwm_root / "lwm").mkdir(parents=True)
     hook = lwm_root / "lwm" / "lwm_shell_hook.zsh"
     hook.write_text("# stable hook bytes", encoding="utf-8")
@@ -112,6 +119,8 @@ def test_install_does_not_rewrite_when_unchanged(tmp_path: Path) -> None:
 def test_uninstall_removes_only_marker_block(tmp_path: Path) -> None:
     rc = tmp_path / ".zshrc"
     lwm_root = tmp_path / "wiki"
+    (lwm_root / "pyproject.toml").parent.mkdir(parents=True, exist_ok=True)
+    (lwm_root / "pyproject.toml").write_text("[project]\nname = 'test'\n", encoding="utf-8")
     (lwm_root / "lwm").mkdir(parents=True)
     (lwm_root / "lwm" / "lwm_shell_hook.zsh").write_text("# stub", encoding="utf-8")
 
@@ -134,9 +143,64 @@ def test_uninstall_is_noop_when_absent(tmp_path: Path) -> None:
     assert result.changed is False
 
 
-def test_install_missing_hook_raises(tmp_path: Path) -> None:
+def test_install_missing_hook_raises(tmp_path: Path, monkeypatch) -> None:
     rc = tmp_path / ".zshrc"
     lwm_root = tmp_path / "wiki"
     (lwm_root / "lwm").mkdir(parents=True)
+
+    def missing_package(_name: str):
+        raise ModuleNotFoundError("lwm package resources unavailable")
+
+    monkeypatch.setattr(shell_hook.importlib.resources, "files", missing_package)
     with pytest.raises(FileNotFoundError):
         shell_hook.install(lwm_root=lwm_root, rc_path=rc)
+
+
+def test_install_uses_packaged_hook_when_data_root_has_no_code(tmp_path: Path) -> None:
+    """The wheel keeps code in site-packages, not under mutable DATA_ROOT."""
+
+    rc = tmp_path / ".zshrc"
+    data_root = tmp_path / "data-root"
+    data_root.mkdir()
+
+    result = shell_hook.install(lwm_root=data_root, rc_path=rc)
+
+    assert result.changed is True
+    assert result.hook_path is not None
+    assert result.hook_path.is_file()
+    assert result.hook_path.name == "lwm_shell_hook.zsh"
+    assert str(result.hook_path).startswith(str(Path(__file__).parents[1]))
+
+
+def test_install_ignores_legacy_code_mirror_in_data_root(tmp_path: Path) -> None:
+    """A legacy DATA_ROOT/lwm mirror must not override the installed wheel."""
+
+    rc = tmp_path / ".zshrc"
+    data_root = tmp_path / "data-root"
+    legacy_hook = data_root / "lwm" / "lwm_shell_hook.zsh"
+    legacy_hook.parent.mkdir(parents=True)
+    legacy_hook.write_text("# legacy mirror", encoding="utf-8")
+
+    result = shell_hook.install(lwm_root=data_root, rc_path=rc)
+
+    assert result.hook_path is not None
+    assert result.hook_path != legacy_hook
+    assert str(result.hook_path).startswith(str(Path(__file__).parents[1]))
+
+
+def test_install_normalizes_migrated_repository_access_path(tmp_path: Path) -> None:
+    """Passing the migrated checkout path still selects the runtime owner."""
+
+    rc = tmp_path / ".zshrc"
+    owner = tmp_path / "owner"
+    repo = tmp_path / "repo"
+    (owner / "raw").mkdir(parents=True)
+    (owner / "wiki").mkdir()
+    (owner / "state").mkdir()
+    repo.mkdir()
+    (repo / "state").symlink_to(owner / "state", target_is_directory=True)
+
+    result = shell_hook.install(lwm_root=repo, rc_path=rc)
+
+    assert result.hook_path is not None
+    assert result.hook_path != repo / "lwm" / "lwm_shell_hook.zsh"

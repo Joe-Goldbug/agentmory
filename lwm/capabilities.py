@@ -1,4 +1,10 @@
-"""Capability registry and receipts for real tool connectivity."""
+"""Capability registry and receipts for real tool connectivity.
+
+Backwards-compatible facade over the new modules
+:mod:`lwm.tool_registry` and :mod:`lwm.capability_proof`. All public symbols
+that existing callers import keep working; new code should import directly
+from the two modules.
+"""
 
 from __future__ import annotations
 
@@ -7,40 +13,65 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-
-KNOWN_TOOLS = (
-    "codex",
-    "claude-code",
-    "opencode",
-    "shell",
-    "vscode",
-    "kiro",
-    "antigravity",
-    "trae",
-    "trae-solo",
-    "minimax",
+from lwm.capability_proof import (
+    ALL_RECEIPT_SOURCES,
+    PROOF_RECEIPT_SOURCES,
+    capability_status,
+    is_proof_source,
+    load,
+    latest_proof_receipts,
+    record as _new_record,
 )
+from lwm.harvest import canonical_data_root
+from lwm.tool_registry import ToolRegistry, default_registry
 
-NATIVE_RECEIPT_SOURCES = {"native-hook", "lifecycle-hook", "watcher-observed"}
 
-TOOL_TARGETS = {
-    "codex": (".codex/AGENTS.md",),
-    "claude-code": (".claude/settings.json",),
-    "opencode": (".config/opencode/AGENTS.md", ".config/opencode/plugins/llm-workmem.ts"),
-    "shell": (".zshrc",),
-    "vscode": (
-        "Library/Application Support/Code/User/prompts/llm-workmem.instructions.md",
-    ),
-    "kiro": (".kiro/steering/llm-workmem.md",),
-    "antigravity": (".agents/AGENTS.md", ".agents/GLOBAL.md"),
-    "trae": (".traerules",),
-    "trae-solo": (".traerules",),
-    "minimax": (".minimax/agents/coder/agent.md",),
+# ---- Compatibility shims --------------------------------------------------
+
+
+def _compat_known_tools() -> tuple[str, ...]:
+    """Legacy tuple kept for any caller that iterates ``KNOWN_TOOLS``."""
+
+    return tuple(d.tool_id for d in default_registry().all())
+
+
+KNOWN_TOOLS: tuple[str, ...] = _compat_known_tools()
+
+# Kept so old imports of ``NATIVE_RECEIPT_SOURCES`` continue to resolve; it now
+# only enumerates the proof sources (watcher is no longer proof).
+NATIVE_RECEIPT_SOURCES = set(PROOF_RECEIPT_SOURCES)
+
+
+#: Legacy per-tool relative paths derived from the registry.
+TOOL_TARGETS: dict[str, tuple[str, ...]] = {
+    d.tool_id: d.discovery_paths
+    for d in default_registry().all()
 }
 
 
-def _tool_targets(tool: str, home: Path) -> tuple[Path, ...]:
-    """Resolve adapter files from the current real installation paths."""
+def _path(root: Path) -> Path:
+    return root / "state" / "capability-receipts.json"
+
+
+def _now() -> str:
+    return datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
+
+
+def _tool_targets(
+    tool: str, home: Path, *, registry: ToolRegistry | None = None
+) -> tuple[Path, ...]:
+    """Resolve adapter files from the current real installation paths.
+
+    The implementation is intentionally simple: it consults the registry's
+    ``discovery_paths`` first, and falls back to a tiny set of per-tool
+    overrides for tools that publish to non-fixed locations (opencode plugin
+    path, vscode prompts directory).
+    """
+
+    definition = (registry or default_registry()).resolve(tool)
+    if definition is None:
+        return ()
+
     if tool == "opencode":
         config_root = home / ".config" / "opencode"
         agents = config_root / "AGENTS.md"
@@ -74,26 +105,7 @@ def _tool_targets(tool: str, home: Path) -> tuple[Path, ...]:
         installed = tuple(path for path in candidates if path.is_file())
         return installed or (candidates[0],)
 
-    return tuple(home / relative for relative in TOOL_TARGETS.get(tool, ()))
-
-
-def _path(root: Path) -> Path:
-    return root / "state" / "capability-receipts.json"
-
-
-def _now() -> str:
-    return datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
-
-
-def load(root: Path) -> dict[str, dict[str, Any]]:
-    path = _path(root)
-    if not path.is_file():
-        return {}
-    try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return {}
-    return payload if isinstance(payload, dict) else {}
+    return tuple(home / relative for relative in definition.discovery_paths)
 
 
 def record(
@@ -104,49 +116,40 @@ def record(
     project_id: str | None = None,
     source: str = "unknown",
     detail: str = "",
+    evidence_path: str = "",
+    operation_id: str = "",
 ) -> dict[str, Any]:
-    if direction not in {"read", "write"}:
-        raise ValueError("direction must be read or write")
-    key = f"{tool}:{direction}"
-    entry = {
-        "tool": tool,
-        "direction": direction,
-        "project_id": project_id,
-        "source": source,
-        "detail": detail,
-        "status": "verified",
-        "recorded_at": _now(),
-    }
+    """Compatibility wrapper that bridges to :func:`lwm.capability_proof.record`.
+
+    Accepts the legacy ``source="watcher-observed"`` style: the receipt is
+    stored, but its ``status`` is forced to ``observed`` and it never produces a
+    ``verified_*`` capability status.
+    """
+
+    root = canonical_data_root(root)
+    definition = ToolRegistry.load(root).resolve(tool)
+    canonical_tool = definition.tool_id if definition is not None else tool
     try:
-        payload = load(root)
-        history = payload.get("_history")
-        if not isinstance(history, dict):
-            history = {}
-        previous = payload.get(key)
-        entries = history.get(key)
-        if not isinstance(entries, list):
-            entries = [previous] if isinstance(previous, dict) else []
-        entries = [item for item in entries if isinstance(item, dict)]
-        entries = [
-            item
-            for item in entries
-            if not (
-                item.get("project_id") == project_id
-                and item.get("source") == source
-            )
-        ]
-        entries.append(entry)
-        history[key] = entries[-250:]
-        payload["_history"] = history
-        payload[key] = entry
-        path = _path(root)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(
-            json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+        receipt = _new_record(
+            root,
+            tool=canonical_tool,
+            direction=direction,
+            project_id=project_id,
+            source=source if source in ALL_RECEIPT_SOURCES else "watcher-observed",
+            evidence_path=evidence_path,
+            operation_id=operation_id,
+            detail=detail,
         )
     except (OSError, TypeError, ValueError) as exc:
-        return {**entry, "status": "unavailable", "error": str(exc)}
-    return entry
+        return {
+            "tool": canonical_tool,
+            "direction": direction,
+            "project_id": project_id,
+            "source": source,
+            "status": "unavailable",
+            "error": str(exc),
+        }
+    return receipt.to_dict()
 
 
 def _latest_receipt(
@@ -156,13 +159,36 @@ def _latest_receipt(
     *,
     allowed_sources: set[str] | None = None,
 ) -> dict[str, Any] | None:
+    """Legacy shim: returns the newest receipt matching ``"{tool}:{direction}"``.
+
+    New storage groups receipts by tool under ``payload[tool]`` with the
+    direction in the receipt body. The shim scans all entries to keep the
+    legacy key contract working.
+    """
+
+    if ":" in key:
+        tool_id, _direction = key.split(":", 1)
+    else:
+        tool_id, _direction = key, None
+
     candidates: list[dict[str, Any]] = []
-    current = payload.get(key)
+    current = payload.get(tool_id)
     if isinstance(current, dict):
         candidates.append(current)
     history = payload.get("_history")
-    if isinstance(history, dict) and isinstance(history.get(key), list):
-        candidates.extend(item for item in history[key] if isinstance(item, dict))
+    if isinstance(history, dict):
+        bucket = history.get(tool_id)
+        if isinstance(bucket, list):
+            candidates.extend(item for item in bucket if isinstance(item, dict))
+    # Fallback to the literal ``{tool}:{direction}`` key for legacy payloads.
+    legacy = payload.get(key)
+    if isinstance(legacy, dict):
+        candidates.append(legacy)
+
+    if _direction is not None:
+        candidates = [
+            item for item in candidates if item.get("direction") == _direction
+        ]
     if expected_project_id:
         candidates = [
             item for item in candidates if item.get("project_id") == expected_project_id
@@ -173,18 +199,18 @@ def _latest_receipt(
         ]
     if not candidates:
         return None
-    return max(candidates, key=lambda item: str(item.get("recorded_at", "")))
+    return max(
+        candidates,
+        key=lambda item: str(item.get("timestamp") or item.get("recorded_at") or ""),
+    )
 
 
 def summary(
     root: Path, *, project_path: str | Path | None = None
 ) -> dict[str, dict[str, Any]]:
-    payload = load(root)
     installed = probe(root, project_path=project_path)
     out: dict[str, dict[str, Any]] = {}
-    for tool in KNOWN_TOOLS:
-        reads = _latest_receipt(payload, f"{tool}:read", None)
-        writes = _latest_receipt(payload, f"{tool}:write", None)
+    for tool in installed:
         read = installed[tool]["read_receipt"] or {"status": "unverified"}
         write = installed[tool]["write_receipt"] or {"status": "unverified"}
         out[tool] = {
@@ -193,16 +219,7 @@ def summary(
             "targets": installed[tool]["targets"],
             "read": read if isinstance(read, dict) else {"status": "unverified"},
             "write": write if isinstance(write, dict) else {"status": "unverified"},
-            "bidirectional": (
-                installed[tool]["status"] == "verified_bidirectional"
-                if project_path is not None
-                else bool(
-                    reads
-                    and writes
-                    and reads.get("status") == "verified"
-                    and writes.get("status") == "verified"
-                )
-            ),
+            "bidirectional": installed[tool]["status"] == "verified_bidirectional",
         }
     return out
 
@@ -210,7 +227,7 @@ def summary(
 def _is_fresh_native(receipt: Any, expected_project_id: str | None) -> bool:
     if not isinstance(receipt, dict) or receipt.get("status") != "verified":
         return False
-    if receipt.get("source") not in NATIVE_RECEIPT_SOURCES:
+    if not is_proof_source(receipt.get("source", "")):
         return False
     if expected_project_id and receipt.get("project_id") != expected_project_id:
         return False
@@ -233,39 +250,35 @@ def probe(
     verified receipt is required before claiming that a tool actually read or
     wrote the hub.
     """
+    root = canonical_data_root(root)
     home = (home or Path.home()).expanduser().resolve()
-    receipts = load(root)
     expected_project_id = None
     if project_path is not None:
         from lwm.project_id import resolve_project_id
 
         expected_project_id = resolve_project_id(project_path).project_id
     out: dict[str, dict[str, Any]] = {}
-    for tool in KNOWN_TOOLS:
-        targets = list(_tool_targets(tool, home))
-        installed = bool(targets) and all(path.is_file() for path in targets)
-        readable = installed and all(path.stat().st_size > 0 for path in targets)
-        read_receipt = _latest_receipt(
-            receipts,
-            f"{tool}:read",
-            expected_project_id,
-            allowed_sources=NATIVE_RECEIPT_SOURCES,
+    registry = ToolRegistry.load(root)
+    for definition in registry.enabled():
+        tool = definition.tool_id
+        targets = list(_tool_targets(tool, home, registry=registry))
+        installed = bool(targets) and any(
+            path.is_file() or path.is_dir() for path in targets
         )
-        write_receipt = _latest_receipt(
-            receipts,
-            f"{tool}:write",
-            expected_project_id,
-            allowed_sources=NATIVE_RECEIPT_SOURCES,
+        readable = installed and any(
+            path.is_file() and path.stat().st_size > 0 for path in targets
         )
-        read_verified = _is_fresh_native(read_receipt, expected_project_id)
-        write_verified = _is_fresh_native(write_receipt, expected_project_id)
-        if read_verified and write_verified:
-            status = "verified_bidirectional"
-        elif read_verified:
-            status = "verified_read_only"
-        elif installed and readable:
-            status = "configured_unverified"
-        else:
+        read_proof, write_proof = latest_proof_receipts(
+            root, tool=tool, expected_project_id=expected_project_id
+        )
+        read_receipt = read_proof.to_dict() if read_proof else None
+        write_receipt = write_proof.to_dict() if write_proof else None
+        status = capability_status(
+            read_receipt=read_receipt,
+            write_receipt=write_receipt,
+            expected_project_id=expected_project_id,
+        )
+        if status == "configured_unverified" and (not installed or not readable):
             status = "not_configured"
         out[tool] = {
             "status": status,
@@ -278,4 +291,12 @@ def probe(
     return out
 
 
-__all__ = ["KNOWN_TOOLS", "TOOL_TARGETS", "load", "record", "probe", "summary"]
+__all__ = [
+    "KNOWN_TOOLS",
+    "NATIVE_RECEIPT_SOURCES",
+    "TOOL_TARGETS",
+    "load",
+    "probe",
+    "record",
+    "summary",
+]

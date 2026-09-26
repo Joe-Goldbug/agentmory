@@ -1,10 +1,10 @@
 """Observe local VS Code Copilot session metadata without reading prompts.
 
-VS Code exposes no lifecycle hook for this integration. The watcher supports
-both the Copilot CLI session-state format and the VS Code Copilot Chat
-workspaceStorage transcript format. It uses only session headers/event types,
-never message content, and labels receipts ``watcher-observed`` so capability
-probing cannot mistake it for a native callback.
+The watcher remains the fallback for hosts that have not fired a native
+integration. The packaged VS Code-compatible companion is the native bridge
+path; until the host fires it, this adapter uses only session headers/event
+types, never message content, and labels receipts ``watcher-observed`` so
+capability probing cannot mistake observation for a native callback.
 """
 
 from __future__ import annotations

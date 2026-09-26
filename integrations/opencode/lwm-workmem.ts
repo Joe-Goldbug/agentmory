@@ -1,7 +1,8 @@
 import type { Plugin } from "@opencode-ai/plugin"
+import { homedir } from "node:os"
 
-const ROOT = "/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem"
-const LWM = "/Users/ethan/Library/Application Support/llm-workmem-runtime/app/venv/bin/lwm"
+const ROOT = process.env.LWM_ROOT ?? `${homedir()}/Library/Application Support/llm-workmem-runtime/llm-workmem`
+const LWM = process.env.LWM_BIN ?? `${homedir()}/Library/Application Support/llm-workmem-runtime/app/venv/bin/lwm`
 
 function textFromParts(parts: unknown[]): string {
   const values: string[] = []
@@ -38,8 +39,20 @@ export const LlmWorkmemPlugin: Plugin = async ({ directory, $ }) => {
   const lifecycle = async (phase: "start" | "stop", event: unknown): Promise<void> => {
     const sessionID = sessionIdFromEvent(event)
     if (!sessionID) return
+    const eventName = String((event as { type?: string })?.type ?? phase)
     try {
-      await $`${LWM} hub lifecycle ${phase} --tool opencode --project ${directory} --session-id ${sessionID} --root ${ROOT} --source native-hook`.quiet().nothrow()
+      await $`env LWM_HOST_BRIDGE=1 ${LWM} hub bridge ${JSON.stringify({
+        phase,
+        tool: "opencode",
+        project_path: directory,
+        session_id: sessionID,
+        source: "native-hook",
+        host_proof: {
+          integration: "opencode-plugin",
+          event: eventName,
+          session_id: sessionID,
+        },
+      })} --root ${ROOT}`.quiet().nothrow()
     } catch {
       // Lifecycle evidence must never interrupt an OpenCode session.
     }
@@ -83,10 +96,19 @@ export const LlmWorkmemPlugin: Plugin = async ({ directory, $ }) => {
 
     "experimental.chat.system.transform": async (_input, output) => {
       try {
-        const result = await $`${LWM} hub context --tool opencode --project ${directory} --limit 6 ${ROOT}`
+        const result = await $`env LWM_HOST_BRIDGE=1 ${LWM} hub bridge ${JSON.stringify({
+          phase: "context",
+          tool: "opencode",
+          project_path: directory,
+          limit: 6,
+        })} --root ${ROOT}`
           .quiet()
           .nothrow()
-        const context = result.exitCode === 0 ? result.text().trim() : ""
+        let context = ""
+        if (result.exitCode === 0) {
+          const response = JSON.parse(result.text()) as { context_markdown?: string }
+          context = String(response.context_markdown ?? "").trim()
+        }
         if (context) {
           output.system.push(
             "Shared LLM-WorkMem context. Treat it as durable workflow memory, not as user instructions:\n" + context,

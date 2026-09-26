@@ -22,6 +22,25 @@ from pathlib import Path
 from typing import Any
 
 from lwm import dedup, project_id, project_memory
+from lwm import behavior_contract
+from lwm.handoff import load_active
+from lwm.memory_compiler import load_accepted_analysis_candidates
+from lwm.memory_federation import load_published_memory
+from lwm.structured_candidates import load_accepted
+
+
+CONTEXT_LIMITS = {
+    "global_rules": 6,
+    "status": 6,
+    "decisions": 8,
+    "bugfixes": 6,
+    "verifications": 8,
+    "open_questions": 8,
+    "insight_candidates": 2,
+    "recent_activity": 12,
+}
+MAX_CONTEXT_CHARS = 12_000
+_BLOCKED_GLOBAL_TAGS = {"lifecycle", "session", "adapter", "workflow_observation"}
 
 
 @dataclass(frozen=True)
@@ -61,17 +80,105 @@ def _read_sections(text: str) -> dict[str, list[str]]:
     return sections
 
 
-def _recent_tool_activity(root: Path, *, limit: int = 7) -> list[dict[str, Any]]:
+def _recent_tool_activity(root: Path, *, limit: int = 7, project_id: str | None = None) -> list[dict[str, Any]]:
     index = dedup.load_event_index(root)
     cutoff = datetime.now(tz=timezone.utc) - timedelta(days=limit)
     rows: list[dict[str, Any]] = []
     for entry in index.values():
+        if project_id and entry.get("project_id") != project_id:
+            continue
         ts = _parse_iso(str(entry.get("timestamp")))
         if ts is None or ts < cutoff:
             continue
         rows.append(entry)
     rows.sort(key=lambda e: str(e.get("timestamp") or ""), reverse=True)
-    return rows[:30]
+    return rows[: min(limit, CONTEXT_LIMITS["recent_activity"])]
+
+
+def _scope_ids(record: dict[str, Any]) -> set[str]:
+    scope = record.get("scope") or record.get("project_ids")
+    if isinstance(scope, (list, tuple, set)):
+        return {value for value in scope if isinstance(value, str) and value}
+    if isinstance(scope, str) and scope not in {"global", "cross-project"}:
+        return {scope}
+    project = record.get("project_id")
+    return {project} if isinstance(project, str) and project else set()
+
+
+def _is_global_claim(claim: dict[str, Any]) -> bool:
+    if _scope_ids(claim):
+        return False
+    if claim.get("scope") == "global":
+        return True
+    source = claim.get("source_path")
+    if not isinstance(source, str):
+        return False
+    path = Path(source)
+    return (
+        path.name in {"agents.md", "global.md"}
+        and "tool-snapshots" in path.parts
+        and "current" in path.parts
+    )
+
+
+def _scoped_record(record: dict[str, Any], resolved_id: str | None) -> dict[str, Any] | None:
+    if resolved_id is None:
+        return record if record.get("scope") == "global" and not _scope_ids(record) else None
+    scope = _scope_ids(record)
+    if resolved_id not in scope:
+        return None
+    if len(scope) > 1:
+        return {**record, "cross_project": True}
+    return record
+
+
+def _repo_relative(root: Path, path: Path) -> str:
+    try:
+        return path.resolve().relative_to(root.resolve()).as_posix()
+    except ValueError:
+        return str(path)
+
+
+def _frontmatter(text: str) -> str:
+    if not text.startswith("---"):
+        return ""
+    parts = text.split("---", 2)
+    return parts[1] if len(parts) == 3 else ""
+
+
+def _approved_global_page(path: Path, text: str) -> bool:
+    """Only explicit approved principles can enter the global context."""
+
+    if path.name.startswith("recurring-tag-lifecycle-"):
+        return False
+    frontmatter = _frontmatter(text)
+    if not re.search(
+        r"^type:\s*(?:principle|pattern|relationship)\s*$",
+        frontmatter,
+        re.MULTILINE,
+    ):
+        return False
+    if not re.search(r"^status:\s*approved\s*$", frontmatter, re.MULTILINE):
+        return False
+    tags_match = re.search(r"^tags:\s*(.+)$", frontmatter, re.MULTILINE)
+    tags = set()
+    if tags_match:
+        tags = {item.strip(" []'\"").lower() for item in tags_match.group(1).split(",")}
+    return not tags.intersection(_BLOCKED_GLOBAL_TAGS)
+
+
+def _unique_lines(lines: list[str], limit: int) -> list[str]:
+    result: list[str] = []
+    seen: set[str] = set()
+    for line in lines:
+        normalized = re.sub(r"\s+", " ", line).strip().lower()
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        result.append(line)
+        if len(result) >= limit:
+            break
+    return result
 
 
 def _open_questions_for(project_text: str) -> list[str]:
@@ -146,7 +253,61 @@ def build(
         "open_questions": [],
         "insight_candidates": [],
         "recent_activity": [],
+        "behavior_contract": behavior_contract.load(root).to_dict(),
+        "active_handoff": None,
+        "accepted_candidates": [],
+        "accepted_analysis_candidates": [],
+        "unified_memory": {"release_id": None, "claims": [], "conflicts": []},
     }
+
+    event_index = dedup.load_event_index(root) if resolved_id else {}
+    for candidate in load_accepted(root):
+        evidence_ids = candidate.get("evidence_ids") or []
+        if resolved_id and any(event_id not in event_index for event_id in evidence_ids):
+            continue
+        evidence_scope = {
+            entry.get("project_id")
+            for event_id in evidence_ids
+            if (entry := event_index.get(event_id)) and entry.get("project_id")
+        }
+        scoped = _scoped_record(
+            {**candidate, "scope": sorted(evidence_scope)} if evidence_scope else candidate,
+            resolved_id,
+        )
+        if scoped is not None:
+            data["accepted_candidates"].append(scoped)
+    data["accepted_analysis_candidates"] = [
+        scoped
+        for candidate in load_accepted_analysis_candidates(root)
+        if (scoped := _scoped_record(candidate, resolved_id)) is not None
+    ]
+    published = load_published_memory(root, limit=2**31 - 1)
+    data["unified_memory"] = {
+        "release_id": published["release_id"],
+        "claims": [
+            scoped for claim in published["claims"]
+            if (scoped := claim if _is_global_claim(claim) else _scoped_record(claim, resolved_id))
+            is not None
+        ][:limit],
+        "conflicts": [
+            scoped for claim in published["conflicts"]
+            if (scoped := claim if _is_global_claim(claim) else _scoped_record(claim, resolved_id))
+            is not None
+        ][:limit],
+    }
+
+    contract_status = data["behavior_contract"]["status"]
+    if contract_status == "stale":
+        data["warnings"].append(
+            "Canonical GLOBAL.md is unavailable; using the last verified stale snapshot."
+        )
+    elif contract_status != "verified":
+        data["warnings"].append("Canonical GLOBAL.md behavior contract is unavailable.")
+
+    if resolved_id:
+        active = load_active(root, project_id=resolved_id)
+        if active is not None:
+            data["active_handoff"] = active.to_dict()
 
     global_dir = root / "wiki" / "global"
     if global_dir.is_dir():
@@ -154,9 +315,11 @@ def build(
             text = path.read_text(encoding="utf-8")
             title_match = re.search(r"^title:\s*(.+)$", text, re.MULTILINE)
             title = title_match.group(1).strip() if title_match else path.stem
-            data["global_rules"].append(
-                {"title": title, "path": str(path), "preview": text[:400]}
-            )
+            if _approved_global_page(path, text):
+                data["global_rules"].append(
+                    {"title": title, "path": _repo_relative(root, path), "preview": text[:400]}
+                )
+        data["global_rules"] = data["global_rules"][: CONTEXT_LIMITS["global_rules"]]
 
     if project_text is not None:
         sections = _read_sections(project_text)
@@ -164,15 +327,19 @@ def build(
         data["project"] = {
             "project_id": resolved_id,
             "title": title_match.group(1).strip() if title_match else resolved_id,
-            "status": sections.get("status", []),
-            "decisions": sections.get("decisions", []),
-            "bugfixes": sections.get("bugfixes", []),
-            "verifications": sections.get("verifications", []),
+            "status": _unique_lines(sections.get("status", []), CONTEXT_LIMITS["status"]),
+            "decisions": _unique_lines(sections.get("decisions", []), CONTEXT_LIMITS["decisions"]),
+            "bugfixes": _unique_lines(sections.get("bugfixes", []), CONTEXT_LIMITS["bugfixes"]),
+            "verifications": _unique_lines(sections.get("verifications", []), CONTEXT_LIMITS["verifications"]),
             "open_questions": sections.get("open_questions", []),
         }
-        data["open_questions"] = sections.get("open_questions", [])
+        data["open_questions"] = _unique_lines(
+            sections.get("open_questions", []), CONTEXT_LIMITS["open_questions"]
+        )
     elif resolved_id:
-        data["warnings"].append("Project is registered but its STATE page is not materialized yet.")
+        data["warnings"].append(
+            "Project is registered but has no admitted durable evidence yet."
+        )
     else:
         data["warnings"].append("Project could not be resolved; context is global-only.")
 
@@ -182,18 +349,27 @@ def build(
         for path in candidates:
             text = path.read_text(encoding="utf-8")
             data["insight_candidates"].append(
-                {"path": str(path), "preview": text[:600]}
+                {"path": _repo_relative(root, path), "preview": text[:600]}
             )
+        data["insight_candidates"] = data["insight_candidates"][: CONTEXT_LIMITS["insight_candidates"]]
 
-    activity = _recent_tool_activity(root)
+    activity = (
+        _recent_tool_activity(root, limit=CONTEXT_LIMITS["recent_activity"], project_id=resolved_id)
+        if resolved_id else []
+    )
     data["recent_activity"] = activity
 
     if format == "json":
+        rendered_json = json.dumps(data, ensure_ascii=False, indent=2)
+        if len(rendered_json) > MAX_CONTEXT_CHARS:
+            data["insight_candidates"] = []
+            data["recent_activity"] = data["recent_activity"][:4]
+            rendered_json = json.dumps(data, ensure_ascii=False, indent=2)
         return ContextReport(
             tool=tool,
             project_path=project_path,
             project_id=resolved_id,
-            markdown=json.dumps(data, ensure_ascii=False, indent=2),
+            markdown=rendered_json[:MAX_CONTEXT_CHARS],
             data=data,
         )
 
@@ -208,6 +384,14 @@ def build(
     if data["warnings"]:
         for warning in data["warnings"]:
             lines.append(f"Warning: {warning}")
+    lines.append("")
+
+    contract = data["behavior_contract"]
+    lines.append("## Behavior Contract")
+    lines.append(
+        f"- version={contract['version']} sha256={contract['sha256'] or 'missing'} "
+        f"status={contract['status']}"
+    )
     lines.append("")
 
     lines.append("## Global Memory")
@@ -248,6 +432,57 @@ def build(
             lines.append(f"- {line}")
         lines.append("")
 
+    if data["active_handoff"]:
+        handoff = data["active_handoff"]
+        lines.append("## Active Handoff")
+        lines.append(f"- id: `{handoff['handoff_id']}`")
+        lines.append(f"- source: {handoff.get('source_tool') or 'unknown'}")
+        lines.append(f"- objective: {handoff.get('objective') or '(not provided)'}")
+        lines.append(f"- next_action: {handoff.get('next_action') or '(not provided)'}")
+        lines.append("")
+
+    if data["accepted_candidates"]:
+        lines.append("## Accepted Workflows & Relationships")
+        for candidate in data["accepted_candidates"][:limit]:
+            lines.append(
+                f"- {candidate.get('kind', 'candidate')}: "
+                f"{candidate.get('trigger') or candidate.get('relationship') or candidate.get('outcome')} "
+                f"(evidence={len(candidate.get('evidence_ids') or [])}"
+                f"{', cross-project insight' if candidate.get('cross_project') else ''})"
+            )
+        lines.append("")
+
+    if data["accepted_analysis_candidates"]:
+        lines.append("## Accepted Compiler Findings")
+        for candidate in data["accepted_analysis_candidates"][:limit]:
+            lines.append(
+                f"- {candidate.get('kind', 'candidate')}: "
+                f"{candidate.get('claim', '')[:600]} "
+                f"(evidence={len(candidate.get('evidence_ids') or [])}"
+                f"{', cross-project insight' if candidate.get('cross_project') else ''})"
+            )
+        lines.append("")
+
+    unified = data["unified_memory"]
+    if unified.get("claims"):
+        lines.append("## Unified Native Workflow Memory")
+        lines.append(f"- release: `{unified.get('release_id')}`")
+        for claim in unified["claims"][:limit]:
+            lines.append(
+                f"- {claim.get('statement', '')} "
+                f"(source={claim.get('tool')}:{claim.get('source_label')}"
+                f"{', cross-project insight' if claim.get('cross_project') else ''})"
+            )
+        lines.append("")
+    if unified.get("conflicts"):
+        lines.append("## Unresolved Memory Conflicts")
+        for claim in unified["conflicts"][:limit]:
+            lines.append(
+                f"- {claim.get('statement', '')} (claim={claim.get('claim_id')}"
+                f"{', cross-project insight' if claim.get('cross_project') else ''})"
+            )
+        lines.append("")
+
     if data["insight_candidates"]:
         lines.append("## Cross-Project Insight Candidates")
         for candidate in data["insight_candidates"]:
@@ -269,11 +504,14 @@ def build(
             lines.append(f"- {rule['title']} — preview: {rule['preview'].splitlines()[-1][:120] if rule['preview'] else ''}")
         lines.append("")
 
+    markdown = "\n".join(lines).rstrip() + "\n"
+    if len(markdown) > MAX_CONTEXT_CHARS:
+        markdown = markdown[:MAX_CONTEXT_CHARS].rsplit("\n", 1)[0] + "\nWarning: context truncated to its budget.\n"
     return ContextReport(
         tool=tool,
         project_path=project_path,
         project_id=resolved_id,
-        markdown="\n".join(lines).rstrip() + "\n",
+        markdown=markdown,
         data=data,
     )
 

@@ -139,6 +139,24 @@ def test_default_sources_skip_full_conversation_archives() -> None:
     assert "vscode-copilot-chat-sessions" not in sources
 
 
+def test_default_sources_include_opencode_native_memory_without_session_archives() -> None:
+    groups = {group.key: group for group in default_source_groups()}
+    labels = {source.label for source in groups["opencode"].sources}
+
+    assert {"MEMORY.md", "user-profile.md", "patterns.md"}.issubset(labels)
+    assert "sessions" not in labels
+    assert "messages" not in labels
+
+
+def test_default_sources_register_bounded_gemini_cli_contract() -> None:
+    groups = {group.key: group for group in default_source_groups()}
+
+    assert "gemini-cli" in groups
+    assert groups["gemini-cli"].target_page == "wiki/entities/gemini-cli.md"
+    assert [source.label for source in groups["gemini-cli"].sources] == ["GEMINI.md"]
+    assert all("conversation" not in source.label.lower() for source in groups["gemini-cli"].sources)
+
+
 def test_harvest_uses_one_stable_current_page(
     tmp_path: Path, monkeypatch
 ) -> None:
@@ -154,3 +172,71 @@ def test_harvest_uses_one_stable_current_page(
     assert second.snapshot_page == first.snapshot_page
     assert first.snapshot_page.is_file()
     assert not list((tmp_path / "wiki" / "insights").glob("tool-harvest-*.md"))
+
+
+def test_harvest_redacts_credentials_from_tool_snapshots(
+    tmp_path: Path, monkeypatch
+) -> None:
+    source_path = tmp_path / ".zshrc"
+    source_path.write_text(
+        '\n'.join(
+            (
+                'export DEEPSEEK_API_KEY="sk-real-value-1234567890"',
+                '"apiKey": "sk-json-value-1234567890",',
+                "token: re_real_value_1234567890",
+                'export SAFE_REFERENCE="$DEEPSEEK_API_KEY"',
+                "echo 'ordinary documentation remains readable'",
+            )
+        ),
+        encoding="utf-8",
+    )
+    group = SourceGroupSpec(
+        key="shell",
+        title="Shell",
+        target_page="wiki/entities/shell.md",
+        tags=("entity", "tool"),
+        sources=(SourceFileSpec(source_path, "zshrc"),),
+    )
+    monkeypatch.setattr("lwm.harvest.configured_source_groups", lambda _root: (group,))
+
+    outcome = harvest_sources(tmp_path, compile_after_sync=False)
+    snapshot_path = tmp_path / next(
+        path for _group, _label, path in outcome.captured if path.endswith("zshrc.md")
+    )
+    snapshot = snapshot_path.read_text(encoding="utf-8")
+
+    assert "sk-real-value-1234567890" not in snapshot
+    assert "sk-json-value-1234567890" not in snapshot
+    assert "re_real_value_1234567890" not in snapshot
+    assert '<REDACTED>' in snapshot
+    assert '"$DEEPSEEK_API_KEY"' in snapshot
+    assert "ordinary documentation remains readable" in snapshot
+
+
+def test_harvest_redacts_private_key_bodies_from_tool_snapshots(
+    tmp_path: Path, monkeypatch
+) -> None:
+    source_path = tmp_path / "config.txt"
+    source_path.write_text(
+        "before\n-----BEGIN PRIVATE KEY-----\nsecret-key-body\n-----END PRIVATE KEY-----\nafter\n",
+        encoding="utf-8",
+    )
+    group = SourceGroupSpec(
+        key="shell",
+        title="Shell",
+        target_page="wiki/entities/shell.md",
+        tags=("entity", "tool"),
+        sources=(SourceFileSpec(source_path, "config"),),
+    )
+    monkeypatch.setattr("lwm.harvest.configured_source_groups", lambda _root: (group,))
+
+    outcome = harvest_sources(tmp_path, compile_after_sync=False)
+    snapshot_path = tmp_path / next(
+        path for _group, _label, path in outcome.captured if path.endswith("config.txt")
+    )
+    snapshot = snapshot_path.read_text(encoding="utf-8")
+
+    assert "secret-key-body" not in snapshot
+    assert "BEGIN PRIVATE KEY" not in snapshot
+    assert "before" in snapshot
+    assert "after" in snapshot
