@@ -12,6 +12,19 @@
 - **极简工程**：杜绝过度设计，除非用户主动要求，否则不引入复杂依赖。
 - **真相比速度重要**：坚守 Truth-First Loop，没有看完日志/真实文件前，不随便下“这应该是权限问题”、“这应该是依赖没装好”之类的模糊结论。
 
+### 🔹 Ponytail 极简工程与 7 级决策阶梯
+- **核心哲学**：最好的代码是没写出来的代码（The best code is the code never written）。像最懒的资深工程师一样思考，最短可用 diff 获胜。
+- **7 级决策阶梯**（写代码前从上往下，停在首个成立台阶）：
+  1. 真的需要存在吗？(YAGNI → 跳过，1 句话说明)
+  2. 代码库已有？(复用 helper/util，杜绝重复造轮子)
+  3. 标准库能做？(stdlib 优先)
+  4. 原生平台能覆盖？(HTML5/CSS 原生代替类库与 JS)
+  5. 已安装依赖能解决？(绝不为了几行代码引入新依赖)
+  6. 能一行解决？(单行解决不冗余包装)
+  7. 以上都不行 → 才写最少可运行代码 (Minimal Viable Code)
+- **工程铁律**：Bug 修根因不修症状（grep caller 共享底层修一次）；删 > 加，boring > clever；零抽象默认；输出先给代码且解释不超过 3 行。
+- **安全底线 100% 保持**：输入校验、防崩溃防丢错、系统权限边界、用户明确要求不可砍。
+
 ### 🔹 框架与样式偏好
 - **核心**：HTML + 原生 Javascript。
 - **样式**：Vanilla CSS 优先，拒绝无意义的 TailwindCSS 堆叠，除非用户主动指定并确认版本。
@@ -42,16 +55,19 @@
 <!-- LLM-WIKI:START -->
 # LLM-WorkMem Context
 
-Use this llm-workmem as the shared workflow and memory source for this tool.
+Use `/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/GLOBAL.md` as the shared personal behavior contract for this tool.
 Project: `/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/projects/antigravity`
+Project memory, handoffs, Recall and review candidates are auxiliary evidence; native platform safety rules, instructions, skills, memory, planning, execution and verification remain authoritative.
+Canonical personal behavior contract: `/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/GLOBAL.md` (version=1 sha256=f73d3a026fa3a213b763698b09cc1e698baa5aaa4e086f52b329ec722b18a29e status=verified).
+Use the startup context command above to refresh this hash before relying on it.
 
 Read order:
-0. **On session start**, run `lwm hub context --tool <your-tool-name> --project /Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/projects/antigravity /Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem` to get the latest dynamic context (project memory, recent decisions, open questions). This is always fresher than the static files below.
-1. `/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/llms.txt` for compact context (fallback if step 0 is unavailable).
-2. `/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/wiki/purpose.md` for scope and guardrails.
-3. `/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/wiki/overview.md` for the current synthesis.
-4. `/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/llms-full.txt` only when deeper context is needed.
-5. `/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/llms.json` for programmatic page metadata.
+0. **On session start**, run `lwm hub bridge '{"phase": "context", "tool": "antigravity", "project_path": "/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/projects/antigravity"}' --output markdown --root '/Users/ethan/Library/Application Support/llm-workmem-runtime/llm-workmem'` to get the latest dynamic context (project memory, recent decisions, open questions). This is always fresher than the static files below.
+1. `/Users/ethan/Library/Application Support/llm-workmem-runtime/llm-workmem/llms.txt` for compact context (fallback if step 0 is unavailable).
+2. `/Users/ethan/Library/Application Support/llm-workmem-runtime/llm-workmem/wiki/purpose.md` for scope and guardrails.
+3. `/Users/ethan/Library/Application Support/llm-workmem-runtime/llm-workmem/wiki/overview.md` for the current synthesis.
+4. `/Users/ethan/Library/Application Support/llm-workmem-runtime/llm-workmem/llms-full.txt` only when deeper context is needed.
+5. `/Users/ethan/Library/Application Support/llm-workmem-runtime/llm-workmem/llms.json` for programmatic page metadata.
 
 Write-back:
 - After meaningful work, emit events via `lwm hub record` so the hub stays current.
@@ -59,4 +75,10 @@ Write-back:
 - Prefer `wiki/` pages that passed audit over raw snapshots.
 - Keep local project facts local unless they should be promoted through review.
 - After meaningful work, update or generate evidence that `lwm harvest`, `lwm watch`, or `lwm audit` can consume.
+
+Structured write-back for completed work:
+- Record only bounded decisions, changes, verifications, risks, or open questions; do not paste a transcript or raw prompt.
+- For cross-tool continuation, submit a bounded handoff with:
+  `lwm hub bridge-stop --tool antigravity --project "$PWD" --task-id "$LWM_TASK_ID" --handoff-json '{"task_id":"...","objective":"...","current_state":"...","changes":["..."],"verifications":["..."],"risks":[],"open_questions":[],"next_action":"..."}' --root '/Users/ethan/Library/Application Support/llm-workmem-runtime/llm-workmem'`
+- A handoff is evidence for the next tool, not a replacement for native instructions, skills, planning, execution, or verification.
 <!-- LLM-WIKI:END -->

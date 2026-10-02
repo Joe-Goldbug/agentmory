@@ -81,6 +81,10 @@ def test_install_global_writes_all_adapters(tmp_path: Path) -> None:
     claude = (fake_home / ".claude" / "CLAUDE.md").read_text(encoding="utf-8")
     assert "shared personal behavior contract" in claude
     assert "Project memory, handoffs, Recall and review candidates are auxiliary evidence" in claude
+    assert "Do not run a second startup fetch" in claude
+    assert "When the task depends on historical decisions" in claude
+    assert "Skip unchanged-state write-back" in claude
+    assert "**On session start**" not in claude
     for path, tool in {
         fake_home / ".codex" / "AGENTS.md": "codex",
         fake_home / ".claude" / "CLAUDE.md": "claude-code",

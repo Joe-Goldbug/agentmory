@@ -1,25 +1,33 @@
 <!-- LBM-WIKI:CURSOR:START -->
 ---
-description: LLM-WorkMem shared workflow and memory source (always apply)
+description: Shared personal behavior contract plus auxiliary evidence context (always apply)
 globs:
 alwaysApply: true
 ---
 
 # LLM-WorkMem Context
 
-Use this llm-workmem as the shared workflow and memory source for this tool.
+Use `/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/GLOBAL.md` as the shared personal behavior contract for this tool.
 Project: `/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/projects/antigravity`
+Project memory, handoffs, Recall and review candidates are auxiliary evidence; native platform safety rules, instructions, skills, memory, planning, execution and verification remain authoritative.
+Canonical personal behavior contract: `/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/GLOBAL.md` (version=1 sha256=f73d3a026fa3a213b763698b09cc1e698baa5aaa4e086f52b329ec722b18a29e status=verified).
 
 Read order:
-1. `/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/llms.txt` for compact context.
-2. `/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/wiki/purpose.md` for scope and guardrails.
-3. `/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/wiki/overview.md` for the current synthesis.
-4. `/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/llms-full.txt` only when deeper context is needed.
-5. `/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/llms.json` for programmatic page metadata.
+1. `/Users/ethan/Library/Application Support/llm-workmem-runtime/llm-workmem/llms.txt` for compact context.
+2. `/Users/ethan/Library/Application Support/llm-workmem-runtime/llm-workmem/wiki/purpose.md` for scope and guardrails.
+3. `/Users/ethan/Library/Application Support/llm-workmem-runtime/llm-workmem/wiki/overview.md` for the current synthesis.
+4. `/Users/ethan/Library/Application Support/llm-workmem-runtime/llm-workmem/llms-full.txt` only when deeper context is needed.
+5. `/Users/ethan/Library/Application Support/llm-workmem-runtime/llm-workmem/llms.json` for programmatic page metadata.
 
 Rules:
 - Treat `raw/` as source evidence, not polished memory.
 - Prefer `wiki/` pages that passed audit over raw snapshots.
 - Keep local project facts local unless they should be promoted through review.
 - After meaningful work, update or generate evidence that `lwm harvest`, `lwm watch`, or `lwm audit` can consume.
+
+On session start, refresh bounded context with:
+`lwm hub bridge '{"phase": "context", "tool": "cursor", "project_path": "/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/projects/antigravity"}' --output markdown --root '/Users/ethan/Library/Application Support/llm-workmem-runtime/llm-workmem'`
+
+For completed work, use structured write-back rather than a transcript:
+`lwm hub bridge-stop --tool cursor --project "$PWD" --task-id "$LWM_TASK_ID" --handoff-json '{"task_id":"...","objective":"...","current_state":"...","changes":["..."],"verifications":["..."],"risks":[],"open_questions":[],"next_action":"..."}' --root '/Users/ethan/Library/Application Support/llm-workmem-runtime/llm-workmem'`
 <!-- LBM-WIKI:CURSOR:END -->

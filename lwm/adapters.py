@@ -84,10 +84,13 @@ def _context_block(
 Use `{contract_reference}` as the shared personal behavior contract for this tool.{project_line}
 Project memory, handoffs, Recall and review candidates are auxiliary evidence; native platform safety rules, instructions, skills, memory, planning, execution and verification remain authoritative.
 Canonical personal behavior contract: `{contract_reference}` ({contract_line}).
-Use the startup context command above to refresh this hash before relying on it.
+Reuse context already injected by a native hook, plugin, companion, or the current
+session. Do not run a second startup fetch when equivalent context is present.
 
 Read order:
-0. **On session start**, run `{context_cmd}` to get the latest dynamic context (project memory, recent decisions, open questions). This is always fresher than the static files below.
+0. When the task depends on historical decisions, cross-tool continuation, or
+   missing project evidence and no equivalent context is already present, run
+   `{context_cmd}` for bounded dynamic context.
 1. `{root / 'llms.txt'}` for compact context (fallback if step 0 is unavailable).
 2. `{root / 'wiki' / 'purpose.md'}` for scope and guardrails.
 3. `{root / 'wiki' / 'overview.md'}` for the current synthesis.
@@ -95,7 +98,8 @@ Read order:
 5. `{root / 'llms.json'}` for programmatic page metadata.
 
 Write-back:
-- After meaningful work, emit events via `lwm hub record` so the hub stays current.
+- After meaningful work that changed verified cross-tool state, emit a bounded
+  event via `lwm hub record`. Skip unchanged-state write-back.
 - Treat `raw/` as source evidence, not polished memory.
 - Prefer `wiki/` pages that passed audit over raw snapshots.
 - Keep local project facts local unless they should be promoted through review.
