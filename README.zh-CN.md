@@ -30,6 +30,21 @@ lwm hub recall "当前项目最近完成了什么验证？" \
 
 这个层只组织证据，不替当前 IDE 或 Shell Agent 生成最终答案。回执或 CBMEM 暂时不可用时，读取仍然继续，并在 warning/health 中报告降级状态。
 
+## 跨 Agent 工作流与记忆
+
+全局适配器安装器支持为 Claude Code、Codex、Kiro、Antigravity、MiniMax、OpenCode、Trae、Cursor、Gemini CLI、VS Code 和 Shell 生成各自适用的指令或集成入口。项目级 attach 也会为支持的工具生成项目上下文。Hook 和会话覆盖因宿主而异；仅有指令文件不代表集成已正常工作。
+
+设置仓库路径，预览安装，并检查实际覆盖：
+
+```bash
+export LWM_ROOT="/path/to/LLM-WorkMem"
+lwm install-global "$LWM_ROOT" --dry-run
+lwm hub tools probe --root "$LWM_ROOT" --json
+lwm hub coverage --root "$LWM_ROOT" --json
+```
+
+LLM-WorkMem 是辅助证据与交接层，不取代各 Agent 原生的指令、技能、计划、执行、验证或记忆；各工具原生工作流仍是权威来源。
+
 > **模型建议：** 由于 wiki 的构建和维护会产生大量 token 消耗，建议使用按计划订阅的服务（如 Claude Max、Cursor 等），或自行部署模型（如 [MiniMax](https://www.minimaxi.com/)、[GLM](https://open.bigmodel.cn/) 等），以避免按量计费带来的高额成本。
 
 ## 快速开始

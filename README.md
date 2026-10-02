@@ -72,6 +72,21 @@ only a qualifying native hook receipt can be reported as verified tool
 integration. Use `lwm hub tools probe` and `lwm hub coverage` rather than
 assuming that a generated instruction file proves bidirectional support.
 
+## Cross-Agent Workflow and Memory
+
+The global adapter installer supports host-specific instruction or integration surfaces for Claude Code, Codex, Kiro, Antigravity, MiniMax, OpenCode, Trae, Cursor, Gemini CLI, VS Code, and shell workflows. Project attachment also generates project-level context for supported hosts. Hook and session coverage varies by host: an installed instruction file alone is not proof of a working integration.
+
+Set the checkout path, preview the installation, then verify actual coverage:
+
+```bash
+export LWM_ROOT="/path/to/LLM-WorkMem"
+lwm install-global "$LWM_ROOT" --dry-run
+lwm hub tools probe --root "$LWM_ROOT" --json
+lwm hub coverage --root "$LWM_ROOT" --json
+```
+
+LLM-WorkMem is an auxiliary evidence and handoff layer. It does not replace each agent's native instructions, skills, planning, execution, verification, or memory; keep those native workflows authoritative.
+
 ## Quick Start
 
 You can do the manual installation without needing `uv` or `act-cli`.
