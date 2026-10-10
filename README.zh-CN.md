@@ -2,316 +2,432 @@
 
 <p align="center">
   <img src="assets/logo.svg" alt="llm-workmem" width="480" /><br />
-  <sub>基于 LLM 的个人知识库</sub>
+  <sub>跨 Agent 统一工作记忆与知识管理系统</sub>
 </p>
 
-一个与你共同成长的 LLM-WorkMem。基于 [Karpathy 的 LLM-WorkMem](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)。
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Python: >=3.11](https://img.shields.io/badge/Python->=3.11-green.svg)](pyproject.toml)
 
-本仓库包含两部分：
+一个与你共同演进的 LLM 工作记忆与个人知识库系统。源自 [Karpathy 的 LLM-WorkMem 哲学](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)，现已全面升级为面向现代 AI 编程工作流的**跨 Agent 工作记忆、任务交接（Handoff）与证据联邦引擎**。
 
-| 组件 | 路径 | 用途 |
-|------|------|------|
-| **Skill** | `skills/llm-workmem/` | Agent 技能（Claude Code / Cursor / Copilot）— INIT、INGEST、QUERY、UPDATE、LINT |
-| **CLI** | `lwm/` | Python 命令行工具 — 构建 wiki 目录树并追踪 `raw/` 变更 |
+[English Documentation](README.md)
 
-如果你要做更偏“个人知识体”的版本，可以直接用 `lwm init --profile personal`，再用 `lwm analyze` 看图谱里的枢纽、孤立页、断链和缺失来源。`lwm query` 支持 quick / deep / thesis 分层查询，`lwm dashboard` 会生成桌面式 HTML 总览，`lwm serve` 可以启动本地工作台，`lwm harvest` 会把工具记忆体快照进 wiki，`lwm watch` 会在源文件真的变化时才刷新，`lwm export` 会输出 `llms.txt` / `llms-full.txt` / `llms.json`，`lwm adapters` / `lwm attach` 会让 IDE 和 shell 读取这套 wiki，`lwm schedule` 会生成定时运行的 launchd 包。
+---
 
-## Evidence Recall B2
+## 核心定位与设计哲学
 
-`lwm hub recall` 现在返回项目范围的证据包，而不是只返回页面命中：
+在现代 AI 辅助研发中，开发者通常在多个工具与环境中频繁切换：使用 **Claude Code** 或 **Codex** 进行架构设计与计划，在 **Antigravity**、**Cursor** 或 **Trae** 中编写代码，通过 **OpenCode** 或 **Kiro** 执行自动化 Agent 任务，并在 **Zsh** 交互式终端中运行验证流水线。
 
+然而，传统的各 Agent 之间彼此割裂：
+- 会话重启后，历史决定、Bugfix 修复经验与验证结果全部丢失；
+- 在不同 AI 工具间交接任务时，需要手动复制粘贴对话记录；
+- 传统的自由文本记忆系统极易产生幻觉、泄露本地秘钥并导致上下文窗口迅速耗尽。
+
+**`llm-workmem` 的核心使命，是为所有本地 AI 编程工具提供一个统一、结构化、具备可验证凭证的辅助证据与工作记忆基础设施。**
+
+### 核心设计原则
+
+1. **辅助证据层（Auxiliary Evidence Layer）**：`llm-workmem` 在会话启动时向各 Agent 注入项目记忆、行为规范、活跃任务交接与联邦知识。它**绝不取代或重写**各工具原生的工具集、技能、计划、执行、验证或内部记忆机制（各工具的原生工作流保持最高权威）。
+2. **真实核心（Truthful Core）**：仅允许结构化的工程决策（Decisions）、变更（Changes）、验证结果（Verifications）与开放问题（Open Questions）进入长期记忆。命令回显、完整 Prompt、对话废话与环境转录被自动识别为操作噪音并剔除。
+3. **真实凭证严格审计（Strict Proof Verification）**：配置文件存在或本地文件观察不等于双向集成完成。系统严格区分“仅生成指令”（instruction-only）、“观察器捕获”（watcher-observed）与“宿主原生 Hook 验证回执”（native-hook verified proof）。
+4. **零信任隐私与安全隔离（Zero-Trust Privacy & Quarantine）**：所有摄入事件必须经过自动化秘钥脱敏与隐私扫描（`privacy.py`）。高风险事件自动进入隔离区，提供安全的审查恢复链路。
+5. **本地优先与确定性（Local-First & Deterministic）**：完全运行在本地文件系统，依托 Markdown、JSON 与可重构索引，不依赖云端数据库或常驻向量检索服务；可选配置本地或远程兼容 LLM 执行离线记忆编译。
+
+---
+
+## 系统架构（四层统一架构）
+
+`llm-workmem` 采用高度解耦的四层统一架构设计：
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                             捕获层 (CAPTURE PLANE)                          │
+│   IDE 生命周期 Hook │ 统一会话桥 (Bridge) │ 宿主 Companion 扩展 │ 终端 Hook │
+│   (Codex, Claude, AGY, Gemini, Kiro, Trae, MiniMax, VS Code, Cursor, Zsh)   │
+└──────────────────────────────────────┬──────────────────────────────────────┘
+                                       │ 原始事件 (raw/events/inbox/)
+                                       ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                       证据与编译器层 (EVIDENCE & COMPILER)                  │
+│  确定性准入分类 (classify_event)     ──► 隐私与秘钥过滤 (privacy.py)         │
+│  项目记忆确定性重建 (project_memory) ──► 证据链溯源绑定                     │
+│  跨 Agent 记忆联邦 (Federation)      ──► LLM 编译器与每日 Token 预算控制    │
+│  候选审查队列 (review/)              ──► 稳定晋级门禁 (Stable Promotion)    │
+└──────────────────────────────────────┬──────────────────────────────────────┘
+                                       │ 验证后的记忆与交接包
+                                       ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                             交付层 (DELIVERY PLANE)                         │
+│  受限启动上下文 (Context <= 12k 字符) │ 跨 Agent 任务交接 (Handoff Packet)  │
+│  统一行为合同 (GLOBAL.md 验证快照)   │ 确定性证据召回 (Evidence Recall B2)  │
+└──────────────────────────────────────┬──────────────────────────────────────┘
+                                       ▲
+┌──────────────────────────────────────┴──────────────────────────────────────┐
+│                             控制层 (CONTROL PLANE)                          │
+│  6小时 Supervisor 调度守护 (Launchd) │ 不可变周期回执 (CycleReceiptV2)      │
+│  工具能力真实探查 (Tools Probe)      │ 严格健康审计 (Health) 与闭环门禁     │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 1. 捕获层（Capture Plane）
+- **统一会话桥接器（`lwm hub bridge`）**：标准 JSON IPC 接口，统一处理各 IDE 与 CLI 的 `context`、`start` 和 `stop` 生命周期阶段。
+- **原生生命周期 Hooks**：深度对接 Claude Code、Codex、Antigravity、Gemini CLI 及 Zsh 终端生命周期事件。
+- **IDE Companion 扩展**：为 VS Code、Trae、Kiro 和 Cursor 提供宿主兼容包。
+- **项目身份严格解析**：基于 Git 仓库根目录哈希（`id=git-<hash>`）确定项目边界，彻底解决软链接和目录间接引用引起的记忆混淆。
+
+### 2. 证据与编译器层（Evidence & Compiler Plane）
+- **真实核心准入（`lwm hub ingest`）**：将输入事件严格分类为 `durable`（可沉淀工程事实）、`operational`（生命周期/命令等运行噪音）或 `rejected`。
+- **项目记忆确定性重建（`lwm hub rebuild-projects` / `reflect`）**：依据摄入事件自动生成项目状态页（近期决策、Bugfix、验证记录与遗留问题），每条记忆均带有精确到文件与 UUID 的证据链链接。
+- **统一原生记忆联邦（`lwm hub federation`）**：将分散在 OpenCode（`MEMORY.md`）、Codex、Claude Code、Antigravity 中的原生记忆统一抽取、去重并解决冲突，生成带时间戳的不可变发布版本（`release-*.json`）。
+- **LLM 记忆编译器（`lwm hub analyze --pending`）**：基于每日 Token 预算与重试状态机，分析多项目间的复用工作流与模式，生成结构化候选对象（`candidates-*.md`）。
+- **稳定晋级门禁（`lwm hub promote-analysis`）**：严格要求跨至少两个不同项目（`MIN_PROMOTION_PROJECTS >= 2`）并具备正面验证结果才可晋级为全局规则（`wiki/global/*.md`）；当下游证据撤回或被推翻时，自动触发版本回退与撤回。
+
+### 3. 交付层（Delivery Plane）
+- **受限启动上下文（`lwm hub context`）**：启动时根据激活工具组装上限 12,000 字符的精炼上下文，杜绝 Prompt 溢出。
+- **跨 Agent 任务交接（`lwm hub handoff-*`）**：在工具退出时固化当前任务目标、当前状态、决定、变更、验证和下一步行动（`next_action`），供下一个启动的工具接力执行。
+- **证据召回 B2（`lwm hub recall`）**：渐进式确定性检索，返回包含检索计划、证据来源、多维覆盖与缺失项的项目级证据包。
+- **统一行为合同（`GLOBAL.md`）**：全局统一的个人工程行为规范，经由 SHA-256 哈希比对与版本快照验证（`lwm hub behavior`）。
+
+### 4. 控制层（Control Plane）
+- **统一 Supervisor 守护（`lwm hub run-supervisor`）**：每 6 小时或开机时自动执行采集、摄入、重建、候选生成、审查导出与审计。
+- **不可变周期回执（`CycleReceiptV2`）**：每次运行均产出隔离不可变回执，明确划分 `ok`、`warning`、`degraded`、`quality_warning` 与 `failed_core`。
+- **闭环工程门禁（`lwm hub closure`）**：外部客观证据不足时拒绝标记任务闭环，阻断未验证完成。
+- **代码库记忆集成（`lwm cbmem`）**：通过 AST 和代码图谱分析深入解析代码结构。
+
+---
+
+## 跨 Agent 工具生态矩阵
+
+`llm-workmem` 原生支持 11 种主流 AI 研发工具与环境：
+
+| 工具 / 宿主 | 交互形态 | 采集机制 | 交付机制 | 凭证验证等级 (Proof Level) |
+|---|---|---|---|---|
+| **Anthropic Claude Code** | CLI / Agent | SessionStart / Stop 原生 Hook | `CLAUDE.md` + Hook Context | 经测试宿主凭证 (`claude-code-hook`) |
+| **OpenAI Codex** | CLI / IDE | `SessionStart`/`SessionEnd` Hook | `hooks.json` + `AGENTS.md` | 经测试宿主凭证 (`codex-hook`) |
+| **OpenCode** | CLI / Agent | 插件生命周期 + 结构化写回 | `AGENTS.md` + 插件桥接 | 经测试宿主凭证 (`opencode-plugin`) |
+| **Google Antigravity (AGY)** | IDE / Agent | PreInvocation / Stop Hook + MCP | `.agents/AGENTS.md` + Hooks | 原生 Hook 契约 + 观察器备选 |
+| **AWS Kiro** | IDE | 会话 / 导向适配器 (Steering) | Companion 扩展 + Steering | Companion 宿主凭证 (`kiro-extension`) |
+| **ByteDance Trae** | IDE | Attach / 会话适配器 | Companion 扩展 + `.traerules` | Companion 宿主凭证 (`trae-extension`) |
+| **MiniMax** | 桌面端 / CLI | 注册 MCP 桥接器 + Shell 包装 | 运行时 SQLite + Shell Context | 注册 MCP 桥接凭证 (`minimax-mcp`) |
+| **VS Code / Copilot** | IDE | 任务与会话观察器 | Companion 扩展 + 用户指令 | Companion 宿主凭证 (`vscode-extension`) |
+| **Cursor** | IDE | 规则系统 (`.mdc`) + Shell 周期 | `.cursor/rules/llm-workmem.mdc` | Companion / Shell 生命周期备选 |
+| **Gemini CLI** | CLI | SessionStart/End 原生 Hook | `GEMINI.md` + 设置 Hook | 原生 Hook 契约 + MCP 桥接 |
+| **Zsh 交互式终端** | 终端命令行 | `preexec` / `precmd` Shell Hook | 动态上下文命令 (`lwm-context`) | 经测试终端凭证 (`shell-hook`) |
+
+> **提示**：安装了配置文件不等于双向集成已打通。通过 `lwm hub tools probe` 和 `lwm hub coverage` 可以实时查看各工具的实际运行状态（区分已配置、宿主存在与真实读写 Proof）。
+
+---
+
+## 安装与快速上手
+
+### 环境要求
+- **Python**: `>= 3.11`
+- **包管理器**: 推荐 [uv](https://docs.astral.sh/uv/)，亦可使用标准 `pip`
+- **操作系统**: macOS / Linux
+
+### 1. 安装 CLI
+
+推荐使用 `uv` 安装：
 ```bash
-lwm hub recall "当前项目最近完成了什么验证？" \
-  --project "/path/to/project" \
-  "/path/to/LLM-WorkMem"
+uv tool install .
+# 或者在本地开发模式下安装：
+uv pip install -e ".[dev]"
 ```
 
-返回内容会包含 `project_id`、检索计划、证据来源、当前/历史/冲突状态、缺失项和 `coverage`。默认 `compact` 只返回精简证据；明确需要深入查证时使用 `--mode deep --format markdown`。项目无法识别时会明确返回 `global-only`，不会假装是项目记忆。
-
-这个层只组织证据，不替当前 IDE 或 Shell Agent 生成最终答案。回执或 CBMEM 暂时不可用时，读取仍然继续，并在 warning/health 中报告降级状态。
-
-## 跨 Agent 工作流与记忆
-
-全局适配器安装器支持为 Claude Code、Codex、Kiro、Antigravity、MiniMax、OpenCode、Trae、Cursor、Gemini CLI、VS Code 和 Shell 生成各自适用的指令或集成入口。项目级 attach 也会为支持的工具生成项目上下文。Hook 和会话覆盖因宿主而异；仅有指令文件不代表集成已正常工作。
-
-设置仓库路径，预览安装，并检查实际覆盖：
-
-```bash
-export LWM_ROOT="/path/to/LLM-WorkMem"
-lwm install-global "$LWM_ROOT" --dry-run
-lwm hub tools probe --root "$LWM_ROOT" --json
-lwm hub coverage --root "$LWM_ROOT" --json
-```
-
-LLM-WorkMem 是辅助证据与交接层，不取代各 Agent 原生的指令、技能、计划、执行、验证或记忆；各工具原生工作流仍是权威来源。
-
-> **模型建议：** 由于 wiki 的构建和维护会产生大量 token 消耗，建议使用按计划订阅的服务（如 Claude Max、Cursor 等），或自行部署模型（如 [MiniMax](https://www.minimaxi.com/)、[GLM](https://open.bigmodel.cn/) 等），以避免按量计费带来的高额成本。
-
-## 快速开始
-
-你可以不安装 `uv` 或 `act-cli`，直接手动安装（见下方"手动安装"章节）。
-
-但使用 act 配置文件可以更快地与本仓库同步。
-
-### 1. 前置条件
-
-- 已安装 `uv`，如未安装请参考[安装指南](https://docs.astral.sh/uv/getting-started/installation/)。
-- 安装 `act-cli`：
-
-```bash
-uv tool install https://github.com/hsuanguo/act-cli.git
-```
-
-### 2. 创建 `act.toml`
-
-在你的 wiki 根目录添加 `act.toml`：
-
-```toml
-[project]
-name = "my-wiki"
-description = "My LLM-WorkMem"
-
-[skills]
-llm-workmem = "hsuanguo/llm-workmem/skills/llm-workmem"
-
-[dependencies.tools.uv]
-lwm = "git+https://github.com/hsuanguo/llm-workmem.git"
-```
-
-### 3. 同步
-
-执行：
-
-```bash
-act
-```
-
-这会安装 `llm-workmem` agent 技能和 `lwm` 命令行工具。
-
-## 手动安装
-
-安装 CLI：
-
+或使用标准 `pip`：
 ```bash
 pip install .
-# 或使用 uv：
-uv tool install .
 ```
 
-将技能复制到你的 wiki 中：
+检查版本：
+```bash
+lwm --version
+```
+
+### 2. 初始化工作站环境
+
+设置持久化工作记忆的数据根目录并安装全局适配器：
 
 ```bash
-cp -r skills/llm-workmem /path/to/project/.claude/skills/
+# 1. 设置工作记忆根目录
+export LWM_ROOT="/path/to/LLM-WorkMem"
+
+# 2. 预览将要安装的适配器与规则文件 (dry-run)
+lwm install-global "$LWM_ROOT" --dry-run
+
+# 3. 正式安装各 IDE / CLI 的全局入口
+lwm install-global "$LWM_ROOT"
+
+# 4. 为支持的 IDE 生成原生 Hook 配置文件
+lwm hub install-ide-hooks "$LWM_ROOT"
+
+# 5. 向 ~/.zshrc 安装终端生命周期捕获 Hook
+lwm hub install-shell-hook "$LWM_ROOT"
 ```
 
-## Skill（技能）
-
-`skills/llm-workmem/` 目录是一个独立的 agent 技能，包含：
-
-- **`SKILL.md`** — 主指令文件（收集上下文、路由操作、执行任务）
-- **`references/`** — 各操作的详细手册：`init.md`、`ingest.md`、`query.md`、`update.md`、`lint.md`、`harvest.md`、`watch.md`、`export.md`、`schedule.md`
-- **`templates/`** — 初始页面模板：`index.md`、`concept.md`、`entity.md`、`insight.md`、`summary.md`
-
-兼容任何从 `.claude/skills/` 或类似路径读取 `SKILL.md` 的 agent。
-
-`.claude/skills/` 被大多数 AI agent 支持（OpenCode、Cursor 等）。如果你的 agent 不支持此路径，请将其移动到 agent 能识别的位置。
-
-## 使用方法
-
-本技能为 Obsidian 设计，但可搭配任何前端使用。典型工作流如下：
-
-<p align="center">
-  <img src="assets/flow.svg" alt="wiki-flow" width="600" /><br />
-</p>
-
-### 1. 创建新 Wiki（INIT）
-
-告诉 Agent：
-
-```
-在 wiki/greek-history 初始化一个关于希腊历史的 wiki
-```
-
-AI Agent 会：
-- 运行 `lwm init` 创建目录结构
-- 生成 `AGENTS.md`（领域模式定义）、`CLAUDE.md` 和初始 wiki 文件
-- 创建空的 `raw/`、`assets/` 及 wiki 子目录
-
-**结果：**
-```
-wiki/greek-history/
-├── AGENTS.md           # 领域模式定义
-├── CLAUDE.md           # 自动引入 AGENTS.md
-├── assets/
-├── raw/
-│   └── files.log
-└── wiki/
-    ├── index.md
-    ├── log.md
-    ├── purpose.md
-    ├── overview.md
-    ├── summaries/
-    ├── concepts/
-    ├── entities/
-    └── insights/
-```
-
-### 2. 添加资料来源（INGEST）
-
-#### 方式 A：文件
-
-将源文件（PDF、Markdown 等）移入 `wiki/greek-history/raw/`
-
-然后告诉 AI：
-```
-收录 raw/ 中的所有新资料
-```
-
-#### 方式 B：直接粘贴内容
-
-```
-将以下内容添加到 wiki：
-<粘贴文章文本或 URL>
-```
-
-#### 收录过程
-
-AI 会：
-1. 完整阅读每个资料来源
-2. 在 `summaries/`、`concepts/`、`entities/` 中创建或更新页面
-3. 执行反向链接审查 — 在现有页面间添加 `[[wikilinks]]`
-4. 扫描整个 wiki，查找受新信息影响的页面（级联更新）
-5. 更新 `index.md`、`overview.md` 和 `log.md`
-6. 通过 `lwm raw sync` 同步 `raw/files.log`
-
-**注意：** AI Agent 会自主执行全部流程，只在遇到真正模糊的情况（事实不明、来源冲突且无法自行判断）时才会向你确认。
-
-### 3. 提问（QUERY）
-
-```
-关于伯罗奔尼撒战争我们了解多少？
-```
-
-```
-对比所有资料中雅典和斯巴达的军事策略
-```
-
-```
-关于迈锡尼文明的衰落，还有哪些未解之谜？
-```
-
-AI 严格基于 wiki 内容回答，使用 `[[wikilinks]]` 引用页面。回答后，它可能会：
-- **主动提议保存**分析结果为 insight 页面（如果回答有独立价值）
-- **报告问题** — 发现现有页面中的过时信息或矛盾，并询问是否需要修复
-
-### 4. 更新页面（UPDATE）
-
-#### 用户触发（你主动要求修改）
-
-```
-更新 concepts/democracy.md — 最新资料说 X
-```
-
-```
-修复 concepts/oligarchy.md 和 concepts/democracy.md 之间的矛盾
-```
-
-Agent 会为每个页面展示差异对比，等待你确认后再写入。
-
-#### LLM 触发（收录过程中自动更新）
-
-当新资料影响已有页面时，如果改动明确，AI Agent 会自动更新。只有在不确定或涉及含义变更时才会征询你的意见。
-
-### 5. 健康检查（LINT）
-
-```
-检查 wiki
-```
-
-AI 会检查：
-
-| 类别 | 自动修复？ | 示例 |
-|------|-----------|------|
-| **确定性问题** | 是 | 断链、缺失 frontmatter、索引不一致 |
-| **启发性问题** | 否 — 仅报告 | 矛盾、过时声明、孤立页面、缺失交叉引用、过时 insight |
-
-将检查报告写入 `insights/lint-<date>.md`，并为启发性问题提供修复建议。
-
-### 6. 检查新资料（漂移检测）
-
-```
-raw/ 里有新文件吗？
-```
-
-或直接运行：
+### 3. 验证工具覆盖状态
 
 ```bash
-lwm raw status    # 仅报告
-lwm raw sync      # 更新 files.log
+# 查看本地各工具的发现状态与采集器就绪情况
+lwm hub tools probe --root "$LWM_ROOT"
+
+# 查看各工具双向读写与凭证覆盖报告
+lwm hub coverage --root "$LWM_ROOT"
 ```
 
-## 日常工作流
+### 4. 安装代码库图谱记忆（可选）
 
-| 你做的 | AI 做的 |
-|--------|---------|
-| 剪藏文章 → 放入 `raw/` | 收录、摘要、交叉引用 |
-| 提问 | 基于 wiki 回答，主动保存 insight |
-| 偶尔说"检查一下" | 健康检查、修复问题、发现空白 |
-| 审阅和引导 | 其他一切 |
-
-## 多 Wiki 设置
-
-你可以在一个 vault 下管理多个 wiki：
-
-```
-vault/wiki/
-├── greek-history/   # 一个知识库
-├── health/          # 另一个
-└── reading/         # 再一个
-```
-
-每个 wiki 完全独立，拥有自己的 `AGENTS.md` 模式定义。Agent 会根据你所在的目录自动加载对应的模式。
-
-## 小贴士
-
-- **Obsidian Web Clipper** 是将文章放入 `raw/` 的最快方式
-- Obsidian 中的**图谱视图**可展示 wiki 结构 — 枢纽、孤立节点、集群
-- **Dataview** 插件可按类型、标签或日期查询页面
-- 你永远不需要自己写 wiki 页面 — AI 会处理所有维护工作
-- `lwm dashboard` 会生成一个可直接打开的桌面式 HTML 页面
-- `lwm query` 会在 wiki 页面里做分层查询和综合输出
-- `lwm serve` 会把整个 wiki 启动成一个本地工作区
-- `lwm harvest` 会把工具记忆体快照并刷新 wiki
-- `lwm watch` 会在源文件有漂移时才刷新并审计结果
-- `lwm export` 会输出可供其他 agent 直接消费的 `llms.txt`、`llms-full.txt` 和 `llms.json`
-- `lwm schedule` 会生成定时 watch + audit 的 launchd 包
-
-### Loop Engineering 控制状态
-
-定时工作按一个有边界的循环运行：感知、定义、分解、执行、评估、更新。
-每轮都会把预期结果、实际证据、下一动作和退出状态写入
-`state/active-loop.json` 或 `state/last-loop.json`。只有存在外部证据时，
-才能进入 `completed_verified`；仅有适配器文件或 launchd plist 不代表完成。
-
-运行 `lwm hub closure <root>` 查看收口门。它会检查循环状态、证据文件、
-源代码与运行副本可读性、导出文件、回执、严格健康状态和 launchd。缺少
-证据会明确报告为 `degraded` 或 `blocked`。
-
-## 代码库记忆（`lwm cbmem`）
-
-`lwm cbmem` 封装了 [DeusData/codebase-memory-mcp](https://github.com/DeusData/codebase-memory-mcp)，让 wiki 能对任意项目目录回答代码结构问题。封装在 `lwm/cbmem.py`；决策记录在 [wiki/insights/integrations-2026-06-30.md](wiki/insights/integrations-2026-06-30.md)；速查表在 [wiki/summaries/lwm-cbmem-cheatsheet.md](wiki/summaries/lwm-cbmem-cheatsheet.md)。
-
-一次性安装（下载约 270 MB 到 `~/bin/`）：
+如需启用针对项目目录的深度 AST 结构与调用图分析：
 
 ```bash
 bash automation/install-cbmem.sh
 lwm cbmem doctor
 ```
 
-子命令：`doctor`、`index`、`index-status`、`search`、`architecture`、`trace`、`changes`、`dead`、`query`、`semantic`。完整列表见 `lwm cbmem --help`。
+---
 
-> **关于 macOS 沙箱。** 一些 agent 沙箱（特别是 Claude Code 的 Bash）会以退出码 137 SIGKILL 掉这 270 MB 的二进制。请在真实终端中运行 `lwm cbmem *`，而不要在沙箱中运行。完整原因见 [wiki/insights/integrations-2026-06-30.md](wiki/insights/integrations-2026-06-30.md) 决策 1。
+## 核心工作流与实战指南
+
+### 1. 会话启动与上下文注入
+
+当任何 AI 工具在项目目录下启动时，自动或手动请求当前项目的精简上下文：
+
+```bash
+# 生成 Markdown 格式（供 Prompt 或指令文件加载）
+lwm hub context --tool claude-code --project "$PWD"
+
+# 生成 JSON 格式（供 IDE 插件解析）
+lwm hub context --tool codex --project "$PWD" --format json
+```
+
+注入内容包含：
+- **行为规范状态**：当前 `GLOBAL.md` 的版本、SHA-256 和有效性；
+- **活跃任务交接**：上一个 Agent 遗留的交接包（如有）；
+- **项目记忆**：当前项目的近期决策、Bug 修复经验与已验证事实；
+- **统一原生记忆**：从各 Agent 原生工作流中提炼的全局经验；
+- **审查候选**：待审查的跨项目模式提示。
+
+### 2. 跨 Agent 任务交接实战
+
+在不同工具之间协同工作时（例如：在 Codex 中完成部分任务后交由 Antigravity 或 Claude Code 继续）：
+
+#### 步骤 A：工具 A 完成当前阶段，记录交接包
+```bash
+lwm hub bridge-stop \
+  --tool codex \
+  --project "$PWD" \
+  --task-id "task-auth-migration" \
+  --task "完成 JWT 校验中间件编写" \
+  --handoff-json '{
+    "task_id": "task-auth-migration",
+    "objective": "将会话 Token 迁移至 JWT 校验",
+    "current_state": "中间件编写完毕，单元测试在边界用例失败",
+    "decisions": ["内部服务采用 HS256 签名算法"],
+    "changes": ["src/auth/jwt.py", "tests/test_jwt.py"],
+    "verifications": ["pytest tests/test_jwt.py -k test_valid_token 通过"],
+    "risks": ["分布式节点存在时间漂移风险"],
+    "open_questions": ["Refresh Token 的有效期窗口确定为多久？"],
+    "next_action": "在 Token 校验器中增加时间漂移容差逻辑"
+  }' \
+  --root "$LWM_ROOT"
+```
+
+#### 步骤 B：工具 B 启动并接手工作
+工具 B 启动后通过 `lwm hub context` 立即看到该交接包，并确认接手：
+```bash
+lwm hub handoff ack --handoff-id "<handoff_id>" --target-tool antigravity --root "$LWM_ROOT"
+```
+
+#### 步骤 C：任务最终验证完成，关闭交接
+```bash
+lwm hub handoff close --handoff-id "<handoff_id>" --root "$LWM_ROOT"
+```
+
+### 3. 提交工作事件与记忆摄入
+
+开发者或 Agent 可以在任何阶段提交结构化工作沉淀：
+
+```bash
+# 提交结构化事实
+lwm hub record \
+  --tool shell \
+  --project "$PWD" \
+  --task "修复内存编译器 Token 预算控制" \
+  --decision "采用预扣除与对账机制控制每日 Token 预算" \
+  --change "lwm/memory_compiler.py" \
+  --verification "pytest tests/test_analysis_compiler.py 通过" \
+  --tag "stable-claim" \
+  --root "$LWM_ROOT"
+
+# 执行摄入与项目记忆重建
+lwm hub ingest "$LWM_ROOT"
+```
+
+### 4. 记忆编译与稳定晋级
+
+```bash
+# 1. 对待处理的长期事件运行离线 LLM 分析
+lwm hub analyze --pending --root "$LWM_ROOT"
+
+# 2. 人工审查候选模式（接受、拒绝或直接晋级）
+lwm hub review-analysis <candidate_id> --decision accept --root "$LWM_ROOT"
+
+# 3. 经过双项目验证后，显式晋级为全局知识
+lwm hub promote-analysis <candidate_id> --root "$LWM_ROOT"
+
+# 4. 编译各 Agent 的原生记忆为统一发布版本
+lwm hub federation compile --root "$LWM_ROOT"
+```
+
+### 5. 证据召回 B2（Evidence Recall B2）
+
+针对工程问题进行可溯源的事实检索：
+
+```bash
+# 精简模式召回
+lwm hub recall "本项目最近关于内存编译器的 Token 上限是如何验证的？" \
+  --project "$PWD" \
+  --root "$LWM_ROOT"
+
+# 深度审计模式并输出 Markdown
+lwm hub recall "梳理本项目所有关于适配器架构的设计决定" \
+  --project "$PWD" \
+  --mode deep \
+  --format markdown \
+  --root "$LWM_ROOT"
+```
+
+### 6. 健康监控与闭环审计
+
+```bash
+# 系统全面健康度快照
+lwm hub health "$LWM_ROOT"
+
+# 检查当前工程循环是否具备充分客观证据闭环
+lwm hub closure "$LWM_ROOT"
+
+# 校验特定周期的不可变回执
+lwm hub verify-cycle --root "$LWM_ROOT"
+```
+
+---
+
+## 经典知识库模式与 Agent Skill
+
+对于希望保留 Karpathy 原版纯 Markdown 个人知识库玩法的用户，`llm-workmem` 依旧提供完整的支持：
+
+<p align="center">
+  <img src="assets/flow.svg" alt="wiki-flow" width="600" /><br />
+</p>
+
+### Agent Skill（`skills/llm-workmem/`）
+仓库内附带开箱即用的 Agent 技能目录，兼容 Claude Code、Cursor、OpenCode 和 Copilot：
+- **`SKILL.md`**：核心路由与指令定义；
+- **`references/`**：涵盖 `init`、`ingest`、`query`、`update`、`lint`、`harvest`、`watch`、`export`、`schedule` 的操作手册；
+- **`templates/`**：初始页面模板（`index.md`、`concept.md`、`entity.md`、`insight.md`、`summary.md`）。
+
+### 知识库常用命令
+```bash
+# 初始化个人知识库目录树
+lwm init --profile personal wiki/my-notes
+
+# 将 raw/ 目录下的原始资料编译为确定性总结页
+lwm compile wiki/my-notes
+
+# 执行层次化知识查询
+lwm query "总结核心观点" --wiki wiki/my-notes
+
+# 导出 AI 可消费格式 (llms.txt, llms-full.txt, llms.json)
+lwm export wiki/my-notes
+
+# 启动本地 Web 工作台
+lwm serve wiki/my-notes
+```
+
+---
+
+## CLI 命令速查手册
+
+### Central Hub 命令（`lwm hub ...`）
+
+| 子命令 | 说明 |
+|---|---|
+| `lwm hub context` | 输出指定工具在指定项目的启动上下文（`--format markdown` 或 `json`） |
+| `lwm hub bridge` | 面向 IDE 与 CLI 的统一 JSON 会话桥接器 |
+| `lwm hub bridge-stop` | Shell 友好的会话退出与 Handoff 提交包装命令 |
+| `lwm hub record` | 提交一条结构化工作事件到 `raw/events/inbox/` |
+| `lwm hub ingest` | 确定性处理 inbox 事件并更新项目记忆 |
+| `lwm hub recall` | 证据召回 B2：渐进式确定性检索 |
+| `lwm hub handoff create` | 创建跨工具任务交接包 |
+| `lwm hub handoff current` | 查看指定项目的当前活跃交接包 |
+| `lwm hub handoff ack` | 记录目标工具已接手交接包 |
+| `lwm hub handoff close` | 任务完成后关闭交接包 |
+| `lwm hub federation compile` | 编译跨 Agent 原生记忆为统一发布版本 |
+| `lwm hub federation restore` | 回退至指定的历史联邦记忆发布版本 |
+| `lwm hub analyze --pending` | 执行 LLM 内存编译器候选分析 |
+| `lwm hub review-analysis` | 审查分析候选（`accept` / `reject` / `promote`） |
+| `lwm hub promote-analysis` | 将已接受的候选通过多项目凭证门禁晋级至 `wiki/global/` |
+| `lwm hub tools list / probe` | 列出已发现工具并探查采集器可用性 |
+| `lwm hub coverage` | 输出双向集成与凭证覆盖状态报告 |
+| `lwm hub health` | 多维度健康度快照（基础设施、数据流、周期状态、质量） |
+| `lwm hub closure` | 检查当前工作循环是否达到闭环证据要求 |
+| `lwm hub behavior show / verify` | 查看并校验权威行为合同 `GLOBAL.md` |
+| `lwm hub install-ide-hooks` | 为各 IDE 生成原生 Hook 配置文件 |
+| `lwm hub install-shell-hook` | 安装或刷新 Zsh 终端生命周期 Hook |
+| `lwm hub rebuild-projects` | 从已准入的原始事件确定性重建所有项目记忆页 |
+| `lwm hub forget` | 从事件存储与项目页中彻底删除指定的事件 |
+| `lwm hub recover-privacy` | 依据当前脱敏规则重新评估被隔离的隐私事件 |
+
+### 根命令（`lwm ...`）
+
+| 命令 | 说明 |
+|---|---|
+| `lwm install-global` | 为当前用户安装全局适配器与接入点 |
+| `lwm attach` | 为特定项目目录安装各工具的上下文入口 |
+| `lwm cbmem` | 代码库图谱记忆命令（`doctor`, `index`, `search`, `architecture`, `trace` 等） |
+| `lwm init` | 初始化 Wiki 目录骨架 |
+| `lwm compile` | 将原始输入文件编译为结构化 Markdown |
+| `lwm query` | 检索与合成知识库内容 |
+| `lwm harvest` | 将外部工具记忆快照进 `raw/` 目录并更新总结 |
+| `lwm watch` | 监控文件变更并自动增量刷新 |
+| `lwm export` | 导出 `llms.txt`、`llms-full.txt` 和 `llms.json` |
+| `lwm audit` | 运行综合健康审计（结构、模式、审查队列、查询评测） |
+| `lwm eval` | 执行预置查询评测套件 |
+| `lwm schedule` | 生成 launchd 定时调度配置包 |
+| `lwm dashboard` | 生成桌面式 HTML 总览报告 |
+| `lwm serve` | 启动本地浏览器工作台 |
+
+---
+
+## 配置文件与系统治理
+
+### 行为合同（`GLOBAL.md`）
+`GLOBAL.md` 是全局统一、经过人工审阅的个人工程行为底线：
+- 坚持长期合作伙伴思维，透明沟通配置与代码；
+- 行动前必须核实真实文件、真实环境与边界；
+- 坚持极简代码哲学（最小完整变更、标准库优先、避免无用抽象）；
+- 严格的非破坏性操作保障（严禁未经明确授权的删库或强推）；
+- **工作习惯与约定绝对本地私有**：个人工作习惯仅保存在本地工作记忆中，GitHub 仓库仅对外展现最纯净标准的工程代码与架构文档。
+
+### 隐私过滤规则（`privacy_rules.toml`）
+所有摄入系统的事件均会执行隐私规则匹配：
+- 秘钥模式自动过滤（API Keys、GitHub Token、AWS 秘钥等）；
+- 绝对敏感路径自动脱敏；
+- 包含不可脱敏机密的事件自动进入安全隔离区，严禁写入项目页。
+
+### 内存编译器配置
+通过环境变量可配置可选的 LLM 离线分析能力：
+```bash
+export LWM_ANALYSIS_ENABLED=1
+export LWM_ANALYSIS_BASE_URL="https://api.openai.com/v1"
+export LWM_ANALYSIS_API_KEY="your-api-key"
+export LWM_ANALYSIS_MODEL="gpt-4o-mini"
+export LWM_ANALYSIS_DAILY_TOKEN_BUDGET=50000
+```
+> 若未配置上述环境变量，系统将完全以确定性模式平稳运行，核心功能不受任何影响。
+
+---
 
 ## 许可证
 
-[MIT](LICENSE)
+本项目基于 [MIT 许可证](LICENSE) 开源。
