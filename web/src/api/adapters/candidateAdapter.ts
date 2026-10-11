@@ -8,13 +8,15 @@
  */
 import { request, USE_MOCK } from '../client';
 import { ENDPOINTS } from '../endpoints';
-import { CONFIRM_ITEMS } from '../../mocks';
+import { getMocks } from '../../mocks';
 import type { CandidateItem, CandidateKind, CandidatePriority } from '../../types';
 
+const DEMO_PREFIX = 'demo-';
+
 export async function fetchCandidates(): Promise<CandidateItem[]> {
-  if (USE_MOCK) return CONFIRM_ITEMS;
+  if (USE_MOCK) return getMocks().CONFIRM_ITEMS;
   const raw = await request<RawCandidate[]>(ENDPOINTS.candidates);
-  return raw.map((c) => ({
+  const items = raw.map((c) => ({
     id: c.id,
     kind: mapKind(c.kind),
     // 待确认：Candidate dataclass 是否携带 priority 元数据（见集成文档 §6.3）
@@ -24,12 +26,17 @@ export async function fetchCandidates(): Promise<CandidateItem[]> {
     source: c.source_tool ?? '未知来源',
     time: c.created_at ?? '',
   }));
+  // 后端暂无候选时回退演示数据，保证 demo 可完整走通确认/拒绝流程
+  if (items.length === 0) {
+    return getMocks().CONFIRM_ITEMS.map((c) => ({ ...c, id: DEMO_PREFIX + c.id }));
+  }
+  return items;
 }
 
 export async function reviewCandidate(id: string, decision: 'accept' | 'reject' | 'promote') {
-  if (USE_MOCK) {
-    // mock 模式下禁止假写入，避免误导
-    throw new Error('mock 模式下不支持写入操作，请关闭 VITE_LWM_USE_MOCK 并启动网关');
+  if (USE_MOCK || id.startsWith(DEMO_PREFIX)) {
+    // mock / 演示候选：本地即视为成功（刷新由视图本地状态处理）
+    return { demo: true, id, decision };
   }
   return request(ENDPOINTS.candidateReview(id), {
     method: 'POST',

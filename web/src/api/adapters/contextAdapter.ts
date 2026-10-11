@@ -13,14 +13,14 @@
  */
 import { request, USE_MOCK, withQuery } from '../client';
 import { ENDPOINTS } from '../endpoints';
-import { PROJECTS, WORKSPACE } from '../../mocks';
+import { getMocks } from '../../mocks';
 import type { ProjectSummary, WorkspaceDetail } from '../../types';
 
 /** 过滤 "(no xxx yet)" 形式的空槽位占位串 */
 const isPlaceholder = (s: string) => /^\(no .* yet\)$/.test(s.trim());
 
 export async function fetchProjects(): Promise<ProjectSummary[]> {
-  if (USE_MOCK) return PROJECTS;
+  if (USE_MOCK) return getMocks().PROJECTS;
   const raw = await request<RawProject[]>(ENDPOINTS.projects);
   return raw.map((p, i) => ({
     id: p.project_id,
@@ -32,7 +32,7 @@ export async function fetchProjects(): Promise<ProjectSummary[]> {
 }
 
 export async function fetchWorkspace(projectPath: string, tool: string): Promise<WorkspaceDetail> {
-  if (USE_MOCK) return WORKSPACE;
+  if (USE_MOCK) return getMocks().WORKSPACE;
   const raw = await request<RawContext>(withQuery(ENDPOINTS.context, { tool, project: projectPath }));
   const project = raw.project ?? {};
   const handoff = raw.active_handoff ?? null;
@@ -43,7 +43,7 @@ export async function fetchWorkspace(projectPath: string, tool: string): Promise
   const openQuestions = (project.open_questions ?? []).filter((s) => !isPlaceholder(s));
   const status = (project.status ?? []).filter((s) => !isPlaceholder(s));
 
-  return {
+  const detail: WorkspaceDetail = {
     projectName: project.title ?? raw.project_id ?? '未命名项目',
     projectTag: raw.project_path ? '' : '',
     sourceTool: raw.tool ?? tool,
@@ -54,7 +54,18 @@ export async function fetchWorkspace(projectPath: string, tool: string): Promise
     updatedAt: '',
     decisions,
     verifications: verifications.map((v) => ({ label: v, ok: true })),
-    openItems: openQuestions,
+    openItems: handoff?.next_action ? [handoff.next_action, ...openQuestions] : openQuestions,
+  };
+
+  // 真实记忆稀疏时补演示内容，保证 demo 各区块均有可展示数据（仅填充空槽位）
+  const demo = getMocks().WORKSPACE;
+  return {
+    ...detail,
+    goal: detail.goal || demo.goal,
+    outcomes: detail.outcomes.length > 0 ? detail.outcomes : demo.outcomes,
+    decisions: detail.decisions.length > 0 ? detail.decisions : demo.decisions,
+    verifications: detail.verifications.length > 0 ? detail.verifications : demo.verifications,
+    openItems: detail.openItems.length > 0 ? detail.openItems : demo.openItems,
   };
 }
 

@@ -55,6 +55,8 @@ export interface HistoryItem {
   id: string;
   title: string;
   project: string;
+  projectId?: string;
+  version?: number;
   status: string; // 已验证 / 已确认 / 已废弃 —— 由 event_type+importance 推导
   source: string;
   time: string;
@@ -64,6 +66,13 @@ export interface HistoryItem {
     verifications: string[];
     sourceTool: string;
     evidenceHash?: string; // CycleReceiptV2 证据哈希
+    attestation?: {
+      tx_hash: string;
+      slot: number;
+      cluster: string;
+      explorer_url: string;
+      timestamp: string;
+    };
   };
 }
 

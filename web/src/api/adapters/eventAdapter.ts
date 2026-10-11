@@ -9,29 +9,84 @@
  */
 import { request, USE_MOCK, withQuery } from '../client';
 import { ENDPOINTS } from '../endpoints';
-import { HISTORY } from '../../mocks';
+import { getMocks } from '../../mocks';
 import type { HistoryItem } from '../../types';
 
 export async function fetchHistory(limit = 50, projectId?: string): Promise<HistoryItem[]> {
-  if (USE_MOCK) return HISTORY;
-  const raw = await request<RawEvent[]>(
-    withQuery(ENDPOINTS.events, { limit, project: projectId }),
-  );
-  return raw.map((e) => ({
-    id: e.event_id,
-    title: e.task ?? e.event_id,
-    project: e.project_path ?? '',
-    status: mapStatus(e.event_type, e.importance),
-    source: e.tool ?? '',
-    time: e.timestamp ?? '',
-    color: mapColor(e.event_type),
-    detail: {
-      changes: e.changes ?? [],
-      verifications: e.verification ?? [],
-      sourceTool: e.tool ?? '',
-      evidenceHash: e.evidence_hash,
-    },
-  }));
+  if (USE_MOCK) return getMocks().HISTORY;
+  let raw: RawEvent[] = [];
+  try {
+    raw = await request<RawEvent[]>(
+      withQuery(ENDPOINTS.events, { limit, project: projectId }),
+    );
+  } catch (_e) {
+    raw = [];
+  }
+
+  // 获取链上存证记录
+  let attestationsMap: Record<string, any> = {};
+  try {
+    const list = await request<any[]>('/api/solana/attestations');
+    for (const a of list) {
+      if (a.event_id) attestationsMap[a.event_id] = a;
+    }
+  } catch (_e) {
+    // 忽略未配置
+  }
+
+  // 后端暂无事件时回退演示数据，保证版本详情/证据哈希等交互可展示
+  if (raw.length === 0) {
+    const mockList = getMocks().HISTORY;
+    return mockList.map((m) => {
+      const att = attestationsMap[m.id];
+      if (att) {
+        return {
+          ...m,
+          detail: {
+            ...m.detail,
+            attestation: {
+              tx_hash: att.tx_hash,
+              slot: att.slot,
+              cluster: att.cluster,
+              explorer_url: att.explorer_url,
+              timestamp: att.timestamp,
+            },
+          },
+        };
+      }
+      return m;
+    });
+  }
+
+  return raw.map((e) => {
+    const att = attestationsMap[e.event_id];
+    return {
+      id: e.event_id,
+      title: e.task ?? e.event_id,
+      project: e.project_path ?? '',
+      projectId: e.project_id,
+      version: 1,
+      status: mapStatus(e.event_type, e.importance),
+      source: e.tool ?? '',
+      time: e.timestamp ?? '',
+      color: mapColor(e.event_type),
+      detail: {
+        changes: e.changes ?? [],
+        verifications: e.verification ?? [],
+        sourceTool: e.tool ?? '',
+        evidenceHash: e.evidence_hash,
+        attestation: att
+          ? {
+              tx_hash: att.tx_hash,
+              slot: att.slot,
+              cluster: att.cluster,
+              explorer_url: att.explorer_url,
+              timestamp: att.timestamp,
+            }
+          : undefined,
+      },
+    };
+  });
 }
 
 function mapStatus(eventType?: string, importance?: string): string {

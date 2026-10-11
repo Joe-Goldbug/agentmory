@@ -10,18 +10,21 @@
  */
 import { request, USE_MOCK } from '../client';
 import { ENDPOINTS } from '../endpoints';
-import { TOOLS } from '../../mocks';
+import { getMocks } from '../../mocks';
+import { getLang } from '../../i18n/store';
+import { DICTS } from '../../i18n/messages';
 import type { ProofLevel, ToolItem } from '../../types';
 
-const PROOF_LABEL: Record<ProofLevel, string> = {
-  'native-hook': '宿主原生 Hook 已验证',
-  'watcher-observed': '观察器捕获',
-  configured: '仅已配置',
-  none: '未接入',
+const proofLabel = (level: ProofLevel): string => {
+  const d = DICTS[getLang()];
+  if (level === 'native-hook') return d['proof.nativeHook'];
+  if (level === 'watcher-observed') return d['proof.watcherObserved'];
+  if (level === 'configured') return d['proof.configured'];
+  return d['proof.none'];
 };
 
 export async function fetchTools(): Promise<ToolItem[]> {
-  if (USE_MOCK) return TOOLS;
+  if (USE_MOCK) return getMocks().TOOLS;
   const raw = await request<RawTool[]>(ENDPOINTS.toolsCoverage);
   return raw.map((t, i) => {
     const proof = mapProof(t.proof_level);
@@ -29,8 +32,10 @@ export async function fetchTools(): Promise<ToolItem[]> {
       id: t.tool ?? String(i),
       name: t.tool ?? 'unknown',
       proof,
-      proofLabel: PROOF_LABEL[proof],
-      lastUsed: t.last_seen ? `最近使用：${t.last_seen}` : '暂无使用记录',
+      proofLabel: proofLabel(proof),
+      lastUsed: t.last_seen
+        ? DICTS[getLang()]['tools.lastUsed'].replace('{time}', t.last_seen)
+        : DICTS[getLang()]['tools.noUsage'],
       initial: (t.tool ?? '?').charAt(0).toUpperCase(),
       color: ['orange', 'blue', 'purple', 'green', 'red'][i % 5],
       enabled: t.readable === true || t.writable === true,

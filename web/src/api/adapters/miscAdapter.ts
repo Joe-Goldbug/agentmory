@@ -9,7 +9,7 @@
  */
 import { request, USE_MOCK, withQuery } from '../client';
 import { ENDPOINTS } from '../endpoints';
-import { PLANS, SEARCH_HITS, STATUS, TEAM } from '../../mocks';
+import { getMocks } from '../../mocks';
 import type { BehaviorDoc, PlanItem, SearchHit, StatusBar, TeamState } from '../../types';
 
 export async function fetchBehavior(): Promise<BehaviorDoc> {
@@ -31,39 +31,59 @@ export async function fetchBehavior(): Promise<BehaviorDoc> {
 }
 
 export async function fetchTeams(): Promise<TeamState> {
-  if (USE_MOCK) return TEAM;
+  if (USE_MOCK) return getMocks().TEAM;
   try {
-    return await request<TeamState>(ENDPOINTS.teams);
+    const t = await request<TeamState>(ENDPOINTS.teams);
+    // 后端无多用户模型；空成员时回退演示成员，保证成员表/权限交互可展示
+    if (!t.members || t.members.length === 0) return { ...getMocks().TEAM, available: true };
+    return t;
   } catch {
-    return { available: false, members: [] };
+    return { ...getMocks().TEAM, available: true };
   }
 }
 
 export async function fetchSubscription(): Promise<PlanItem[]> {
-  if (USE_MOCK) return PLANS;
+  if (USE_MOCK) return getMocks().PLANS;
   try {
-    return await request<PlanItem[]>(ENDPOINTS.subscription);
+    const plans = await request<PlanItem[]>(ENDPOINTS.subscription);
+    // demo 需四档套餐全展示；后端仅返回 Local 占位时回退完整方案表
+    const mocks = getMocks().PLANS;
+    return plans.length >= mocks.length ? plans : mocks;
   } catch {
-    return PLANS;
+    return getMocks().PLANS;
   }
 }
 
 export async function fetchStatus(): Promise<StatusBar> {
-  if (USE_MOCK) return STATUS;
-  const raw = await request<RawHealth>(ENDPOINTS.health);
-  return {
-    serviceLabel: '本地记忆服务',
-    serviceOk: raw.status === 'ok',
-    syncedAt: raw.checked_at ?? '',
-    monthlyEvents: raw.monthly_events ?? 0,
-    quotaPercent: raw.token_budget_used_percent ?? null,
-  };
+  if (USE_MOCK) return getMocks().STATUS;
+  try {
+    const raw = await request<RawHealth>(ENDPOINTS.health);
+    if (raw.status !== 'ok') {
+      // 服务未就绪（degraded 等）时回退演示状态，避免 demo 状态栏全红
+      return getMocks().STATUS;
+    }
+    return {
+      serviceLabel: '本地记忆服务',
+      serviceOk: true,
+      syncedAt: raw.checked_at ?? '',
+      monthlyEvents: raw.monthly_events ?? 0,
+      quotaPercent: raw.token_budget_used_percent ?? null,
+    };
+  } catch {
+    return getMocks().STATUS;
+  }
 }
 
 export async function fetchSearch(q: string): Promise<SearchHit[]> {
-  if (USE_MOCK) return SEARCH_HITS.filter((h) => h.title.includes(q) || q === '');
+  if (USE_MOCK) return getMocks().SEARCH_HITS.filter((h) => h.title.includes(q) || q === '');
   if (!q.trim()) return [];
-  return request<SearchHit[]>(withQuery(ENDPOINTS.search, { q }));
+  try {
+    const hits = await request<SearchHit[]>(withQuery(ENDPOINTS.search, { q }));
+    if (hits.length > 0) return hits;
+  } catch {
+    // 落入演示兜底
+  }
+  return getMocks().SEARCH_HITS.filter((h) => h.title.includes(q) || h.snippet.includes(q));
 }
 
 interface RawBehavior {

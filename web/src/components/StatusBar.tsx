@@ -1,7 +1,9 @@
 import { Icons } from './Icons';
 import type { StatusBar as StatusModel } from '../types';
+import { useI18n } from '../i18n';
 
 export default function StatusBar({ status }: { status: StatusModel | null }) {
+  const { t } = useI18n();
   if (!status) return <div className="h-10 bg-white border-t border-gray-200 shrink-0" />;
   return (
     <div className="h-10 bg-white border-t border-gray-200 flex items-center px-6 text-xs text-gray-500 justify-between shrink-0 z-10 shadow-[0_-2px_4px_rgba(0,0,0,0.02)]">
@@ -18,20 +20,24 @@ export default function StatusBar({ status }: { status: StatusModel | null }) {
               }`}
             ></div>
           </div>
-          {status.serviceLabel}: {status.serviceOk ? '正常' : '不可用'} ({status.syncedAt})
+          {status.serviceLabel}: {status.serviceOk ? t('status.ok') : t('status.down')} ({status.syncedAt})
         </span>
         <span className="flex items-center space-x-1">
           <Icons.History className="w-3 h-3 text-blue-500 mr-1" />
           <span>
-            本月沉淀工作事件: <strong className="text-gray-700">{status.monthlyEvents} 条</strong>
+            {t('status.savedExplanations')}:{' '}
+            <strong className="text-gray-700">
+              {status.monthlyEvents}
+              {t('status.times') ? ` ${t('status.times')}` : ''}
+            </strong>
           </span>
         </span>
         <span className="flex items-center space-x-1">
           <Icons.Shield className="w-3 h-3 text-orange-500 mr-1" />
           <span>
-            额度:{' '}
+            {t('status.quota')}:{' '}
             <strong className="text-gray-700">
-              {status.quotaPercent === null ? '未启用 LLM 编译' : `${status.quotaPercent}%`}
+              {status.quotaPercent === null ? t('status.quotaDisabled') : `${status.quotaPercent}%`}
             </strong>
           </span>
         </span>

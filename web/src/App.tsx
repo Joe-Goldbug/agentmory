@@ -13,18 +13,33 @@ import TeamView from './views/TeamView';
 import { useAsyncData } from './hooks/useAsyncData';
 import { fetchCandidates } from './api/adapters/candidateAdapter';
 import { fetchStatus, fetchSubscription, fetchSearch } from './api/adapters/miscAdapter';
+import { AuthProvider, useAuth } from './auth/AuthContext';
+import LoginView from './views/LoginView';
+import { I18nProvider, useI18n } from './i18n';
 
 const TOOL = (import.meta.env.VITE_LWM_TOOL as string | undefined) ?? 'codex';
 const PROJECT_PATH = (import.meta.env.VITE_LWM_PROJECT_PATH as string | undefined) ?? '';
 
 export default function App() {
+  return (
+    <I18nProvider>
+      <AuthProvider>
+        <Shell />
+      </AuthProvider>
+    </I18nProvider>
+  );
+}
+
+function Shell() {
+  const { user, ready } = useAuth();
+  const { t, lang } = useI18n();
   const [activeTab, setActiveTab] = useState('workspace');
   const [showSubscription, setShowSubscription] = useState(false);
   const [query, setQuery] = useState('');
 
-  const status = useAsyncData(() => fetchStatus(), []);
-  const candidates = useAsyncData(() => fetchCandidates(), []);
-  const plans = useAsyncData(() => fetchSubscription(), []);
+  const status = useAsyncData(() => fetchStatus(), [lang]);
+  const candidates = useAsyncData(() => fetchCandidates(), [lang]);
+  const plans = useAsyncData(() => fetchSubscription(), [lang]);
 
   // 搜索防抖
   const [debounced, setDebounced] = useState('');
@@ -32,7 +47,16 @@ export default function App() {
     const t = setTimeout(() => setDebounced(query), 300);
     return () => clearTimeout(t);
   }, [query]);
-  const search = useAsyncData(() => fetchSearch(debounced), [debounced]);
+  const search = useAsyncData(() => fetchSearch(debounced), [debounced, lang]);
+
+  if (!ready) {
+    return (
+      <div className="h-screen w-full flex items-center justify-center bg-[#f8f9fa] text-gray-400 text-sm">
+        {t('app.restoring')}
+      </div>
+    );
+  }
+  if (!user) return <LoginView />;
 
   return (
     <div className="flex h-screen w-full bg-[#f8f9fa] font-sans text-gray-800 overflow-hidden">

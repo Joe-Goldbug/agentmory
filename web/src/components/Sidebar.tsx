@@ -1,6 +1,8 @@
 import { Icons } from './Icons';
-import { NAVIGATION } from '../mocks';
+import { getMocks } from '../mocks';
 import { palette } from '../utils/colorMap';
+import { useAuth } from '../auth/AuthContext';
+import { useI18n } from '../i18n';
 
 interface Props {
   activeTab: string;
@@ -19,27 +21,44 @@ const ICON_BY_ID: Record<string, keyof typeof Icons> = {
 };
 
 export default function Sidebar({ activeTab, onTabChange, pendingCount, onUpgrade }: Props) {
+  const { user } = useAuth();
+  const { t, lang, toggle } = useI18n();
+  const NAVIGATION = getMocks(lang).NAVIGATION;
+
+  const displayName = user?.name || user?.email?.split('@')[0] || t('side.noUser');
+  const initial = (displayName[0] ?? '?').toUpperCase();
+
   return (
     <aside className="w-64 bg-white border-r border-gray-200 flex flex-col flex-shrink-0 z-10 shadow-[2px_0_8px_rgba(0,0,0,0.02)]">
-      <div className="h-14 flex items-center px-4 space-x-2">
-        <div className="w-3 h-3 rounded-full bg-[#ff5f56] border border-[#e0443e]"></div>
-        <div className="w-3 h-3 rounded-full bg-[#ffbd2e] border border-[#dea123]"></div>
-        <div className="w-3 h-3 rounded-full bg-[#27c93f] border border-[#1aab29]"></div>
+      <div className="h-14 flex items-center justify-between px-4">
+        <div className="flex items-center space-x-2">
+          <div className="w-3 h-3 rounded-full bg-[#ff5f56] border border-[#e0443e]"></div>
+          <div className="w-3 h-3 rounded-full bg-[#ffbd2e] border border-[#dea123]"></div>
+          <div className="w-3 h-3 rounded-full bg-[#27c93f] border border-[#1aab29]"></div>
+        </div>
+        <button
+          onClick={toggle}
+          title={t('common.langSwitch')}
+          className="text-[11px] font-semibold px-2 py-0.5 rounded-md border border-gray-200 text-gray-500 hover:text-blue-600 hover:border-blue-200 transition"
+        >
+          {lang === 'zh' ? 'EN' : '中文'}
+        </button>
       </div>
 
       <div className="px-6 py-2 mb-4 flex items-center space-x-3">
         <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white">
           <Icons.Infinity className="w-5 h-5" />
         </div>
-        <h1 className="font-bold text-gray-900 leading-tight">AI 工作记忆</h1>
+        <h1 className="font-bold text-gray-900 leading-tight">
+          {lang === 'zh' ? 'AI 工作记忆' : 'AI Work Memory'}
+        </h1>
       </div>
 
       <nav className="flex-1 px-3 space-y-1 overflow-y-auto">
         {NAVIGATION.map((item) => {
           const Icon = Icons[ICON_BY_ID[item.id]];
           const active = activeTab === item.id;
-          const badge =
-            item.id === 'confirm' && pendingCount > 0 ? ` (${pendingCount})` : '';
+          const badge = item.id === 'confirm' && pendingCount > 0 ? ` (${pendingCount})` : '';
           return (
             <button
               key={item.id}
@@ -59,18 +78,20 @@ export default function Sidebar({ activeTab, onTabChange, pendingCount, onUpgrad
         <div className="flex items-center justify-between mb-1">
           <div className="flex items-center space-x-3">
             <div className="w-9 h-9 rounded-full bg-[#c94b3a] text-white flex items-center justify-center font-semibold text-sm shadow-inner">
-              LI
+              {initial}
             </div>
             <div className="flex flex-col">
-              <span className="text-sm font-bold text-gray-900 leading-tight">李 慢走</span>
-              <span className="text-xs text-gray-500 mt-0.5">免费版</span>
+              <span className="text-sm font-bold text-gray-900 leading-tight truncate max-w-[110px]">
+                {displayName}
+              </span>
+              <span className="text-xs text-gray-500 mt-0.5">{t('side.free')}</span>
             </div>
           </div>
           <button
             onClick={onUpgrade}
             className="px-3 py-1.5 bg-white border border-gray-200 rounded-full text-xs font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 shadow-sm transition-all"
           >
-            升级订阅
+            {t('side.upgrade')}
           </button>
         </div>
       </div>
