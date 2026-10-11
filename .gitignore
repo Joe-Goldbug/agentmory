@@ -266,3 +266,22 @@ knowledge-digest.pages/
 
 # Local dev helper script (not a project deliverable)
 /fix-venv.sh
+
+# --- 前端工程（web/）与本机 Windows 运行时 ---
+# Node 依赖与构建产物
+node_modules/
+/web/dist/
+
+# 本机运行时数据根：Windows 上 raw/wiki/automation 是 git 符号链接，指向 macOS 路径
+# 无法使用，故另建 .runtime/ 承载真实事件与项目记忆。
+# 见 docs/frontend-demo-integration.md §7.2
+/.runtime/
+
+# 前端本地环境变量（含网关地址与本机的项目绝对路径）
+/web/.env.local
+
+# 本机 Agent 工作记忆（WorkBuddy 会话数据，非项目交付物）
+/.workbuddy/
+
+# TypeScript 增量构建缓存
+/web/*.tsbuildinfo
