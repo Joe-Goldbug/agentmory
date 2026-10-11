@@ -399,6 +399,61 @@ def _infer_kind(text: str) -> str:
     return "rule"
 
 
+def _handle_solana_config(root: Path, params: dict[str, list[str]], body: Any) -> Any:
+    from lwm import solana_storage
+    return solana_storage.get_solana_config(root)
+
+
+def _handle_solana_quota(root: Path, params: dict[str, list[str]], body: Any) -> Any:
+    from lwm import solana_storage
+    wallet = ((params.get("wallet") or [""])[0]).strip()
+    if not wallet:
+        raise ApiError(HTTPStatus.BAD_REQUEST, "E_BAD_WALLET", "缺少 wallet 参数")
+    return solana_storage.get_wallet_quota(root, wallet)
+
+
+def _handle_solana_attestations(root: Path, params: dict[str, list[str]], body: Any) -> Any:
+    from lwm import solana_storage
+    wallet = ((params.get("wallet") or [""])[0]).strip()
+    event_id = ((params.get("event_id") or [""])[0]).strip()
+    if event_id:
+        res = solana_storage.get_attestation(root, event_id)
+        if not res:
+            raise ApiError(HTTPStatus.NOT_FOUND, "E_NOT_FOUND", "未找到该事件的链上存证")
+        return res
+    return solana_storage.list_attestations(root, wallet or None)
+
+
+def _handle_solana_purchase(root: Path, body: Any) -> Any:
+    from lwm import solana_storage
+    wallet = str((body or {}).get("wallet", "")).strip()
+    tx_hash = str((body or {}).get("tx_hash", "")).strip()
+    token_amount = int((body or {}).get("token_amount", 10))
+    quota_added = int((body or {}).get("quota_added", 10))
+    if not wallet or not tx_hash:
+        raise ApiError(HTTPStatus.BAD_REQUEST, "E_BAD_PARAMS", "缺少 wallet 或 tx_hash")
+    return solana_storage.record_quota_purchase(root, wallet, tx_hash, token_amount, quota_added)
+
+
+def _handle_solana_commit(root: Path, body: Any) -> Any:
+    from lwm import solana_storage
+    wallet = str((body or {}).get("wallet", "")).strip()
+    event_id = str((body or {}).get("event_id", "")).strip()
+    project_id = str((body or {}).get("project_id", "")).strip()
+    version = int((body or {}).get("version", 1))
+    snapshot_hash = str((body or {}).get("snapshot_hash", "")).strip()
+    tx_hash = str((body or {}).get("tx_hash", "")).strip()
+    slot = (body or {}).get("slot")
+    if not wallet or not event_id or not snapshot_hash or not tx_hash:
+        raise ApiError(HTTPStatus.BAD_REQUEST, "E_BAD_PARAMS", "缺少必要参数")
+    try:
+        return solana_storage.record_attestation(
+            root, wallet, event_id, project_id, version, snapshot_hash, tx_hash, slot
+        )
+    except ValueError as exc:
+        raise ApiError(HTTPStatus.BAD_REQUEST, "E_QUOTA_EXCEEDED", str(exc)) from exc
+
+
 # --------------------------------------------------------------------------
 # routing table
 # --------------------------------------------------------------------------
@@ -416,16 +471,45 @@ ROUTES: dict[str, Callable[[Path, dict[str, list[str]], Any], Any]] = {
     "/api/search": _handle_search,
     "/api/teams": _handle_teams,
     "/api/subscription": _handle_subscription,
+    "/api/solana/config": _handle_solana_config,
+    "/api/solana/quota": _handle_solana_quota,
+    "/api/solana/attestations": _handle_solana_attestations,
 }
 
 REVIEW_PREFIX = "/api/candidates/"
 REVIEW_SUFFIX = "/review"
 
 
-def _dispatch(root: Path, method: str, path: str, params: dict[str, list[str]], body: Any) -> Any:
+def _dispatch(
+    root: Path,
+    method: str,
+    path: str,
+    params: dict[str, list[str]],
+    body: Any,
+    auth_header: str = "",
+) -> Any:
     if method == "POST" and path.startswith(REVIEW_PREFIX) and path.endswith(REVIEW_SUFFIX):
         candidate_id = unquote(path[len(REVIEW_PREFIX) : -len(REVIEW_SUFFIX)])
         return _handle_review(root, candidate_id, body)
+    if method == "POST" and path == "/api/solana/purchase":
+        return _handle_solana_purchase(root, body)
+    if method == "POST" and path == "/api/solana/commit":
+        return _handle_solana_commit(root, body)
+    # webauth 依赖本模块的 ApiError，延迟导入避免循环
+    from lwm import webauth
+
+    if method == "POST" and path == "/api/auth/register":
+        return webauth.handle_register(root, body)
+    if method == "POST" and path == "/api/auth/login":
+        return webauth.handle_login(root, body)
+    if method == "POST" and path == "/api/auth/wallet/nonce":
+        return webauth.handle_wallet_nonce(root, body)
+    if method == "POST" and path == "/api/auth/wallet/verify":
+        return webauth.handle_wallet_verify(root, body)
+    if method == "GET" and path == "/api/auth/me":
+        return webauth.handle_me(root, body, auth_header)
+    if method == "POST" and path == "/api/auth/logout":
+        return webauth.handle_logout(root, body, auth_header)
     handler = ROUTES.get(path)
     if handler is None:
         raise KeyError(path)
@@ -477,7 +561,7 @@ def make_handler(root: Path) -> type[BaseHTTPRequestHandler]:
             # 候选 id 可能含中文/空格，同样按 UTF-8 还原
             path = unquote(parsed.path)
             try:
-                data = _dispatch(root, method, path, params, body)
+                data = _dispatch(root, method, path, params, body, self.headers.get("Authorization", ""))
             except KeyError:
                 self._fail(HTTPStatus.NOT_FOUND, "E_NOT_FOUND", f"no route for {path}")
                 return
