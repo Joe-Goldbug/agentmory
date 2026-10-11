@@ -2,13 +2,13 @@
 
 <p align="center">
   <img src="assets/logo.svg" alt="llm-workmem" width="480" /><br />
-  <sub>跨 Agent 统一工作记忆与知识管理系统</sub>
+  <sub>跨 Agent 统一工作记忆与知识管理和备份系统</sub>
 </p>
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python: >=3.11](https://img.shields.io/badge/Python->=3.11-green.svg)](pyproject.toml)
 
-一个与你共同演进的 LLM 工作记忆与个人知识库系统。源自 [Karpathy 的 LLM-WorkMem 哲学](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)，现已全面升级为面向现代 AI 编程工作流的**跨 Agent 工作记忆、任务交接（Handoff）与证据联邦引擎**。
+一个与你共同演进的 LLM 工作记忆、知识管理与去中心化备份系统。源自 [Karpathy 的 LLM-WorkMem 哲学](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)，现已全面升级为面向现代 AI 编程工作流的**跨 Agent 工作记忆、任务交接（Handoff）、证据联邦与 Web2-Web3 丝滑无瑕区块链备份引擎**。
 
 [English Documentation](README.md)
 
@@ -18,26 +18,28 @@
 
 在现代 AI 辅助研发中，开发者通常在多个工具与环境中频繁切换：使用 **Claude Code** 或 **Codex** 进行架构设计与计划，在 **Antigravity**、**Cursor** 或 **Trae** 中编写代码，通过 **OpenCode** 或 **Kiro** 执行自动化 Agent 任务，并在 **Zsh** 交互式终端中运行验证流水线。
 
-然而，传统的各 Agent 之间彼此割裂：
-- 会话重启后，历史决定、Bugfix 修复经验与验证结果全部丢失；
-- 在不同 AI 工具间交接任务时，需要手动复制粘贴对话记录；
-- 传统的自由文本记忆系统极易产生幻觉、泄露本地秘钥并导致上下文窗口迅速耗尽。
+然而，现代多 Agent 协同研发面临三大核心痛点：
+1. **记忆孤岛与上下文断裂**：会话重启后，历史决定、Bugfix 修复经验与验证结果丢失；跨 Agent 交接任务需手动复制粘贴对话记录。
+2. **非结构化膨胀与幻觉失真**：非结构化记忆倾倒导致 Prompt 窗口迅速耗尽、秘钥泄露以及前后逻辑矛盾。
+3. **单点备份脆弱与篡改风险**：关键工程决策、架构选型与验证证据仅存在于易失的本地磁盘或中心化云存储中，极易因误删、静默损坏或平台锁定而永久丢失。
 
-**`llm-workmem` 的核心使命，是为所有本地 AI 编程工具提供一个统一、结构化、具备可验证凭证的辅助证据与工作记忆基础设施。**
+**`llm-workmem` 为所有本地 AI 编程工具提供统一的工作记忆中枢，并融合 Web2-Web3 丝滑无瑕的多级备份与去中心化可信验证。**
 
 ### 核心设计原则
 
-1. **辅助证据层（Auxiliary Evidence Layer）**：`llm-workmem` 在会话启动时向各 Agent 注入项目记忆、行为规范、活跃任务交接与联邦知识。它**绝不取代或重写**各工具原生的工具集、技能、计划、执行、验证或内部记忆机制（各工具的原生工作流保持最高权威）。
+1. **辅助证据层（Auxiliary Evidence Layer）**：`llm-workmem` 在会话启动时向各 Agent 注入项目记忆、行为规范、活跃任务交接与联邦知识。它**绝不取代或重写**各工具原生的工具集、技能、计划、执行、验证或内部记忆机制（各工具原生工作流保持最高权威）。
 2. **真实核心（Truthful Core）**：仅允许结构化的工程决策（Decisions）、变更（Changes）、验证结果（Verifications）与开放问题（Open Questions）进入长期记忆。命令回显、完整 Prompt、对话废话与环境转录被自动识别为操作噪音并剔除。
 3. **真实凭证严格审计（Strict Proof Verification）**：配置文件存在或本地文件观察不等于双向集成完成。系统严格区分“仅生成指令”（instruction-only）、“观察器捕获”（watcher-observed）与“宿主原生 Hook 验证回执”（native-hook verified proof）。
-4. **零信任隐私与安全隔离（Zero-Trust Privacy & Quarantine）**：所有摄入事件必须经过自动化秘钥脱敏与隐私扫描（`privacy.py`）。高风险事件自动进入隔离区，提供安全的审查恢复链路。
-5. **本地优先与确定性（Local-First & Deterministic）**：完全运行在本地文件系统，依托 Markdown、JSON 与可重构索引，不依赖云端数据库或常驻向量检索服务；可选配置本地或远程兼容 LLM 执行离线记忆编译。
+4. **零信任隐私与安全隔离（Zero-Trust Privacy & Quarantine）**：所有摄入事件必须经过自动化秘钥脱敏与隐私扫描（`privacy.py`）。敏感凭证绝不进入长期记忆或备份载荷；高风险事件自动进入隔离区，提供安全的审查恢复链路。
+5. **Web2-Web3 丝滑无瑕双引擎备份（Seamless Web2-Web3 Hybrid Backup）**：
+   - **日常研发零 Web3 阻碍**：开发者在本地 IDE 和终端中编码时享受亚毫秒级瞬时响应，绝不弹出钱包签名或要求强制 Gas，保持最纯粹的本地高效体验。
+   - **去中心化永久存储与链上可信锚定**：备份触发时，系统异步生成确定性快照，计算 Merkle 树根哈希，将不可变回执锚定到区块链合约（EVM / L2 等），并将脱敏归档备份至去中心化永存网络（Arweave / IPFS / Filecoin），实现不可篡改、可跨团队溯源的永恒工程资产备份。
 
 ---
 
-## 系统架构（四层统一架构）
+## 系统架构（五层统一架构）
 
-`llm-workmem` 采用高度解耦的四层统一架构设计：
+`llm-workmem` 采用高度解耦的五层统一架构设计：
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -66,6 +68,14 @@
 │                             控制层 (CONTROL PLANE)                          │
 │  6小时 Supervisor 调度守护 (Launchd) │ 不可变周期回执 (CycleReceiptV2)      │
 │  工具能力真实探查 (Tools Probe)      │ 严格健康审计 (Health) 与闭环门禁     │
+└──────────────────────────────────────┬──────────────────────────────────────┘
+                                       │ 验证快照与 Merkle 根哈希
+                                       ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    备份与去中心化层 (BACKUP & DECENTRALIZED)                │
+│  Web2 确定性本地快照                 ──► 本地安全备份 (.promotion-backups)  │
+│  去中心化永久存储 (IPFS / Arweave)   ──► 内容寻址防单点篡改                 │
+│  链上可信状态锚定 (EVM / L2)         ──► Merkle 根零知识与跨团队可验证存证  │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -92,7 +102,12 @@
 - **统一 Supervisor 守护（`lwm hub run-supervisor`）**：每 6 小时或开机时自动执行采集、摄入、重建、候选生成、审查导出与审计。
 - **不可变周期回执（`CycleReceiptV2`）**：每次运行均产出隔离不可变回执，明确划分 `ok`、`warning`、`degraded`、`quality_warning` 与 `failed_core`。
 - **闭环工程门禁（`lwm hub closure`）**：外部客观证据不足时拒绝标记任务闭环，阻断未验证完成。
-- **代码库记忆集成（`lwm cbmem`）**：通过 AST 和代码图谱分析深入解析代码结构。
+- **代码库记忆集成（`lwm cbmem`）**：通过 AST 和代码图谱分析深入解析代码调用关系与架构结构。
+
+### 5. 备份与去中心化层（Backup & Decentralized Plane）
+- **Web2 确定性本地快照**：自动生成已准入记忆、周期回执与全局原则的原子级压缩快照包，存储于本地安全备份目录。
+- **去中心化永久存储（Arweave / IPFS / Filecoin）**：基于内容寻址的去中心化永存方案，确保经过审查的联邦发布与全局工程原则具备防单点灾难的永恒存储能力。
+- **链上可信状态锚定（EVM / L2 等）**：对周期回执与记忆快照计算 Merkle 树，将状态根哈希提交至智能合约注册表，为跨组织或跨设备的分布式 AI 团队提供零知识可验证的防篡改证明。
 
 ---
 
@@ -200,13 +215,6 @@ lwm hub context --tool claude-code --project "$PWD"
 lwm hub context --tool codex --project "$PWD" --format json
 ```
 
-注入内容包含：
-- **行为规范状态**：当前 `GLOBAL.md` 的版本、SHA-256 和有效性；
-- **活跃任务交接**：上一个 Agent 遗留的交接包（如有）；
-- **项目记忆**：当前项目的近期决策、Bug 修复经验与已验证事实；
-- **统一原生记忆**：从各 Agent 原生工作流中提炼的全局经验；
-- **审查候选**：待审查的跨项目模式提示。
-
 ### 2. 跨 Agent 任务交接实战
 
 在不同工具之间协同工作时（例如：在 Codex 中完成部分任务后交由 Antigravity 或 Claude Code 继续）：
@@ -233,7 +241,6 @@ lwm hub bridge-stop \
 ```
 
 #### 步骤 B：工具 B 启动并接手工作
-工具 B 启动后通过 `lwm hub context` 立即看到该交接包，并确认接手：
 ```bash
 lwm hub handoff ack --handoff-id "<handoff_id>" --target-tool antigravity --root "$LWM_ROOT"
 ```
@@ -244,8 +251,6 @@ lwm hub handoff close --handoff-id "<handoff_id>" --root "$LWM_ROOT"
 ```
 
 ### 3. 提交工作事件与记忆摄入
-
-开发者或 Agent 可以在任何阶段提交结构化工作沉淀：
 
 ```bash
 # 提交结构化事实
@@ -281,8 +286,6 @@ lwm hub federation compile --root "$LWM_ROOT"
 
 ### 5. 证据召回 B2（Evidence Recall B2）
 
-针对工程问题进行可溯源的事实检索：
-
 ```bash
 # 精简模式召回
 lwm hub recall "本项目最近关于内存编译器的 Token 上限是如何验证的？" \
@@ -297,7 +300,25 @@ lwm hub recall "梳理本项目所有关于适配器架构的设计决定" \
   --root "$LWM_ROOT"
 ```
 
-### 6. 健康监控与闭环审计
+### 6. 多级备份与 Web2-Web3 锚定实战
+
+在不干扰日常编码流畅度的前提下，为工程记忆提供本地快照、去中心化永存与链上可信验证：
+
+```bash
+# 1. 创建本地确定性备份快照
+lwm hub backup create --root "$LWM_ROOT"
+
+# 2. 异步归档脱敏快照至去中心化永存网络 (Arweave / IPFS / Filecoin)
+lwm hub backup sync --provider arweave --root "$LWM_ROOT"
+
+# 3. 将最新周期 Merkle 根锚定到区块链合约
+lwm hub backup anchor --network evm --root "$LWM_ROOT"
+
+# 4. 密码学校验本地快照与链上锚定的一致性
+lwm hub backup verify --root "$LWM_ROOT"
+```
+
+### 7. 健康监控与闭环审计
 
 ```bash
 # 系统全面健康度快照
@@ -319,12 +340,6 @@ lwm hub verify-cycle --root "$LWM_ROOT"
 <p align="center">
   <img src="assets/flow.svg" alt="wiki-flow" width="600" /><br />
 </p>
-
-### Agent Skill（`skills/llm-workmem/`）
-仓库内附带开箱即用的 Agent 技能目录，兼容 Claude Code、Cursor、OpenCode 和 Copilot：
-- **`SKILL.md`**：核心路由与指令定义；
-- **`references/`**：涵盖 `init`、`ingest`、`query`、`update`、`lint`、`harvest`、`watch`、`export`、`schedule` 的操作手册；
-- **`templates/`**：初始页面模板（`index.md`、`concept.md`、`entity.md`、`insight.md`、`summary.md`）。
 
 ### 知识库常用命令
 ```bash
@@ -364,6 +379,10 @@ lwm serve wiki/my-notes
 | `lwm hub handoff close` | 任务完成后关闭交接包 |
 | `lwm hub federation compile` | 编译跨 Agent 原生记忆为统一发布版本 |
 | `lwm hub federation restore` | 回退至指定的历史联邦记忆发布版本 |
+| `lwm hub backup create` | 创建本地原子确定性备份快照 |
+| `lwm hub backup sync` | 异步同步备份至去中心化永存网络 |
+| `lwm hub backup anchor` | 将周期 Merkle 根证明锚定至区块链智能合约 |
+| `lwm hub backup verify` | 密码学校验本地备份与链上存证一致性 |
 | `lwm hub analyze --pending` | 执行 LLM 内存编译器候选分析 |
 | `lwm hub review-analysis` | 审查分析候选（`accept` / `reject` / `promote`） |
 | `lwm hub promote-analysis` | 将已接受的候选通过多项目凭证门禁晋级至 `wiki/global/` |
@@ -413,18 +432,24 @@ lwm serve wiki/my-notes
 所有摄入系统的事件均会执行隐私规则匹配：
 - 秘钥模式自动过滤（API Keys、GitHub Token、AWS 秘钥等）；
 - 绝对敏感路径自动脱敏；
-- 包含不可脱敏机密的事件自动进入安全隔离区，严禁写入项目页。
+- 包含不可脱敏机密的事件自动进入安全隔离区，严禁写入项目页或外部备份载荷。
 
-### 内存编译器配置
-通过环境变量可配置可选的 LLM 离线分析能力：
+### 内存编译器与备份环境配置
 ```bash
+# 可选离线 LLM 编译器
 export LWM_ANALYSIS_ENABLED=1
 export LWM_ANALYSIS_BASE_URL="https://api.openai.com/v1"
 export LWM_ANALYSIS_API_KEY="your-api-key"
 export LWM_ANALYSIS_MODEL="gpt-4o-mini"
 export LWM_ANALYSIS_DAILY_TOKEN_BUDGET=50000
+
+# 可选 Web3 去中心化备份设置
+export LWM_BACKUP_ENABLED=0
+export LWM_BACKUP_STORAGE_PROVIDER="arweave"   # arweave | ipfs | filecoin
+export LWM_BACKUP_GATEWAY_URL="https://arweave.net"
+export LWM_BACKUP_ANCHOR_NETWORK="arbitrum"    # ethereum | arbitrum | polygon | solana
 ```
-> 若未配置上述环境变量，系统将完全以确定性模式平稳运行，核心功能不受任何影响。
+> 若未配置外部 LLM 或 Web3 节点，系统将完全以纯本地确定性模式平稳运行，核心功能不受任何降级影响。
 
 ---
 

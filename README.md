@@ -2,16 +2,16 @@
 
 <p align="center">
   <img src="assets/logo.svg" alt="llm-workmem" width="480" /><br />
-  <sub>Universal Cross-Agent Working Memory & Knowledge Platform</sub><br />
-  <sub>跨 Agent 统一工作记忆与知识管理系统</sub>
+  <sub>Universal Cross-Agent Working Memory, Knowledge Management & Backup System</sub><br />
+  <sub>跨 Agent 统一工作记忆与知识管理和备份系统</sub>
 </p>
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python: >=3.11](https://img.shields.io/badge/Python->=3.11-green.svg)](pyproject.toml)
 
 > **Bilingual Documentation / 中英文双语对照文档**
-> An LLM working memory and knowledge platform that evolves with you. Originating from [Karpathy's LLM-WorkMem philosophy](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f), `llm-workmem` has evolved into a comprehensive **cross-agent working memory, task handoff, and evidence federation engine** designed for modern AI coding workflows.
-> 一个与你共同演进的 LLM 工作记忆与个人知识库系统。源自 [Karpathy 的 LLM-WorkMem 哲学](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)，现已全面升级为面向现代 AI 编程工作流的**跨 Agent 工作记忆、任务交接（Handoff）与证据联邦引擎**。
+> An LLM working memory, knowledge management, and decentralized backup platform that evolves with you. Originating from [Karpathy's LLM-WorkMem philosophy](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f), `llm-workmem` has evolved into a comprehensive **cross-agent working memory, task handoff, evidence federation, and seamless Web2-Web3 blockchain backup engine** designed for modern AI engineering workflows.
+> 一个与你共同演进的 LLM 工作记忆、知识管理与去中心化备份系统。源自 [Karpathy 的 LLM-WorkMem 哲学](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)，现已全面升级为面向现代 AI 编程工作流的**跨 Agent 工作记忆、任务交接（Handoff）、证据联邦与 Web2-Web3 丝滑无瑕区块链备份引擎**。
 
 ---
 
@@ -22,20 +22,20 @@
 
 ---
 
-**[EN]** However, each agent operates as an isolated silo:
-- Previous decisions, bugfixes, and verifications are lost across session restarts.
-- Passing a task between different AI agents requires manually copying conversation snippets.
-- Unstructured memory systems suffer from hallucinations, credential leakage, and unbounded context bloat.
+**[EN]** However, modern multi-agent development faces three critical pain points:
+1. **Isolated Memory Silos**: Previous decisions, bugfixes, and verifications are lost across session restarts. Passing a task between AI agents requires manually copying conversation snippets.
+2. **Context Degradation & Hallucinations**: Unstructured memory dumps cause prompt bloat, security token leaks, and conflicting assumptions.
+3. **Fragile Backup & Tamper Vulnerability**: Critical engineering decisions, architectural trade-offs, and verification proofs reside solely in ephemeral local disks or centralized cloud silos, vulnerable to accidental loss, silent corruption, or vendor lock-in.
 
-**[ZH]** 然而，传统的各 Agent 之间彼此割裂：
-- 会话重启后，历史决定、Bugfix 修复经验与验证结果全部丢失；
-- 在不同 AI 工具间交接任务时，需要手动复制粘贴对话记录；
-- 传统的自由文本记忆系统极易产生幻觉、泄露本地秘钥并导致上下文窗口迅速耗尽。
+**[ZH]** 然而，现代多 Agent 协同研发面临三大核心痛点：
+1. **记忆孤岛与上下文断裂**：会话重启后，历史决定、Bugfix 修复经验与验证结果丢失；跨 Agent 交接任务需手动复制粘贴对话记录。
+2. **非结构化膨胀与幻觉失真**：非结构化记忆倾倒导致 Prompt 窗口迅速耗尽、秘钥泄露以及前后逻辑矛盾。
+3. **单点备份脆弱与篡改风险**：关键工程决策、架构选型与验证证据仅存在于易失的本地磁盘或中心化云存储中，极易因误删、静默损坏或平台锁定而永久丢失。
 
 ---
 
-**[EN]** **`llm-workmem` acts as a universal, auxiliary evidence and memory backbone for all your AI coding agents.**
-**[ZH]** **`llm-workmem` 的核心使命，是为所有本地 AI 编程工具提供一个统一、结构化、具备可验证凭证的辅助证据与工作记忆基础设施。**
+**[EN]** **`llm-workmem` solves this by providing a universal working memory backbone with seamless Web2-Web3 multi-tier backup and cryptographic provenance.**
+**[ZH]** **`llm-workmem` 为所有本地 AI 编程工具提供统一的工作记忆中枢，并融合 Web2-Web3 丝滑无瑕的多级备份与去中心化可信验证。**
 
 ---
 
@@ -54,18 +54,20 @@
    - **[ZH]** 配置文件存在或本地文件观察不等于双向集成完成。系统严格区分“仅生成指令”（instruction-only）、“观察器捕获”（watcher-observed）与“宿主原生 Hook 验证回执”（native-hook verified proof）。
 
 4. **Zero-Trust Privacy & Quarantine / 零信任隐私与安全隔离**
-   - **[EN]** Automated secret and token scrubbing runs on every ingested event. Questionable events are quarantined with safe recovery workflows.
-   - **[ZH]** 所有摄入事件必须经过自动化秘钥脱敏与隐私扫描（`privacy.py`）。高风险事件自动进入隔离区，提供安全的审查恢复链路。
+   - **[EN]** Automated secret and token scrubbing runs on every ingested event (`privacy.py`). Sensitive keys never enter project memory or external backup payloads. Questionable events are quarantined with safe recovery workflows.
+   - **[ZH]** 所有摄入事件必须经过自动化秘钥脱敏与隐私扫描（`privacy.py`）。敏感凭证绝不进入长期记忆或备份载荷；高风险事件自动进入隔离区，提供安全的审查恢复链路。
 
-5. **No Cloud Dependency / 本地优先与确定性**
-   - **[EN]** Runs entirely locally on your machine via deterministic file storage, Markdown, JSON lines, and optional local or remote OpenAI-compatible LLM analysis.
-   - **[ZH]** 完全运行在本地文件系统，依托 Markdown、JSON 与可重构索引，不依赖云端数据库或常驻向量检索服务；可选配置本地或远程兼容 LLM 执行离线记忆编译。
+5. **Seamless Web2-Web3 Hybrid Backup / Web2-Web3 丝滑无瑕双引擎备份**
+   - **[EN]** **Zero Web3 Friction for Everyday Coding**: Developers use local IDEs and CLI tools with sub-millisecond latency without requiring crypto wallets, gas tokens, or transaction popups during daily coding sessions.
+   - **[ZH]** **日常研发零 Web3 阻碍**：开发者在本地 IDE 和终端中编码时享受亚毫秒级瞬时响应，绝不弹出钱包签名或要求强制 Gas，保持最纯粹的本地高效体验。
+   - **[EN]** **Decentralized Permanence & Cryptographic Anchoring**: When backup is triggered, the system asynchronously snapshots admitted memories, computes Merkle root proofs, and anchors receipts to blockchain registries (EVM / L2s) while storing tamper-proof archives on decentralized storage (Arweave / IPFS / Filecoin).
+   - **[ZH]** **去中心化永久存储与链上可信锚定**：备份触发时，系统异步生成确定性快照，计算 Merkle 树根哈希，将不可变回执锚定到区块链合约（EVM / L2 等），并将脱敏归档备份至去中心化永存网络（Arweave / IPFS / Filecoin），实现不可篡改、可跨团队溯源的永恒工程资产备份。
 
 ---
 
 ## 2. System Architecture / 系统架构
 
-`llm-workmem` is organized into four decoupled architectural planes / 采用高度解耦的四层统一架构设计:
+`llm-workmem` is organized into five decoupled architectural planes / 采用高度解耦的五层统一架构设计:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -94,6 +96,14 @@
 │                             CONTROL PLANE / 控制层                          │
 │  6-Hour Supervisor (Launchd) │ Immutable Cycle Receipts │ Closure Gate      │
 │  Tool Capability Probing     │ Strict Health Audit      │ CBMEM Code Graph  │
+└──────────────────────────────────────┬──────────────────────────────────────┘
+                                       │ Verified Snapshots & Merkle Roots / 验证快照与根哈希
+                                       ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                  BACKUP & DECENTRALIZED PLANE / 备份与去中心化层            │
+│  Web2 Deterministic Snapshots        ──► Local Receipts (.promotion-backups)│
+│  Decentralized Archival (IPFS/Arweave)──► Permanent Content Addressing     │
+│  On-Chain State Anchoring (EVM/L2)   ──► Verifiable Merkle Root Registry    │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -158,6 +168,17 @@
 - **Codebase Memory (`lwm cbmem`) / 代码库图谱记忆**:
   - **[EN]** Integrates deep AST code-graph analysis via [codebase-memory-mcp](https://github.com/DeusData/codebase-memory-mcp).
   - **[ZH]** 通过 AST 和代码图谱分析深入解析代码调用关系与架构结构。
+
+### 5. Backup & Decentralized Plane / 备份与去中心化层
+- **Web2 Deterministic Local Backups / Web2 确定性本地快照**:
+  - **[EN]** Generates atomic, compressed tarballs of admitted memories, cycle receipts, and global principles into `.promotion-backups` and `state/backups/`.
+  - **[ZH]** 自动生成已准入记忆、周期回执与全局原则的原子级压缩快照包，存储于本地安全备份目录。
+- **Decentralized Archival (Arweave / IPFS / Filecoin) / 去中心化永久存储**:
+  - **[EN]** Content-addressed, permanent decentralized storage ensuring that federated memory releases cannot be deleted or corrupted by any single entity.
+  - **[ZH]** 基于内容寻址的去中心化永存方案，确保经过审查的联邦发布与全局工程原则具备防单点灾难的永恒存储能力。
+- **On-Chain Cryptographic Anchoring (EVM / L2s) / 链上可信状态锚定**:
+  - **[EN]** Calculates Merkle trees over `CycleReceiptV2` batches and commits Merkle root state hashes to smart contract registries for zero-knowledge verifiable provenance across cross-organizational agent teams.
+  - **[ZH]** 对周期回执与记忆快照计算 Merkle 树，将状态根哈希提交至智能合约注册表，为跨组织或跨设备的分布式 AI 团队提供零知识可验证的防篡改证明。
 
 ---
 
@@ -353,7 +374,28 @@ lwm hub recall "Trace all architectural decisions on tool adapters" \
 
 ---
 
-### Workflow 6: Health & Closure Gate / 系统健康与闭环审计
+### Workflow 6: Multi-Tier Backup & Web2-Web3 Anchoring / 多级备份与 Web2-Web3 锚定实战
+
+**[EN]** Safeguard engineering memory across local snapshots, decentralized storage, and on-chain verification without interrupting daily coding:
+**[ZH]** 在不干扰日常编码流畅度的前提下，为工程记忆提供本地快照、去中心化永存与链上可信验证：
+
+```bash
+# 1. Create a local deterministic backup snapshot / 创建本地确定性备份快照
+lwm hub backup create --root "$LWM_ROOT"
+
+# 2. Asynchronously export sanitized snapshot to decentralized storage / 异步归档至去中心化永存
+lwm hub backup sync --provider arweave --root "$LWM_ROOT"
+
+# 3. Anchor latest cycle Merkle root on-chain / 将最新周期 Merkle 根锚定到区块链合约
+lwm hub backup anchor --network evm --root "$LWM_ROOT"
+
+# 4. Verify cryptographic integrity against on-chain root / 校验本地快照与链上锚定的一致性
+lwm hub backup verify --root "$LWM_ROOT"
+```
+
+---
+
+### Workflow 7: Health & Closure Gate / 系统健康与闭环审计
 
 ```bash
 # Full system health snapshot / 系统多维度健康度快照
@@ -414,6 +456,10 @@ lwm serve wiki/my-notes
 | `lwm hub handoff close` | Mark a handoff closed upon task completion / 任务完成后关闭交接包 |
 | `lwm hub federation compile` | Compile unified native-memory release / 编译跨 Agent 原生记忆为统一发布版本 |
 | `lwm hub federation restore` | Roll back to a previous unified memory release / 回退至指定的历史联邦记忆发布版本 |
+| `lwm hub backup create` | Create atomic deterministic backup snapshot / 创建本地原子确定性备份快照 |
+| `lwm hub backup sync` | Asynchronously sync backup to decentralized storage / 异步同步备份至去中心化永存网络 |
+| `lwm hub backup anchor` | Anchor cycle Merkle root proof to blockchain / 将周期 Merkle 根证明锚定至区块链 |
+| `lwm hub backup verify` | Cryptographically verify local backup against on-chain proof / 校验本地备份与链上存证一致性 |
 | `lwm hub analyze --pending` | Execute LLM memory compiler analysis / 执行 LLM 内存编译器候选分析 |
 | `lwm hub review-analysis` | Review an analysis candidate (`accept`/`reject`/`promote`) / 审查分析候选 |
 | `lwm hub promote-analysis` | Promote accepted candidate through multi-project gates / 晋级候选至全局知识库 |
@@ -456,19 +502,26 @@ lwm serve wiki/my-notes
 **[ZH]** `GLOBAL.md` 是全局统一、经过人工审阅的个人工程行为底线（通过 SHA-256 哈希与版本快照验证）。强制要求：最小化变更、标准库优先、行动前验证、严格非破坏性安全保障，以及个人工作习惯绝对本地私有（GitHub 仅呈现纯工程代码与文档）。
 
 ### Privacy Rules (`privacy_rules.toml`) / 隐私与脱敏规则
-**[EN]** All ingested events are sanitized against `privacy_rules.toml` (scrubbing API keys, tokens, credentials, and sensitive local paths). High-risk items enter quarantine and never enter project pages.
-**[ZH]** 所有摄入系统的事件均会依据 `privacy_rules.toml` 自动脱敏（过滤 API Keys、Tokens、凭据及敏感本地路径）。高风险事件自动进入安全隔离区，严禁写入项目页。
+**[EN]** All ingested events are sanitized against `privacy_rules.toml` (scrubbing API keys, tokens, credentials, and sensitive local paths). High-risk items enter quarantine and never enter project pages or backup payloads.
+**[ZH]** 所有摄入系统的事件均会依据 `privacy_rules.toml` 自动脱敏（过滤 API Keys、Tokens、凭据及敏感本地路径）。高风险事件自动进入安全隔离区，严禁写入项目页或外部备份载荷。
 
-### Memory Compiler Settings / 内存编译器环境配置
+### Memory Compiler & Backup Settings / 内存编译器与备份环境配置
 ```bash
+# Optional LLM Memory Compiler / 可选离线 LLM 编译器
 export LWM_ANALYSIS_ENABLED=1
 export LWM_ANALYSIS_BASE_URL="https://api.openai.com/v1"
 export LWM_ANALYSIS_API_KEY="your-api-key"
 export LWM_ANALYSIS_MODEL="gpt-4o-mini"
 export LWM_ANALYSIS_DAILY_TOKEN_BUDGET=50000
+
+# Optional Web3 & Decentralized Backup / 可选 Web3 去中心化备份设置
+export LWM_BACKUP_ENABLED=0
+export LWM_BACKUP_STORAGE_PROVIDER="arweave"   # arweave | ipfs | filecoin
+export LWM_BACKUP_GATEWAY_URL="https://arweave.net"
+export LWM_BACKUP_ANCHOR_NETWORK="arbitrum"    # ethereum | arbitrum | polygon | solana
 ```
-> **[EN]** If no LLM endpoint is configured, `llm-workmem` operates completely deterministically with zero degradation to core features.
-> **[ZH]** 若未配置上述环境变量，系统将完全以确定性模式平稳运行，核心功能不受任何影响。
+> **[EN]** If no external LLM or Web3 endpoint is configured, `llm-workmem` operates completely deterministically and locally with zero degradation to core features.
+> **[ZH]** 若未配置外部 LLM 或 Web3 节点，系统将完全以纯本地确定性模式平稳运行，核心功能不受任何降级影响。
 
 ---
 
