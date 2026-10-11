@@ -13,7 +13,16 @@ and can never be promoted to ``verified_*`` status.
 
 from __future__ import annotations
 
-import fcntl
+try:  # POSIX
+    import fcntl
+except ImportError:  # pragma: no cover - Windows has no fcntl
+    fcntl = None
+
+try:  # Windows
+    import msvcrt
+except ImportError:  # pragma: no cover - POSIX has no msvcrt
+    msvcrt = None
+
 import json
 import re
 import uuid
@@ -278,11 +287,22 @@ def _receipt_lock(root: Path):
     path = _payload_path(root).with_name("capability-receipts.lock")
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a+", encoding="utf-8") as handle:
-        fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
-        try:
+        if fcntl is not None:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+        elif msvcrt is not None:
+            handle.seek(0)
+            msvcrt.locking(handle.fileno(), msvcrt.LK_LOCK, 1)
+            try:
+                yield
+            finally:
+                handle.seek(0)
+                msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+        else:  # pragma: no cover - 无可用锁实现时退化为不加锁
             yield
-        finally:
-            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
 
 def record(
