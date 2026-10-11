@@ -1,7 +1,7 @@
 """Event deduplication and the ``state/event-index.json`` ledger.
 
-``dedup_key`` = sha1(``timestamp_date | tool | project_id | event_type |
-task[:80] | sorted(verification)[:80]``). Re-submitting the same key
+``dedup_key`` hashes the date, owner, lifecycle/turn identity and full bounded
+work/result fields. Re-submitting the same key
 writes the new event to ``rejected/`` with ``reason=duplicate``.
 
 For ``session_summary`` and ``session_start`` the same ``session_id``
@@ -28,20 +28,13 @@ class DedupDecision:
     existing_event_id: str | None = None
 
 
-def _safe_first80(value: Any) -> str:
-    text = "" if value is None else str(value)
-    return text[:80]
-
-
 def dedup_key(event: dict[str, Any]) -> str:
     """Compute the deterministic dedup key for an event."""
 
     timestamp = str(event.get("timestamp") or "")
     date_part = timestamp[:10] or "unknown"
-    task_part = _safe_first80(event.get("task"))
-    verification_part = ",".join(
-        sorted(_safe_first80(v) for v in event.get("verification") or [])
-    )
+    task_part = str(event.get("task") or "")
+    verification_part = json.dumps(event.get("verification") or [], sort_keys=True, ensure_ascii=False)
     fields = [
         date_part,
         str(event.get("tool") or ""),
@@ -49,6 +42,10 @@ def dedup_key(event: dict[str, Any]) -> str:
         str(event.get("event_type") or ""),
         task_part,
         verification_part,
+        str(event.get("session_id") or ""),
+        str(event.get("task_id") or ""),
+        json.dumps({key: event.get(key) for key in ("decisions", "changes", "risks", "open_questions")},
+                   sort_keys=True, ensure_ascii=False),
     ]
     payload = "|".join(fields).encode("utf-8")
     return hashlib.sha1(payload).hexdigest()
@@ -114,6 +111,8 @@ def record_event(
         "timestamp": event.get("timestamp"),
         "bucket": bucket,
         "file": file_path,
+        "session_id": event.get("session_id"),
+        "task_id": event.get("task_id"),
     }
     save_event_index(root, index)
 
@@ -126,6 +125,7 @@ def _session_key_exists(
     event_type: str,
     project_id: str,
     incoming_ts: datetime,
+    task_id: str = "",
 ) -> str | None:
     """Return existing event_id if another session event within 24h is indexed."""
 
@@ -135,12 +135,14 @@ def _session_key_exists(
     for event_id, entry in index.items():
         if entry.get("bucket") not in {"inbox", "processed"}:
             continue
-        if entry.get("event_type") not in {"session_start", "session_summary"}:
+        if entry.get("event_type") != event_type:
             continue
         meta = entry
         if meta.get("tool") not in {None, tool}:
             continue
         if meta.get("project_id") != project_id:
+            continue
+        if meta.get("session_id") != session_id or str(meta.get("task_id") or "") != task_id:
             continue
         existing_ts = _parse_iso(str(meta.get("timestamp")))
         if existing_ts is None:
@@ -177,6 +179,7 @@ def evaluate(
             event_type=str(event.get("event_type") or ""),
             project_id=str(event.get("project_id") or ""),
             incoming_ts=ts,
+            task_id=str(event.get("task_id") or ""),
         )
         if existing:
             return DedupDecision(

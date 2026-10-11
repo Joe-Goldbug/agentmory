@@ -260,6 +260,7 @@ def promote_analysis(
         claim=candidate.claim,
         events=load_processed_events(root),
         evidence_ids=candidate.evidence_ids,
+        counterevidence_ids=candidate.counterevidence_ids,
         actor=actor,
     )
     if not evaluated.promoted:

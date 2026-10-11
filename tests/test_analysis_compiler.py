@@ -75,6 +75,7 @@ def test_analysis_review_and_recall_require_human_acceptance(tmp_path: Path) -> 
 
 # Configuration
 
+
 def test_disabled_config_is_not_usable() -> None:
     cfg = AnalysisConfig.from_env({})
     usable, reason = cfg.is_usable()
@@ -133,11 +134,12 @@ def test_remote_endpoint_with_key_is_usable() -> None:
 
 # Validator
 
+
 @pytest.mark.parametrize("kind", ["workflow", "relationship", "conflict", "summary"])
 def test_valid_candidate_passes(kind: str) -> None:
     ok, reason = validate_candidate(
         _candidate(kind=kind, evidence_ids=("e1", "e2")),
-        known_event_ids={"e1", "e2"},
+        known_event_ids={"e1", "e2", "e3"},
     )
     assert ok, reason
 
@@ -167,31 +169,23 @@ def test_overlap_between_claim_and_counter_is_rejected() -> None:
     ],
 )
 def test_forbidden_patterns_reject_claims(claim: str) -> None:
-    ok, reason = validate_candidate(
-        _candidate(claim=claim), known_event_ids={"e1", "e2"}
-    )
+    ok, reason = validate_candidate(_candidate(claim=claim), known_event_ids={"e1", "e2", "e3"})
     assert not ok and "forbidden_pattern" in reason
 
 
 def test_empty_claim_rejected() -> None:
-    ok, reason = validate_candidate(
-        _candidate(claim="   "), known_event_ids={"e1", "e2"}
-    )
+    ok, reason = validate_candidate(_candidate(claim="   "), known_event_ids={"e1", "e2"})
     assert not ok and reason == "empty_claim"
 
 
 def test_unknown_kind_rejected() -> None:
-    ok, _ = validate_candidate(
-        _candidate(kind="opinion"), known_event_ids={"e1", "e2"}
-    )
+    ok, _ = validate_candidate(_candidate(kind="opinion"), known_event_ids={"e1", "e2"})
     assert not ok
 
 
 def test_provider_payload_rejects_unknown_fields_and_evidence_drift() -> None:
     candidate = _candidate()
-    ok, reason = validate_provider_payload(
-        {"claim": "ok", "unexpected": True}, candidate=candidate
-    )
+    ok, reason = validate_provider_payload({"claim": "ok", "unexpected": True}, candidate=candidate)
     assert not ok and reason.startswith("unsupported_provider_fields")
 
     ok, reason = validate_provider_payload(
@@ -218,6 +212,7 @@ def test_provider_payload_accepts_only_existing_evidence() -> None:
 
 # Provider (no real network)
 
+
 def test_provider_unavailable_when_httpx_missing(monkeypatch, tmp_path: Path) -> None:
     cfg = AnalysisConfig.from_env(
         {
@@ -228,6 +223,7 @@ def test_provider_unavailable_when_httpx_missing(monkeypatch, tmp_path: Path) ->
     )
 
     import builtins
+
     original_import = builtins.__import__
 
     def fake_import(name, *args, **kwargs):
@@ -254,6 +250,7 @@ def test_provider_uses_cache_when_present(tmp_path: Path) -> None:
     evidence = [{"event_id": "e1", "task": "x"}]
     key = cache_key_for(
         cfg,
+        prompt_hash=hashlib.sha256(b"x").hexdigest(),
         evidence_hash=hashlib.sha256(
             json.dumps(evidence, sort_keys=True).encode("utf-8")
         ).hexdigest(),
@@ -264,9 +261,7 @@ def test_provider_uses_cache_when_present(tmp_path: Path) -> None:
         json.dumps({"kind": "workflow", "claim": "cached claim"}),
         encoding="utf-8",
     )
-    result, reason = classify_with_provider(
-        cfg, prompt="x", evidence=evidence, cache_root=tmp_path
-    )
+    result, reason = classify_with_provider(cfg, prompt="x", evidence=evidence, cache_root=tmp_path)
     assert reason == "cache_hit"
     assert result and result["claim"] == "cached claim"
 
@@ -305,9 +300,7 @@ def test_provider_does_not_persist_api_key(tmp_path: Path) -> None:
         def post(self, *args, **kwargs):
             return FakeResponse()
 
-    fake_module = type(
-        "M", (), {"post": FakeClient().post, "HTTPError": Exception}
-    )()
+    fake_module = type("M", (), {"post": FakeClient().post, "HTTPError": Exception})()
     with patch.dict("sys.modules", {"httpx": fake_module}):
         result, _ = classify_with_provider(
             cfg, prompt="x", evidence=[{"id": "e1"}], cache_root=tmp_path
@@ -355,13 +348,9 @@ def test_daily_budget_is_persisted_and_rejects_over_budget(tmp_path: Path) -> No
 def test_daily_budget_reconciles_provider_usage(tmp_path: Path) -> None:
     assert reserve_daily_budget(tmp_path, token_count=20, budget=100) is True
 
-    usage = json.loads(
-        (tmp_path / "state" / "analysis" / "usage.json").read_text(encoding="utf-8")
-    )
+    usage = json.loads((tmp_path / "state" / "analysis" / "usage.json").read_text(encoding="utf-8"))
     reconcile_daily_budget(tmp_path, reserved_tokens=20, actual_tokens=7)
-    usage = json.loads(
-        (tmp_path / "state" / "analysis" / "usage.json").read_text(encoding="utf-8")
-    )
+    usage = json.loads((tmp_path / "state" / "analysis" / "usage.json").read_text(encoding="utf-8"))
 
     assert usage["used_tokens"] == 7
     assert usage["last_actual_tokens"] == 7
@@ -383,7 +372,7 @@ def test_analyze_pending_uses_retry_wait_until_retry_window(tmp_path: Path, monk
         ),
         encoding="utf-8",
     )
-    candidate = _candidate(evidence_ids=("e1",), scope=("p1",))
+    candidate = _candidate(evidence_ids=("e1",), counterevidence_ids=(), scope=("p1",))
     save_candidate(tmp_path, candidate)
     config = AnalysisConfig(
         enabled=True,
@@ -498,6 +487,7 @@ def test_analyze_pending_reports_lock_unavailable(tmp_path: Path, monkeypatch) -
 
 
 # Persistence
+
 
 def test_save_load_round_trip(tmp_path: Path) -> None:
     candidate = _candidate()

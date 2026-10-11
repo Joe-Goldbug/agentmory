@@ -19,14 +19,11 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Literal
 
-from lwm.events import (
-    new_event_id,
-)
 from lwm.privacy import SECRET_PATTERNS
 
 
@@ -45,9 +42,7 @@ from lwm.privacy import SECRET_PATTERNS
 
 Durability = Literal["durable", "operational", "rejected"]
 
-DURABLE_EVENT_TYPES = frozenset(
-    {"decision", "bugfix", "verification", "project_status"}
-)
+DURABLE_EVENT_TYPES = frozenset({"decision", "bugfix", "verification", "project_status"})
 
 OPERATIONAL_EVENT_TYPES = frozenset(
     {
@@ -172,9 +167,7 @@ def classify_event(event: object) -> EventAdmission:
     event_type = str(event.get("event_type") or "").strip()
     task = _bounded_task(event.get("task"))
     fields = {key: _bounded_items(event.get(key)) for key in DURABLE_FIELDS}
-    combined = "\n".join(
-        [task, *(item for values in fields.values() for item in values)]
-    )
+    combined = "\n".join([task, *(item for values in fields.values() for item in values)])
 
     if _contains_noise_marker(combined):
         return EventAdmission("rejected", "instruction_or_environment_dump", None)
@@ -260,15 +253,11 @@ class ProjectMemoryEntry:
         """
 
         head = f"- {self.timestamp} — {self.text}"
-        if not self.tool and not self.evidence_path:
+        if self.event_id == "legacy":
             return head
         provenance = " · ".join(
-            part
-            for part in (self.tool, self.event_id, self.evidence_path)
-            if part and part != "legacy"
+            (self.tool or "unknown", self.event_id, self.evidence_path or "(source unavailable)")
         )
-        if not provenance:
-            return head
         return f"{head}\n  ↳ {provenance}"
 
 
@@ -280,7 +269,7 @@ def _split_section(body: str, section_name: str) -> tuple[str, str, str]:
     start = matches[0].end()
     next_match = pattern.search(body, start)
     end = next_match.start() if next_match else len(body)
-    before = body[:matches[0].start()]
+    before = body[: matches[0].start()]
     section = body[start:end].rstrip()
     after = body[end:]
     return before, section, after
@@ -315,7 +304,33 @@ def project_section_for_event(event: dict[str, Any]) -> str:
 
 
 def _durable_text(event: dict[str, Any], section: str) -> str:
-    """Build the bounded, human-readable text for one durable entry."""
+    """Compact each field independently; changes cannot consume verification."""
+
+    task = _bounded_task(event.get("task"))
+    parts = [task] if task and section != "verifications" else []
+    keys = (
+        ("verification",)
+        if section == "verifications"
+        else ("decisions", "changes", "verification", "risks")
+    )
+    labels = {
+        "decisions": "decisions",
+        "changes": "changes",
+        "verification": "verified",
+        "risks": "risks",
+    }
+    for key in keys:
+        items = _bounded_items(event.get(key))
+        if not items:
+            continue
+        budget = (MAX_ENTRY_CHARS - 2 * (len(items) - 1)) // len(items)
+        compact = [item if len(item) <= budget else item[: budget - 3] + "..." for item in items]
+        parts.append(f"{labels[key]}: {'; '.join(compact)}")
+    return " — ".join(parts) or str(event.get("event_type") or "(no task)")
+
+
+def _legacy_durable_text(event: dict[str, Any], section: str) -> str:
+    """Read compatibility for bullets rendered before independent budgets."""
 
     task = _bounded_task(event.get("task"))
     fields = {key: _bounded_items(event.get(key)) for key in DURABLE_FIELDS}
@@ -356,7 +371,7 @@ def event_entry(
         section=section,
         text=_durable_text(event, section),
         timestamp=str(event.get("timestamp") or ""),
-        event_id=str(event.get("event_id") or new_event_id()),
+        event_id=_stable_event_id(event),
         tool=str(event.get("tool") or ""),
         evidence_path=evidence_path,
     )
@@ -377,7 +392,28 @@ def _read_existing_entries(body: str) -> dict[str, list[ProjectMemoryEntry]]:
             name = line[3:].strip().lower().replace(" ", "_")
             current = name if name in sections else None
             continue
-        if current is None or not line.strip().startswith("- "):
+        if current is None:
+            continue
+        if line.strip().startswith("↳ ") and sections[current]:
+            parts = line.strip()[2:].split(" · ", 2)
+            tool, event_id, evidence = "", "legacy", ""
+            if len(parts) == 3:
+                tool, event_id, evidence = parts
+            elif len(parts) == 2:
+                if parts[1].startswith("raw/"):
+                    event_id, evidence = parts
+                else:
+                    tool, event_id = parts
+            elif parts:
+                event_id = parts[0]
+            sections[current][-1] = replace(
+                sections[current][-1],
+                event_id=event_id,
+                tool="" if tool == "unknown" else tool,
+                evidence_path="" if evidence == "(source unavailable)" else evidence,
+            )
+            continue
+        if not line.strip().startswith("- "):
             continue
         match = re.match(r"- (\S+) — (.*)", line.strip())
         if not match:
@@ -423,8 +459,7 @@ def render_project_page(
         timestamp_now = updated
     else:
         timestamp_now = (
-            datetime.now(timezone.utc).replace(tzinfo=None).isoformat(timespec="seconds")
-            + "Z"
+            datetime.now(timezone.utc).replace(tzinfo=None).isoformat(timespec="seconds") + "Z"
         )
     last_event_text = str((last_event or {}).get("event_type") or "n/a")
     last_event_ts = str((last_event or {}).get("timestamp") or "n/a")
@@ -433,9 +468,7 @@ def render_project_page(
     def render_section(name: str, label: str, *, reverse: bool = True) -> str:
         items = entries.get(name) or []
         # Deterministic ordering: timestamp first, event_id as tiebreaker.
-        ordered = sorted(
-            items, key=lambda e: (e.timestamp, e.event_id), reverse=reverse
-        )
+        ordered = sorted(items, key=lambda e: (e.timestamp, e.event_id), reverse=reverse)
         limit = SECTION_LIMITS.get(name)
         if limit is not None:
             ordered = ordered[:limit]
@@ -473,7 +506,9 @@ def _is_lifecycle_only_page(text: str) -> bool:
     if "Last task: (no task recorded)" not in text:
         return False
     entries = _read_existing_entries(text)
-    if any(entries.get(name) for name in ("decisions", "bugfixes", "verifications", "open_questions")):
+    if any(
+        entries.get(name) for name in ("decisions", "bugfixes", "verifications", "open_questions")
+    ):
         return False
     lifecycle_markers = {
         "session_start",
@@ -516,32 +551,158 @@ def append_event(root: Path, event: dict[str, Any]) -> Path | None:
     target = project_page_path(root, project_id)
     target.parent.mkdir(parents=True, exist_ok=True)
 
-    if target.is_file():
-        existing = _read_existing_entries(target.read_text(encoding="utf-8"))
+    original = target.read_text(encoding="utf-8") if target.is_file() else ""
+    if original:
+        existing = _read_existing_entries(original)
     else:
-        existing = {name: [] for name in (
-            "status",
-            "decisions",
-            "bugfixes",
-            "verifications",
-            "open_questions",
-        )}
-
-    section, entry = event_entry(event)
-    if section == "status" and "open_questions" in existing:
-        for question in event.get("open_questions") or []:
-            q_entry = ProjectMemoryEntry(
-                section="open_questions",
-                text=str(question),
-                timestamp=entry.timestamp,
-                event_id=entry.event_id,
+        existing = {
+            name: []
+            for name in (
+                "status",
+                "decisions",
+                "bugfixes",
+                "verifications",
+                "open_questions",
             )
-            existing["open_questions"].append(q_entry)
+        }
 
-    existing.setdefault(section, []).append(entry)
-    page = render_project_page(project_id, existing, last_event=event)
-    target.write_text(page, encoding="utf-8")
+    before = {name: list(items) for name, items in existing.items()}
+    # Old generated bullets already have a pointer: recover their independent
+    # fields from that exact source, without scanning the raw event tree.
+    seen: set[str] = set()
+    for entry in [item for items in existing.values() for item in items]:
+        if not entry.evidence_path or entry.event_id in seen:
+            continue
+        seen.add(entry.event_id)
+        path = (root / entry.evidence_path).resolve()
+        if not path.is_relative_to(processed_events_dir(root).resolve()):
+            continue
+        try:
+            source = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if (
+            isinstance(source, dict)
+            and _stable_event_id(source) == entry.event_id
+            and source.get("project_id") == project_id
+            and classify_event(source).durability == "durable"
+        ):
+            _add_event_entries(existing, source, entry.evidence_path, refresh=True)
+    # Recover identity only for uniquely matched source-backed legacy bullets.
+    # Unmatched human bullets remain untouched, with no invented provenance.
+    if any(entry.event_id == "legacy" for items in existing.values() for entry in items):
+        sources = [
+            (path, source)
+            for path, source in load_processed_events(root)
+            if source.get("project_id") == project_id
+            and classify_event(source).durability == "durable"
+        ]
+        recovered: dict[str, tuple[Path, dict[str, Any]]] = {}
+        for name, items in existing.items():
+            for entry in list(items):
+                if entry.event_id != "legacy":
+                    continue
+                matches = [
+                    (path, source)
+                    for path, source in sources
+                    if str(source.get("timestamp") or "") == entry.timestamp
+                    and name == project_section_for_event(source)
+                    and entry.text
+                    in {
+                        _legacy_durable_text(source, name).strip(),
+                        _durable_text(source, name).strip(),
+                    }
+                ]
+                if len({_stable_event_id(source) for _, source in matches}) == 1:
+                    items.remove(entry)
+                    path, source = matches[0]
+                    recovered[_stable_event_id(source)] = (path, source)
+        for path, source in recovered.values():
+            _add_event_entries(existing, source, _relative_evidence_path(root, path), refresh=True)
+
+    evidence = _event_evidence_path(root, event)
+    _add_event_entries(existing, event, evidence)
+    if original and existing == before:
+        return target
+
+    last_event = event
+    previous = re.search(r"^Last event: (.*?) @ (.*?)$", original, re.MULTILINE)
+    if previous and previous[2] > str(event.get("timestamp") or ""):
+        task = re.search(r"^Last task: (.*)$", original, re.MULTILINE)
+        last_event = {
+            "event_type": previous[1],
+            "timestamp": previous[2],
+            "task": task[1] if task else "",
+        }
+    page = render_project_page(
+        project_id, existing, last_event=last_event, updated=str(last_event.get("timestamp") or "")
+    )
+    headings = list(re.finditer(r"^## (.+)$", original, re.MULTILINE))
+    for i, heading in enumerate(headings):
+        if heading[1].lower().replace(" ", "_") not in existing:
+            end = headings[i + 1].start() if i + 1 < len(headings) else len(original)
+            page += "\n" + original[heading.start() : end]
+    if page != original:
+        target.write_text(page, encoding="utf-8")
     return target
+
+
+def _event_evidence_path(root: Path, event: dict[str, Any]) -> str:
+    event_id = _stable_event_id(event)
+    if Path(event_id).name != event_id:
+        return ""
+    for bucket in ("processed", "inbox"):
+        base = root / "raw/events" / bucket
+        candidates = [base / f"{event_id}.json"]
+        if base.is_dir():
+            candidates.extend(
+                day / f"{event_id}.json" for day in sorted(base.iterdir()) if day.is_dir()
+            )
+        for path in candidates:
+            if path.is_file():
+                if bucket == "inbox":
+                    path = root / "raw/events/processed" / path.parent.name / path.name
+                return _relative_evidence_path(root, path)
+    return ""
+
+
+def _add_event_entries(
+    sections: dict[str, list[ProjectMemoryEntry]],
+    event: dict[str, Any],
+    evidence_path: str,
+    *,
+    refresh: bool = False,
+) -> None:
+    section, entry = event_entry(event, evidence_path=evidence_path)
+    previous = [
+        item for items in sections.values() for item in items if item.event_id == entry.event_id
+    ]
+    if previous and not refresh:
+        return
+    if previous:
+        entry = replace(
+            entry,
+            tool=entry.tool or previous[0].tool,
+            evidence_path=entry.evidence_path or previous[0].evidence_path,
+        )
+    additions = [entry]
+    if section != "verifications" and _bounded_items(event.get("verification")):
+        additions.append(
+            replace(entry, section="verifications", text=_durable_text(event, "verifications"))
+        )
+    additions.extend(
+        replace(entry, section="open_questions", text=question)
+        for question in _bounded_items(event.get("open_questions"))
+    )
+    if sorted(previous, key=lambda item: (item.section, item.text)) == sorted(
+        additions, key=lambda item: (item.section, item.text)
+    ):
+        return
+    # Replace the same identity, including its projections, rather than append.
+    for name, items in sections.items():
+        sections[name] = [item for item in items if item.event_id != entry.event_id]
+    for addition in additions:
+        sections.setdefault(addition.section, []).append(addition)
 
 
 def normalize_existing_pages(root: Path) -> list[Path]:
@@ -596,8 +757,11 @@ def normalize_existing_pages(root: Path) -> list[Path]:
                 # orphan line; ignore.
                 continue
 
-        needs_fix = any(not _re.search(r":\s*\[", fm.split("tags:", 1)[-1].split("\n", 1)[0])
-                        for key in ("tags",) if key in fields)
+        needs_fix = any(
+            not _re.search(r":\s*\[", fm.split("tags:", 1)[-1].split("\n", 1)[0])
+            for key in ("tags",)
+            if key in fields
+        )
         if not needs_fix:
             continue
 
@@ -672,11 +836,7 @@ def _stable_event_id(event: dict[str, Any]) -> str:
             str(event.get("timestamp") or ""),
             str(event.get("event_type") or ""),
             _bounded_task(event.get("task")),
-            *(
-                item
-                for key in DURABLE_FIELDS
-                for item in _bounded_items(event.get(key))
-            ),
+            *(item for key in DURABLE_FIELDS for item in _bounded_items(event.get(key))),
         ]
     )
     return "legacy-" + hashlib.sha256(material.encode("utf-8")).hexdigest()[:16]
@@ -728,9 +888,7 @@ def aggregate_project_pages(
     Returns ``project_id -> (sections, newest_event, newest_timestamp)``.
     """
 
-    pages: dict[
-        str, tuple[dict[str, list[ProjectMemoryEntry]], dict[str, Any], str]
-    ] = {}
+    pages: dict[str, tuple[dict[str, list[ProjectMemoryEntry]], dict[str, Any], str]] = {}
     seen_ids: dict[str, set[str]] = {}
 
     for path, event, admission in admitted:
@@ -759,22 +917,7 @@ def aggregate_project_pages(
         evidence = _relative_evidence_path(root, path)
         normalized = dict(event)
         normalized["event_id"] = event_id
-        section, entry = event_entry(
-            normalized, evidence_path=evidence, admission=admission
-        )
-        sections.setdefault(section, []).append(entry)
-
-        for question in _bounded_items(event.get("open_questions")):
-            sections["open_questions"].append(
-                ProjectMemoryEntry(
-                    section="open_questions",
-                    text=question,
-                    timestamp=entry.timestamp,
-                    event_id=event_id,
-                    tool=entry.tool,
-                    evidence_path=evidence,
-                )
-            )
+        _add_event_entries(sections, normalized, evidence)
 
         timestamp = str(event.get("timestamp") or "")
         if timestamp >= pages[project_id][2]:
@@ -876,9 +1019,7 @@ def rebuild_project_pages(
 
     for pid, (sections, newest_event, newest_ts) in sorted(pages.items()):
         target = project_page_path(root, pid)
-        body = render_project_page(
-            pid, sections, newest_event, updated=newest_ts or None
-        )
+        body = render_project_page(pid, sections, newest_event, updated=newest_ts or None)
         rel = _relative_evidence_path(root, target)
         if target.is_file() and target.read_text(encoding="utf-8") == body:
             unchanged.append(rel)

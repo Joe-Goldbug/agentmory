@@ -1,13 +1,15 @@
-"""Observe Kiro's local project session index without reading message content."""
+"""Observe Kiro boundaries and bounded results without persisting raw chat."""
 
 from __future__ import annotations
 
 import argparse
 import json
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 from lwm import lifecycle
+from adapters.hooks._common import host_results
 
 
 def _load_json(path: Path) -> object:
@@ -48,8 +50,18 @@ def observe(root: Path, sessions_root: Path, seen: set[str], *, settle_seconds: 
                 settled = session_path.is_file() and session_path.stat().st_mtime <= cutoff
             except OSError:
                 settled = False
-            stop_key = f"stop:{index_path.parent.name}:{session_id}"
+            stop_key = f"stop:{index_path.parent.name}:{session_id}:{session_path.stat().st_mtime_ns}" if settled else ""
             if settled and stop_key not in seen:
+                summary = None
+                if session_path.stat().st_size <= 2_000_000:
+                    session = _load_json(session_path)
+                    if isinstance(session, dict):
+                        session_workspace = session.get("workspaceDirectory") or session.get("workspacePath")
+                        if session_workspace and Path(str(session_workspace)).resolve() != Path(workspace).resolve():
+                            continue
+                        history = session.get("history")
+                        if isinstance(history, list):
+                            summary = host_results({"transcript": history[-160:]}, host="kiro")
                 lifecycle.stop(
                     root,
                     tool="kiro",
@@ -57,6 +69,9 @@ def observe(root: Path, sessions_root: Path, seen: set[str], *, settle_seconds: 
                     session_id=session_id,
                     task="Kiro local session observed idle",
                     source="watcher-observed",
+                    task_id=str((summary or {}).get("task_id") or "") or None,
+                    handoff_summary=summary,
+                    source_timestamp=datetime.fromtimestamp(session_path.stat().st_mtime, timezone.utc).isoformat(),
                 )
                 seen.add(stop_key)
 

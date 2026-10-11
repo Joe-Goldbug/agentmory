@@ -266,7 +266,7 @@ def test_install_global_merges_codex_and_gemini_hooks_without_overwriting_user_s
 
     codex = json.loads(codex_path.read_text(encoding="utf-8"))
     assert codex["user-hook"]["UserPromptSubmit"][0]["hooks"][0]["command"] == "./user-hook.sh"
-    assert set(codex["hooks"]) == {"SessionStart", "SessionEnd"}
+    assert set(codex["hooks"]) == {"SessionStart", "UserPromptSubmit", "Stop", "SessionEnd"}
     for groups in codex["hooks"].values():
         assert any("adapters.hooks.codex_native" in item["command"] for group in groups for item in group["hooks"])
 

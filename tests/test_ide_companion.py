@@ -26,6 +26,7 @@ def test_companion_declares_activation_commands_and_tool_overrides() -> None:
     assert commands == {
         "llm-workmem.startSession",
         "llm-workmem.stopSession",
+        "llm-workmem.deliverContext",
     }
     properties = package["contributes"]["configuration"]["properties"]
     assert properties["llmWorkmem.toolId"]["default"] == "vscode"
@@ -38,7 +39,9 @@ def test_companion_uses_host_bound_bridge_without_persisting_host_text() -> None
     source = (COMPANION / "extension.js").read_text(encoding="utf-8")
 
     assert '["hub", "bridge"' in source
-    assert 'source: "ide-extension"' in source
+    assert '"ide-extension"' in source
+    assert "native-instruction-file-ready" in source
+    assert "context_sha256" in source
     assert "host_proof" in source
     assert 'LWM_HOST_BRIDGE: "1"' in source
     assert "workspaceFolders" in source

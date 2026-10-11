@@ -1,5 +1,7 @@
 # llm-workmem
 
+> **Current backup design / 最新备份设计（2026-10-11）**: Team and Enterprise can select LWM-managed storage, a supported decentralized storage backend, or both. On-chain proof is a separate option. See the [current strategy](docs/business_plan/WEB2_WEB3_BACKUP_STRATEGY_AND_TOKENOMICS.md), which supersedes older backup, compliance and tokenomics claims below. Backup CLI examples, performance figures and Web3 descriptions below require implementation and restore verification before being treated as shipped capabilities. Team 与企业可选公司托管、受支持的去中心化存储或双副本；存证独立选择。下文相关命令和功能描述不得代替真实恢复验收，也不构成永久保存或合规保证。
+
 <p align="center">
   <img src="assets/logo.svg" alt="llm-workmem" width="480" /><br />
   <sub>Universal Cross-Agent Working Memory, Knowledge Management & Backup System</sub><br />
@@ -10,8 +12,8 @@
 [![Python: >=3.11](https://img.shields.io/badge/Python->=3.11-green.svg)](pyproject.toml)
 
 > **Bilingual Documentation / 中英文双语对照文档**
-> An LLM working memory, knowledge management, and decentralized backup platform that evolves with you. Originating from [Karpathy's LLM-WorkMem philosophy](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f), `llm-workmem` has evolved into a comprehensive **cross-agent working memory, task handoff, evidence federation, and seamless Web2-Web3 blockchain backup engine** designed for modern AI engineering workflows.
-> 一个与你共同演进的 LLM 工作记忆、知识管理与去中心化备份系统。源自 [Karpathy 的 LLM-WorkMem 哲学](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)，现已全面升级为面向现代 AI 编程工作流的**跨 Agent 工作记忆、任务交接（Handoff）、证据联邦与 Web2-Web3 丝滑无瑕区块链备份引擎**。
+> LLM-WorkMem is designed as a cross-agent working memory, knowledge management and backup system. Its product direction combines evidence-based handoff, recoverable encrypted backups and optional independent integrity proofs. Availability is determined by verified implementation, not this product description.
+> LLM-WorkMem 的产品方向是跨 Agent 统一工作记忆、知识管理与备份系统，整合有来源的任务交接、可恢复加密备份和可选独立验真。具体功能可用性以实现和验收记录为准。
 
 ---
 

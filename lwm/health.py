@@ -312,6 +312,11 @@ def _classify(snapshot: dict[str, Any], *, strict: bool = False) -> str:
         return STATUS_FAILED
     if quality.get("error"):
         return STATUS_FAILED
+    cycle = snapshot.get("cycle", {})
+    if cycle.get("last_status") in {"failed", "failed_core"} or cycle.get("core_status") == "failed_core":
+        return STATUS_FAILED
+    if infra.get("schedule_expected", "launchd" in infra) and not infra.get("launchd", {}).get("loaded"):
+        return STATUS_DEGRADED
     if not quality.get("audit_ok"):
         # Review candidates and source gaps are quality work, not evidence-core
         # corruption. Keep the hub usable and visible as degraded; only the
@@ -397,11 +402,16 @@ def collect(
         isinstance(last_attempt, dict)
         and last_attempt.get("schema_version") == 2
     )
-    latest_cycle = (
-        v2_receipt
-        if isinstance(v2_receipt, dict) and v2_receipt.get("schema_version") == 2
-        else last_attempt if receipt_is_v2 else receipt
-    )
+    def cycle_time(value: dict[str, Any]) -> float:
+        try:
+            parsed = datetime.fromisoformat(str(value.get("finished_at") or "").replace("Z", "+00:00"))
+            return parsed.replace(tzinfo=parsed.tzinfo or timezone.utc).timestamp()
+        except (ValueError, TypeError):
+            return 0.0
+
+    v2_candidates = [value for value in (v2_receipt, last_attempt)
+                     if isinstance(value, dict) and value.get("schema_version") == 2]
+    latest_cycle = max(v2_candidates, key=cycle_time) if v2_candidates else receipt
     latest_cycle_is_attempt = latest_cycle is last_attempt and isinstance(last_attempt, dict)
     latest_status = (
         latest_cycle.get("core_status")
@@ -423,7 +433,11 @@ def collect(
         "last_status": latest_status,
         "core_status": latest_cycle.get("core_status") if receipt_is_v2 else None,
         "receipt_schema_version": 2 if receipt_is_v2 else 1 if receipt else None,
-        "last_success_at": latest_finished if latest_status == "success" else None,
+        "last_success_at": (
+            v2_receipt.get("finished_at") if isinstance(v2_receipt, dict)
+            and v2_receipt.get("core_status") == "success"
+            else latest_finished if latest_status == "success" else None
+        ),
         "last_receipt_id": (
             latest_cycle.get("receipt_id") or latest_cycle.get("cycle_id")
             if isinstance(latest_cycle, dict)
@@ -464,6 +478,7 @@ def collect(
         "checked_at": datetime.now(tz=timezone.utc).isoformat(),
         "infrastructure": {
             "launchd": _launchd_status(),
+            "schedule_expected": (root / "state" / "scheduler-owner.json").is_file(),
             "stale_test_launch_agents": _stale_test_launch_agents(),
             "last_health_json_mtime": last_health_mtime,
             "pid": os.getpid(),

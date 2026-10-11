@@ -34,7 +34,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, unquote, urlparse
 
-from lwm import health as lwm_health
+from lwm import backup, health as lwm_health
 from lwm import hub_service, memory_compiler
 
 DEFAULT_HOST = "127.0.0.1"
@@ -372,6 +372,19 @@ def _handle_subscription(root: Path, params: dict[str, list[str]], body: Any) ->
     ]
 
 
+def _handle_backup_bundle(root: Path, params: dict[str, list[str]], body: Any) -> Any:
+    return backup.export_snapshot(root.resolve())
+
+
+def _handle_backup_restore(root: Path, params: dict[str, list[str]], body: Any) -> Any:
+    if not isinstance(body, dict) or "tar_base64" not in body or "sha256" not in body:
+        raise ValueError("missing required fields: tar_base64, sha256")
+    import base64
+
+    tar_bytes = base64.b64decode(str(body["tar_base64"]))
+    return backup.restore_snapshot(root.resolve(), tar_bytes, str(body["sha256"]))
+
+
 # --- small markdown helpers (candidates live as Markdown, not JSON) ---
 
 
@@ -474,6 +487,8 @@ ROUTES: dict[str, Callable[[Path, dict[str, list[str]], Any], Any]] = {
     "/api/solana/config": _handle_solana_config,
     "/api/solana/quota": _handle_solana_quota,
     "/api/solana/attestations": _handle_solana_attestations,
+    "/api/backup/bundle": _handle_backup_bundle,
+    "/api/backup/restore": _handle_backup_restore,
 }
 
 REVIEW_PREFIX = "/api/candidates/"

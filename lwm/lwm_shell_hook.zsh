@@ -21,7 +21,39 @@
 # Opt-out. Must be checked on every call because the user can flip it per
 # session without re-sourcing the hook.
 _lbm_shell_hook_disabled() {
-  [[ "${LWM_SHELL_HOOK:-${LBM_SHELL_HOOK:-1}}" == "0" ]]
+  [[ "${LWM_ANALYSIS_JOB:-0}" == "1" || "${LWM_SHELL_HOOK:-${LBM_SHELL_HOOK:-1}}" == "0" ]]
+}
+
+# Explicit launch wrapper. Context is an actual initial agent input, never
+# a discarded preexec return or an override of native instructions/settings.
+# Usage: lwm-agent codex|claude|opencode|agy "initial request" [native options]
+lwm-agent() {
+  local host="$1" request="$2"
+  (( $# >= 2 )) || { print -u2 'usage: lwm-agent <host> <request> [native options]'; return 2; }
+  shift 2
+  case "$host" in codex|claude|opencode|agy) ;; *) return 2 ;; esac
+  if _lbm_shell_hook_disabled; then
+    case "$host" in
+      codex|claude) command "$host" "$@" "$request" ;;
+      opencode) command opencode "$@" --prompt "$request" ;;
+      agy) command agy "$@" --prompt-interactive "$request" ;;
+    esac
+    return $?
+  fi
+  local root="$(_lbm_shell_hook_root)" context input
+  context=$(LWM_LAUNCH_PROJECT="$PWD" LWM_LAUNCH_HOST="$host" python3 -c '
+import json,os
+print(json.dumps({"phase":"context","tool":{"agy":"antigravity","claude":"claude-code"}.get(os.environ["LWM_LAUNCH_HOST"],os.environ["LWM_LAUNCH_HOST"]),"project_path":os.environ["LWM_LAUNCH_PROJECT"]}))' |
+    "${LWM_BIN:-lwm}" hub bridge --root "$root" --output markdown 2>/dev/null) || context=""
+  input="$request"
+  if [[ -n "$context" ]]; then
+    input=$'Shared LLM-WorkMem evidence only. Native safety, instructions, skills and verification remain authoritative.\n'"$context"$'\n\nUser request:\n'"$request"
+  fi
+  case "$host" in
+    codex|claude) command "$host" "$@" "$input" ;;
+    opencode) command opencode "$@" --prompt "$input" ;;
+    agy) command agy "$@" --prompt-interactive "$input" ;;
+  esac
 }
 
 # Resolve the wiki root once per session, fall back to the canonical location.

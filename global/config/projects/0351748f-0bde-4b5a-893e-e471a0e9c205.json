@@ -1,6 +1,6 @@
 {
   "id": "0351748f-0bde-4b5a-893e-e471a0e9c205",
-  "name": "iDream-new-120.55.71.237",
+  "name": "iDream-new😴-120.55.71.237",
   "projectResources": {
     "resources": [
       {
@@ -11,11 +11,64 @@
       }
     ]
   },
+  "permissionGrants": {
+    "permissionGrants": {
+      "allow": [
+        "command(openssl s_client -connect idream.fans:443 -servername idream.fans </dev/null 2>/dev/null)",
+        "command(openssl x509 -noout -text)",
+        "command(bash scripts/maintenance/ssh_cmd.sh \"echo OK\")",
+        "command(bash scripts/maintenance/ssh_cmd.sh \"cat /etc/letsencrypt/renewal/idream.fans.conf\")",
+        "command(bash scripts/maintenance/ssh_cmd.sh \"certbot renew --dry-run\")",
+        "read_url(idream.fans)",
+        "command(bash scripts/maintenance/ssh_cmd.sh \"ls -la /etc/nginx/conf.d/ && cat /etc/nginx/conf.d/*.conf\")",
+        "command(bash scripts/maintenance/ssh_cmd.sh \"head -n 40 /etc/nginx/conf.d/admin.conf\")",
+        "command(bash scripts/maintenance/ssh_cmd.sh \"certbot plugins\")",
+        "command(bash scripts/maintenance/ssh_cmd.sh \"certbot certonly --webroot   -w /usr/share/nginx/html/pc -d idream.fans -d www.idream.fans   -w /usr/share/nginx/html/admin/backend/web -d admin.idream.fans   -w /usr/share/nginx/html/admin/frontend/web -d api.idream.fans   -w /usr/share/nginx/html/admin/upload -d img.idream.fans   -w /usr/share/nginx/html/h5/dist -d m.idream.fans   -w /usr/share/nginx/html/admin/api/web -d mapi.idream.fans   --dry-run\")",
+        "command(./scripts/maintenance/ssh_cmd.sh)",
+        "command(bash scripts/maintenance/ssh_cmd.sh \"crontab -l; ls -la /etc/cron* /etc/systemd/system/*cert* 2>/dev/null; systemctl list-timers | grep -i cert 2>/dev/null\")",
+        "command(bash scripts/maintenance/ssh_cmd.sh \"cat /etc/cron.d/certbot-renew\")",
+        "command(bash scripts/maintenance/ssh_cmd.sh \"cat /etc/letsencrypt/renewal-hooks/deploy/reload-nginx.sh\")",
+        "command(/opt/homebrew/bin/sshpass)",
+        "command(bash scripts/maintenance/ssh_cmd.sh \"certbot certonly --webroot   -w /usr/share/nginx/html/pc -d idream.fans -d www.idream.fans   -w /usr/share/nginx/html/admin/backend/web -d admin.idream.fans   -w /usr/share/nginx/html/admin/frontend/web -d api.idream.fans   -w /usr/share/nginx/html/admin/upload -d img.idream.fans   -w /usr/share/nginx/html/h5/dist -d m.idream.fans   -w /usr/share/nginx/html/admin/api/web -d mapi.idream.fans   --non-interactive --agree-tos\")",
+        "command(openssl x509 -noout -dates -subject -issuer)",
+        "command(expect)",
+        "command(curl -Iv https://idream.fans 2>&1)",
+        "command(bash scripts/maintenance/ssh_cmd.sh \"echo '0 3 * * 1 root certbot renew --quiet' > /etc/cron.d/certbot-renew && chmod 644 /etc/cron.d/certbot-renew && certbot renew --dry-run\")",
+        "command(bash scripts/maintenance/ssh_cmd.sh \"ps aux | grep certbot; ls -la /var/lib/letsencrypt/ /var/log/letsencrypt/.certbot.lock 2>/dev/null\")",
+        "command(bash scripts/maintenance/ssh_cmd.sh \"wait \\$(pgrep certbot) 2>/dev/null; certbot renew --dry-run\")",
+        "command(bash scripts/maintenance/ssh_cmd.sh \"ps aux | grep certbot\")",
+        "command(bash scripts/maintenance/ssh_cmd.sh \"ps -p 5228 -o pid,stat,time,cmd || echo 'Process finished'\")",
+        "command(bash scripts/maintenance/ssh_cmd.sh \"kill -9 5228 2>/dev/null; rm -f /var/log/letsencrypt/.certbot.lock /var/lib/letsencrypt/.certbot.lock; certbot renew --dry-run\")",
+        "command(curl -s -I https://img.idream.fans/img/avatar/avatar_7945b6be7b35fc52.png)",
+        "command(curl -s -I https://img.idream.fans/img/avatar/c9/f0/f8/original.jpg)",
+        "command(echo)",
+        "command(lwm)",
+        "command(git push --dry-run origin main)",
+        "command(git ls-remote)",
+        "command(git add)",
+        "command(git push origin main)",
+        "write_file(/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/AntigravitySync/brain/c773b618-ab8e-48d6-803b-c7f58ae1e07a/scratch/gen_local_md5.py)",
+        "write_file(/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/AntigravitySync/brain/c773b618-ab8e-48d6-803b-c7f58ae1e07a/scratch/server_check_md5.py)",
+        "write_file(/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/AntigravitySync/brain/c773b618-ab8e-48d6-803b-c7f58ae1e07a/scratch/diff_md5.py)",
+        "command(diff)",
+        "command(python3 -c '\nimport subprocess\n\nfor f in [\"usr/share/nginx/html/pc/controller/sign.js\", \"usr/share/nginx/html/admin/frontend/controllers/LoginController.php\"]:\n    local = open(f, \"rb\").read()\n    p = subprocess.run([\"expect\", \"-c\", f\"\"\"\nset timeout 15\nspawn ssh -o StrictHostKeyChecking=no root@120.55.71.237 \"cat /{f}\"\nexpect \"password:\" {{ send \"@Z46536trgfety5464yr\\\\r\" }}\nexpect eof\n\"\"\"], capture_output=True)\n    # find where content starts\n    out = p.stdout\n    # remove spawn line and password prompt\n    lines = out.split(b\"\\n\")\n    clean_lines = [l for l in lines if b\"password:\" not in l and b\"spawn ssh\" not in l and b\"\\r\" not in l or len(l) > 1]\n    print(f, \"local size:\", len(local), \"remote raw length:\", len(out))\n')",
+        "command(md5)",
+        "command(expect -c '\nset timeout 15\nspawn ssh -o StrictHostKeyChecking=no root@120.55.71.237 \"cat /usr/share/nginx/html/admin/backend/controllers/StatController.php\"\nexpect \"password:\" { send \"@Z46536trgfety5464yr\\r\" }\nexpect eof\n' | tail -n +5 > /tmp/server_stat.php && diff -u usr/share/nginx/html/admin/backend/controllers/StatController.php /tmp/server_stat.php | head -n 40)",
+        "write_file(/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/AntigravitySync/brain/c773b618-ab8e-48d6-803b-c7f58ae1e07a/scratch/sync_from_server.py)",
+        "command(python3 /Users/ethan/.gemini/antigravity/brain/c773b618-ab8e-48d6-803b-c7f58ae1e07a/scratch/sync_from_server.py)",
+        "command(cp)",
+        "command(git commit)"
+      ]
+    },
+    "v2Migrated": true
+  },
   "settings": {
-    "fileAccessPolicy": "AGENT_SETTING_POLICY_ASK",
+    "fileAccessPolicy": "AGENT_SETTING_POLICY_ALLOW",
     "internetPolicy": "AGENT_SETTING_POLICY_ASK",
-    "autoExecutionPolicy": "CASCADE_COMMANDS_AUTO_EXECUTION_OFF",
-    "artifactReviewMode": "ARTIFACT_REVIEW_MODE_ALWAYS"
+    "sandboxMode": false,
+    "autoExecutionPolicy": "CASCADE_COMMANDS_AUTO_EXECUTION_EAGER",
+    "artifactReviewMode": "ARTIFACT_REVIEW_MODE_ALWAYS",
+    "permissionPreset": "AGENT_PERMISSION_PRESET_TURBO"
   },
   "updatedAt": "2026-06-25T09:01:23.480467Z"
 }

@@ -14,8 +14,11 @@ A claim may be promoted only when:
 * the candidate is an admitted durable event (Truthful Core) — never a
   lifecycle/session/adapter/shell tag;
 * at least two distinct project ids back the claim;
-* at least one verification entry exists across the supporting events;
+* positive, claim-relevant verifications exist in at least two projects;
 * the claim passes the no-cosmic / no-secret validator.
+
+Only derived approved pages are revalidated and retracted, with backups and
+audit history. Manual rules are never touched; reapproval remains explicit.
 """
 
 from __future__ import annotations
@@ -23,12 +26,14 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable
 
-from lwm.project_memory import classify_event
+from lwm import lockfile
+from lwm.analysis import _parse_frontmatter, _split_csv_list
+from lwm.project_memory import classify_event, load_processed_events
 
 
 BLOCKED_PROMOTION_TAGS = frozenset(
@@ -53,9 +58,7 @@ FORBIDDEN_PATTERNS = (
     r"\bnever\b",
 )
 
-_SECRET_RE = re.compile(
-    r"(sk-[A-Za-z0-9]{20,}|ghp_[A-Za-z0-9]{30,}|AKIA[0-9A-Z]{16})"
-)
+_SECRET_RE = re.compile(r"(sk-[A-Za-z0-9]{20,}|ghp_[A-Za-z0-9]{30,}|AKIA[0-9A-Z]{16})")
 
 
 @dataclass(frozen=True)
@@ -69,6 +72,7 @@ class PromotionCandidate:
     claim_key: str
     target_path: Path | None
     reasons: tuple[str, ...] = ()
+    counterevidence_ids: tuple[str, ...] = ()
 
 
 def normalize_claim(text: str) -> str:
@@ -104,6 +108,8 @@ def _eligible_events(
     target = normalize_claim(claim)
     eligible: list[dict] = []
     for event in events:
+        if not _active_event(event):
+            continue
         if evidence_ids is not None and str(event.get("event_id") or "") not in evidence_ids:
             continue
         if classify_event(event).durability != "durable":
@@ -124,6 +130,65 @@ def _eligible_events(
     return eligible
 
 
+def _active_event(event: dict) -> bool:
+    terminal = {
+        "retired",
+        "retracted",
+        "withdrawn",
+        "source_withdrawn",
+        "superseded",
+        "rejected",
+        "deleted",
+    }
+    return not (
+        str(event.get("status") or "").lower() in terminal
+        or event.get("superseded_by")
+        or event.get("withdrawn_at")
+        or event.get("retired_at")
+        or (
+            isinstance(event.get("source"), dict)
+            and str(event["source"].get("status") or "").lower() in terminal
+        )
+    )
+
+
+def _verified_for_claim(event: dict, claim: str) -> bool:
+    target = normalize_claim(claim)
+    values = event.get("verification_results", event.get("verification", []))
+    if isinstance(values, (str, dict)):
+        values = [values]
+    if not isinstance(values, list):
+        return False
+    positive_support = False
+    for value in values:
+        if isinstance(value, dict):
+            positive = str(value.get("status") or "").lower() in {
+                "passed",
+                "pass",
+                "success",
+                "succeeded",
+                "ok",
+            }
+            relevant = normalize_claim(str(value.get("claim") or "")) == target or value.get(
+                "claim_key"
+            ) == stable_claim_key(claim)
+            if positive and relevant:
+                positive_support = True
+            elif relevant and str(value.get("status") or "").lower() in {"failed", "fail", "error"}:
+                return False
+        elif isinstance(value, str):
+            text = normalize_claim(value)
+            negative = re.search(
+                r"\b(fail(?:ed|ure|s)?|error|unknown|unrelated|not|unverified)\b", text
+            )
+            positive = re.search(r"\b(pass(?:ed)?|success(?:ful)?|succeeded|ok)\b", text)
+            if positive and not negative and target and target in text:
+                positive_support = True
+            elif negative and target and target in text:
+                return False
+    return positive_support
+
+
 def _safe_path_part(text: str) -> str:
     return re.sub(r"[^A-Za-z0-9_\-]", "-", text).strip("-")[:64] or "page"
 
@@ -138,24 +203,34 @@ def render_global_page(
     actor: str,
     reasons: tuple[str, ...] = (),
     page_type: str = "principle",
+    counterevidence_ids: tuple[str, ...] = (),
 ) -> str:
     if page_type not in {"pattern", "relationship", "principle"}:
         raise ValueError(f"unsupported global page type: {page_type}")
     now = datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
     frontmatter_lines = [
         "---",
-        f"title: {claim}",
+        f"title: {json.dumps(claim, ensure_ascii=False)}",
         f"type: {page_type}",
         "status: approved",
         f"claim_key: {claim_key}",
         f"actor: {actor}",
         f"projects: [{', '.join(project_ids)}]",
         f"event_ids: [{', '.join(event_ids)}]",
-        "evidence_paths:",
-        *(
-            f"  - {path}"
-            for path in evidence_paths
+        f"counterevidence_ids: [{', '.join(counterevidence_ids)}]",
+        "promotion_metadata: "
+        + json.dumps(
+            {
+                "claim": claim,
+                "event_ids": event_ids,
+                "counterevidence_ids": counterevidence_ids,
+                "claim_key": claim_key,
+                "page_type": page_type,
+            },
+            ensure_ascii=False,
         ),
+        "evidence_paths:",
+        *(f"  - {path}" for path in evidence_paths),
         f"created_at: {now}",
         f"updated: {now}",
         f"tags: [{page_type}, approved, stable-claim]",
@@ -190,6 +265,7 @@ def evaluate_promotion(
     claim: str,
     events: Iterable[dict],
     evidence_ids: Iterable[str] | None = None,
+    counterevidence_ids: Iterable[str] = (),
     actor: str = "human",
 ) -> PromotionCandidate:
     """Evaluate one claim against an event stream.
@@ -243,7 +319,11 @@ def evaluate_promotion(
         )
 
     selected_ids = set(evidence_ids) if evidence_ids is not None else None
-    eligible = _eligible_events(events, claim=claim, evidence_ids=selected_ids)
+    counter_ids = set(counterevidence_ids)
+    events = tuple(event for event in events if isinstance(event, dict))
+    # One source cannot impersonate two project verifications.
+    event_index = {str(event.get("event_id")): event for event in events if event.get("event_id")}
+    eligible = _eligible_events(event_index.values(), claim=claim, evidence_ids=selected_ids)
     if not eligible:
         return PromotionCandidate(
             claim=claim,
@@ -258,26 +338,38 @@ def evaluate_promotion(
         )
 
     project_ids = sorted({str(e.get("project_id")) for e in eligible if e.get("project_id")})
-    event_ids = tuple(
-        str(e.get("event_id") or "") for e in eligible if e.get("event_id")
-    )
+    event_ids = tuple(str(e.get("event_id") or "") for e in eligible if e.get("event_id"))
     evidence_paths = tuple(
         str(e.get("source", {}).get("path") or "")
         for e in eligible
         if isinstance(e.get("source"), dict)
     )
-    verification_count = sum(
-        1 for e in eligible if e.get("verification")
-    )
+    verification_count = sum(1 for e in eligible if _verified_for_claim(e, claim))
     verified_projects = sorted(
         {
             str(e.get("project_id"))
             for e in eligible
-            if e.get("verification") and e.get("project_id")
+            if _verified_for_claim(e, claim) and e.get("project_id")
         }
     )
 
     reasons: list[str] = []
+    if selected_ids is not None and selected_ids - set(event_ids):
+        reasons.append("missing_or_retired_evidence")
+    if counter_ids:
+        reasons.append("counterevidence_requires_review")
+    if any(
+        _active_event(e)
+        and (
+            set(e.get("retracts_event_ids") or ()) & set(event_ids)
+            or e.get("retracts_claim_key") == key
+            or e.get("supersedes_claim_key") == key
+        )
+        for e in events
+    ):
+        reasons.append("source_retraction")
+    if any(e.get("counterevidence_ids") for e in eligible):
+        reasons.append("source_counterevidence")
     if len(project_ids) < MIN_PROMOTION_PROJECTS:
         reasons.append(f"insufficient_projects:{len(project_ids)}")
     if len(verified_projects) < MIN_VERIFIED_PROJECTS:
@@ -295,6 +387,7 @@ def evaluate_promotion(
         claim_key=key,
         target_path=target,
         reasons=tuple(reasons) if reasons else ("ok",),
+        counterevidence_ids=tuple(sorted(counter_ids)),
     )
 
 
@@ -310,16 +403,22 @@ def persist_promotion(
     promotable.
     """
 
-    if not candidate.promoted or candidate.target_path is None:
+    if candidate.target_path is None:
         return None
+    if not candidate.promoted:
+        return _retract_promotion(candidate, actor=actor)
     if page_type not in {"pattern", "relationship", "principle"}:
         raise ValueError(f"unsupported global page type: {page_type}")
     candidate.target_path.parent.mkdir(parents=True, exist_ok=True)
     rollback_path: Path | None = None
     if candidate.target_path.is_file():
+        if not _derived_metadata(
+            candidate.target_path.read_text(encoding="utf-8"), candidate.claim_key
+        ):
+            return None
         backup_dir = candidate.target_path.parent / ".promotion-backups"
         backup_dir.mkdir(parents=True, exist_ok=True)
-        timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
         rollback_path = backup_dir / f"{candidate.claim_key}-{timestamp}.md"
         rollback_path.write_bytes(candidate.target_path.read_bytes())
     rendered = render_global_page(
@@ -331,6 +430,7 @@ def persist_promotion(
         actor=actor,
         reasons=candidate.reasons,
         page_type=page_type,
+        counterevidence_ids=candidate.counterevidence_ids,
     )
     temporary = candidate.target_path.with_name(candidate.target_path.name + ".tmp")
     temporary.write_text(rendered, encoding="utf-8")
@@ -343,6 +443,122 @@ def persist_promotion(
         page_type=page_type,
     )
     return candidate.target_path
+
+
+def _derived_metadata(text: str, claim_key: str | None = None) -> dict | None:
+    fields, _ = _parse_frontmatter(text)
+    if "stable-claim" not in _split_csv_list(fields.get("tags", "")):
+        return None
+    if fields.get("type") not in {"pattern", "relationship", "principle"}:
+        return None
+    try:
+        metadata = (
+            json.loads(fields["promotion_metadata"])
+            if fields.get("promotion_metadata")
+            else {
+                "claim": fields.get("title", ""),
+                "claim_key": fields.get("claim_key", ""),
+                "event_ids": list(_split_csv_list(fields.get("event_ids", ""))),
+                "counterevidence_ids": list(_split_csv_list(fields.get("counterevidence_ids", ""))),
+                "page_type": fields.get("type"),
+            }
+        )
+    except ValueError:
+        return None
+    if not isinstance(metadata, dict) or not isinstance(metadata.get("claim"), str):
+        return None
+    if (
+        metadata.get("claim_key") != stable_claim_key(metadata["claim"])
+        or (claim_key is not None and metadata["claim_key"] != claim_key)
+        or not isinstance(metadata.get("event_ids"), list)
+        or not metadata["event_ids"]
+        or not all(isinstance(eid, str) for eid in metadata["event_ids"])
+    ):
+        return None
+    return {**metadata, "status": fields.get("status")}
+
+
+def _retract_promotion(candidate: PromotionCandidate, *, actor: str) -> Path | None:
+    path = candidate.target_path
+    if path is None or not path.is_file():
+        return None
+    text = path.read_text(encoding="utf-8")
+    metadata = _derived_metadata(text, candidate.claim_key)
+    if not metadata or metadata["status"] not in {"approved", "source_withdrawn"}:
+        return None
+    backup_dir = path.parent / ".promotion-backups"
+    backup_dir.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+    backup = backup_dir / f"{candidate.claim_key}-{stamp}.md"
+    backup.write_bytes(path.read_bytes())
+    front, body = text[4:].split("\n---\n", 1)
+    front = re.sub(r"^status:.*$", "status: retracted", front, count=1, flags=re.MULTILINE)
+    front = re.sub(
+        r"^tags:.*$",
+        f"tags: [{metadata['page_type']}, retracted, stable-claim]",
+        front,
+        count=1,
+        flags=re.MULTILINE,
+    )
+    front += "\nretraction_reasons: " + json.dumps(candidate.reasons)
+    temporary = path.with_name(path.name + ".tmp")
+    temporary.write_text(f"---\n{front}\n---\n{body}", encoding="utf-8")
+    temporary.replace(path)
+    _append_audit(
+        candidate,
+        actor=actor,
+        action="retracted",
+        rollback_path=backup,
+        page_type=metadata["page_type"],
+    )
+    return path
+
+
+def revalidate_promotions(root: Path, *, actor: str = "memory-compiler") -> dict:
+    """Recompute derived approvals only. Never generate or reapprove a page."""
+    root = root.resolve()
+    report = {"retracted": [], "unchanged": [], "errors": []}
+    with lockfile.cycle_lock(root):
+        pages = []
+        for path in sorted((root / "wiki/global").glob("*.md")):
+            metadata = _derived_metadata(path.read_text(encoding="utf-8"))
+            if metadata and metadata["status"] in {"approved", "source_withdrawn"}:
+                pages.append((path, metadata))
+        if not pages:
+            return report
+        events = [event for _, event in load_processed_events(root)]
+        review_states: dict[str, list[dict]] = {}
+        for path in sorted((root / "state/analysis/candidates").glob("*.json")):
+            try:
+                payload = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            if isinstance(payload, dict) and isinstance(payload.get("claim"), str):
+                review_states.setdefault(stable_claim_key(payload["claim"]), []).append(payload)
+        for path, metadata in pages:
+            evaluated = evaluate_promotion(
+                root,
+                claim=metadata["claim"],
+                events=events,
+                evidence_ids=metadata["event_ids"],
+                counterevidence_ids=metadata.get("counterevidence_ids", ()),
+            )
+            approvals = review_states.get(metadata["claim_key"], [])
+            if any(item.get("state") == "rejected" for item in approvals):
+                evaluated = replace(
+                    evaluated, promoted=False, reasons=("human_approval_withdrawn",)
+                )
+            elif any(item.get("counterevidence_ids") for item in approvals):
+                evaluated = replace(
+                    evaluated, promoted=False, reasons=("counterevidence_requires_review",)
+                )
+            if evaluated.target_path != path:
+                continue
+            if not evaluated.promoted and persist_promotion(evaluated, actor=actor):
+                report["retracted"].append(path.name)
+            else:
+                report["unchanged"].append(path.name)
+    return report
 
 
 def _append_audit(
@@ -370,6 +586,7 @@ def _append_audit(
         "target": str(candidate.target_path),
         "projects": list(candidate.project_ids),
         "event_ids": list(candidate.event_ids),
+        "counterevidence_ids": list(candidate.counterevidence_ids),
         "evidence_paths": list(candidate.evidence_paths),
         "reasons": list(candidate.reasons),
         "page_type": page_type,
@@ -391,5 +608,6 @@ __all__ = [
     "normalize_claim",
     "persist_promotion",
     "render_global_page",
+    "revalidate_promotions",
     "stable_claim_key",
 ]

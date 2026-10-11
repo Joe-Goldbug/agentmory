@@ -92,7 +92,12 @@ def test_promote_analysis_uses_stable_evidence_and_updates_state(tmp_path: Path)
             "project_id": "p1",
             "task": "Reuse the same daily memory refresh loop",
             "decisions": ["Reuse the same daily memory refresh loop"],
-            "verification": ["v1"],
+            "verification": ["PASS: daily refresh replay retained source event IDs in project p1"],
+            "verification_results": [{
+                "status": "passed",
+                "claim": "The daily refresh loop is reused across projects",
+                "check": "Source-backed daily refresh replay in p1",
+            }],
         },
         {
             "event_id": "e2",
@@ -100,7 +105,12 @@ def test_promote_analysis_uses_stable_evidence_and_updates_state(tmp_path: Path)
             "project_id": "p2",
             "task": "Reuse the same daily memory refresh loop",
             "decisions": ["Reuse the same daily memory refresh loop"],
-            "verification": ["v2"],
+            "verification": ["PASS: daily refresh replay retained source event IDs in project p2"],
+            "verification_results": [{
+                "status": "passed",
+                "claim": "The daily refresh loop is reused across projects",
+                "check": "Source-backed daily refresh replay in p2",
+            }],
         },
     ]
     for event in events:

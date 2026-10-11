@@ -1,28 +1,22 @@
 {
-  "id": "dcd4eb56-3209-4e3c-a24b-d8ac987bafba",
-  "name": "Anchor 8July2026",
-  "projectResources": {
-    "resources": [
+  "id":  "dcd4eb56-3209-4e3c-a24b-d8ac987bafba",
+  "name":  "Anchor 8July2026",
+  "projectResources":  {
+    "resources":  [
       {
-        "folderUri": "file:///Users/ethan/Desktop/Anchor%208July2026"
+        "folderUri":  "file:///Users/ethan/Desktop/Anchor%208July2026"
       }
     ]
   },
-  "permissionGrants": {
-    "permissionGrants": {
-      "allow": [
-        "command(git status)",
-        "command(node -e \"const fs = require\\('fs'\\); const code = fs\\.readFileSync\\('/Users/ethan/Desktop/Anchor 8July2026/9chapters\\.html', 'utf8'\\)\\.match\\(/<script>\\(\\[\\\\s\\\\S\\]\\*\\?\\)<\\\\/script>/\\)\\[1\\]; new \\(require\\('vm'\\)\\.Script\\)\\(code\\);\")",
-        "command(git diff)",
-        "command(node /Users/ethan/\\.gemini/antigravity/brain/e181ea18-6487-4425-93a9-4603c65bba05/scratch/test_runtime\\.js)"
-      ]
-    }
+  "permissionGrants":  {
+    "permissionGrants":  {},
+    "v2Migrated":  true
   },
-  "settings": {
-    "fileAccessPolicy": "AGENT_SETTING_POLICY_ALLOW",
-    "internetPolicy": "AGENT_SETTING_POLICY_ASK",
-    "autoExecutionPolicy": "CASCADE_COMMANDS_AUTO_EXECUTION_OFF",
-    "artifactReviewMode": "ARTIFACT_REVIEW_MODE_ALWAYS"
+  "settings":  {
+    "fileAccessPolicy":  "AGENT_SETTING_POLICY_ALLOW",
+    "internetPolicy":  "AGENT_SETTING_POLICY_ASK",
+    "autoExecutionPolicy":  "CASCADE_COMMANDS_AUTO_EXECUTION_OFF",
+    "artifactReviewMode":  "ARTIFACT_REVIEW_MODE_ALWAYS"
   },
-  "updatedAt": "2026-07-12T15:57:39.322601Z"
+  "updatedAt":  "2026-07-12T15:57:39.322601Z"
 }

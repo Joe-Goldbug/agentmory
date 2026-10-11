@@ -239,7 +239,7 @@ def test_runtime_code_and_adapters_are_mirrored_without_deleted_residue(
 def test_load_schedule_bundle_invokes_launchctl(
     tmp_path: Path, monkeypatch
 ) -> None:
-    """``load_schedule_bundle`` should bootout, bootstrap, kickstart via subprocess."""
+    """Bootstrap uses RunAtLoad without killing its newly started cycle."""
 
     import lwm.harvest as harvest_module
 
@@ -266,4 +266,4 @@ def test_load_schedule_bundle_invokes_launchctl(
     verbs = [c[1][1] for c in calls if len(c[1]) > 1]
     assert "bootout" in verbs
     assert "bootstrap" in verbs
-    assert "kickstart" in verbs
+    assert "kickstart" not in verbs

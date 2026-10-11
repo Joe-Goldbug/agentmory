@@ -646,47 +646,20 @@ def _write_native_lifecycle_hooks(
 
 
 def _write_codex_hooks(path: Path, root: Path, *, home: Path) -> Path:
-    """Merge Codex SessionStart/SessionEnd hooks without touching trust state."""
+    """Merge stable Codex session and per-turn hooks without changing trust."""
 
-    result = _write_native_lifecycle_hooks(
+    return _write_native_lifecycle_hooks(
         path,
         root,
         home=home,
         module="adapters.hooks.codex_native",
         events=(
             ("SessionStart", "SessionStart"),
+            ("UserPromptSubmit", "UserPromptSubmit"),
+            ("Stop", "Stop"),
             ("SessionEnd", "SessionEnd"),
         ),
     )
-    # Older LLM-WorkMem versions emitted Codex's Claude-style ``Stop`` key.
-    # Remove only that generated handler so user-owned Stop entries survive.
-    payload = json.loads(result.read_text(encoding="utf-8"))
-    hooks = payload.get("hooks") if isinstance(payload.get("hooks"), dict) else {}
-    legacy = hooks.get("Stop") if isinstance(hooks.get("Stop"), list) else []
-    retained_legacy: list[object] = []
-    for group in legacy:
-        if not isinstance(group, dict) or not isinstance(group.get("hooks"), list):
-            retained_legacy.append(group)
-            continue
-        handlers = group["hooks"]
-        retained_handlers = [
-            item
-            for item in handlers
-            if not _is_generated_native_handler(item, "adapters.hooks.codex_native")
-        ]
-        if retained_handlers:
-            updated_group = dict(group)
-            updated_group["hooks"] = retained_handlers
-            retained_legacy.append(updated_group)
-    if retained_legacy:
-        hooks["Stop"] = retained_legacy
-    else:
-        hooks.pop("Stop", None)
-    payload["hooks"] = hooks
-    result.write_text(
-        json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
-    )
-    return result
 
 
 def _write_gemini_cli_hooks(path: Path, root: Path, *, home: Path) -> Path:

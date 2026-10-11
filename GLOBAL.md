@@ -39,3 +39,9 @@ Runtime state, receipts, logs, caches, absolute local paths, and launchd state a
 ## Cross-tool handoff
 
 Every IDE and shell may read the same LLM-WorkMem evidence and write sanitized events through `lwm hub record`. The active tool still decides the answer and owns its native workflow.
+
+## Privacy & Git Separation Boundary (绝对本地私有与 GitHub 纯代码边界)
+
+- **工作习惯与约定绝对本地私有**：用户的工作习惯、同步铁律、沟通偏好与私人约定，100% 仅保存在本地持久化工作记忆（LLM-WorkMem）中。绝不出现在 GitHub 的任何文件、Commit 信息或公开 README 中。
+- **GitHub 仅呈现纯工程代码**：GitHub 上的所有仓库（私人仓与协作仓）仅对外展现最干净、最标准的工程代码、配置文件、架构文档和测试用例，不掺杂任何个人工作习惯或 Agent 元指令陈述。
+

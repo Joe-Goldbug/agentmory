@@ -48,7 +48,7 @@ def test_codex_writes_native_hook_without_trust_mutation(tmp_path: Path) -> None
     install = hooks_gen.install_codex(tmp_path, root=tmp_path / "workmem")
     assert install.config_path == tmp_path / ".codex" / "hooks.json"
     payload = json.loads(install.config_path.read_text(encoding="utf-8"))
-    assert set(payload["hooks"]) == {"SessionStart", "SessionEnd"}
+    assert set(payload["hooks"]) == {"SessionStart", "SessionEnd", "Stop", "UserPromptSubmit"}
     assert all(" -I -m " in groups[0]["hooks"][0]["command"] for groups in payload["hooks"].values())
     assert "native hooks" in install.detail
     assert "user approval" in install.detail
@@ -103,17 +103,17 @@ def test_codex_replaces_only_legacy_generated_stop_hook(tmp_path: Path) -> None:
     hooks_gen.install_codex(tmp_path, root=tmp_path / "workmem")
 
     payload = json.loads(path.read_text(encoding="utf-8"))
-    assert set(payload["hooks"]) == {"SessionStart", "SessionEnd", "Stop"}
+    assert set(payload["hooks"]) == {"SessionStart", "SessionEnd", "Stop", "UserPromptSubmit"}
     assert any(
         item["command"] == "./user-owned-stop-hook"
         for group in payload["hooks"]["Stop"]
         for item in group["hooks"]
     )
-    assert all(
-        "--phase Stop" not in item["command"]
+    assert sum(
+        "--phase Stop" in item["command"]
         for group in payload["hooks"]["Stop"]
         for item in group["hooks"]
-    )
+    ) == 1
 
 
 def test_gemini_cli_writes_native_hooks(tmp_path: Path) -> None:
@@ -238,8 +238,8 @@ def test_opencode_plugin_handles_start_and_end(tmp_path: Path) -> None:
     assert "session.error" in text
     assert 'event: async ({ event })' in text
     assert 'event.type === "session.idle" || event.type === "session.error"' in text
-    assert "properties?.sessionID" in text
-    assert "properties?.info?.id" in text
+    assert "p.sessionID" in text
+    assert "p.info?.id" in text
     assert "experimental.session.compacting" in text
     assert "output.context.push(context)" in text
     assert "hub bridge" in text

@@ -146,6 +146,7 @@ MANIFEST_HASHES="$(cd "$ROOT_DIR" && {
   find mcp -type f -name '*.py' -print0 2>/dev/null
   find lwm adapters -type f -name '*.toml' -print0 2>/dev/null
   find lwm adapters -type f -name '*.json' -print0 2>/dev/null
+  find lwm integrations -type f \( -name '*.js' -o -name '*.ts' -o -name '*.zsh' \) -print0 2>/dev/null
 } | sort -z | xargs -0 shasum -a 256 | awk '{print $1"  "$2}')"
 
 printf '%s\n' "$MANIFEST_HASHES" | "$PYTHON_BIN" "$ROOT_DIR/scripts/write-runtime-manifest.py" \

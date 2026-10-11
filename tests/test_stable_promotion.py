@@ -20,16 +20,22 @@ from lwm.stable_promotion import (
 )
 
 
-def _event(project_id: str, *, decisions: list[str] | None = None,
-           verifications: list[str] | None = None,
-           tags: list[str] | None = None,
-           event_id: str = "e1") -> dict:
+def _event(
+    project_id: str,
+    *,
+    decisions: list[str] | None = None,
+    verifications: list[str] | None = None,
+    tags: list[str] | None = None,
+    event_id: str = "e1",
+) -> dict:
     return {
         "project_id": project_id,
         "event_type": "decision",
         "task": "Reuse the same daily memory refresh loop",
         "decisions": decisions or ["Reuse the same daily memory refresh loop"],
-        "verification": verifications or [],
+        "verification": [
+            "PASS: Reuse the same daily memory refresh loop" for _ in verifications or []
+        ],
         "tags": tags or ["stable-claim"],
         "event_id": event_id,
     }
@@ -157,9 +163,7 @@ def test_forbidden_pattern_blocks_promotion(tmp_path: Path) -> None:
         _event("p1", verifications=["v"], event_id="e1"),
         _event("p2", verifications=["v"], event_id="e2"),
     ]
-    candidate = evaluate_promotion(
-        tmp_path, claim="This causes latency in ingest", events=events
-    )
+    candidate = evaluate_promotion(tmp_path, claim="This causes latency in ingest", events=events)
     assert not candidate.promoted
     assert any("forbidden_pattern" in r for r in candidate.reasons)
 
@@ -169,9 +173,7 @@ def test_secret_in_claim_blocks_promotion(tmp_path: Path) -> None:
         _event("p1", verifications=["v"], event_id="e1"),
         _event("p2", verifications=["v"], event_id="e2"),
     ]
-    candidate = evaluate_promotion(
-        tmp_path, claim="rotate sk-" + "A" * 32, events=events
-    )
+    candidate = evaluate_promotion(tmp_path, claim="rotate sk-" + "A" * 32, events=events)
     assert not candidate.promoted
     assert "secret_in_claim" in candidate.reasons
 
@@ -229,6 +231,10 @@ def test_explicit_evidence_ids_allow_a_validated_paraphrase(tmp_path: Path) -> N
         _event("p1", verifications=["v1"], event_id="e1"),
         _event("p2", verifications=["v2"], event_id="e2"),
     ]
+    for event in events:
+        event["verification_results"] = [
+            {"status": "passed", "claim": "The daily refresh loop is reused across projects"}
+        ]
     candidate = evaluate_promotion(
         tmp_path,
         claim="The daily refresh loop is reused across projects",

@@ -20,6 +20,9 @@ from lwm.capability_proof import (
     is_proof_source,
     load,
     latest_proof_receipts,
+    is_within_window,
+    build_event_location_index,
+    _evidence_file,
     record as _new_record,
 )
 from lwm.harvest import canonical_data_root
@@ -220,6 +223,8 @@ def summary(
             "read": read if isinstance(read, dict) else {"status": "unverified"},
             "write": write if isinstance(write, dict) else {"status": "unverified"},
             "bidirectional": installed[tool]["status"] == "verified_bidirectional",
+            "proof_scope": installed[tool]["proof_scope"],
+            "useful_memory_status": installed[tool]["useful_memory_status"],
         }
     return out
 
@@ -259,6 +264,8 @@ def probe(
         expected_project_id = resolve_project_id(project_path).project_id
     out: dict[str, dict[str, Any]] = {}
     registry = ToolRegistry.load(root)
+    event_locations = build_event_location_index(root)
+    receipt_history = load(root).get("_history", {})
     for definition in registry.enabled():
         tool = definition.tool_id
         targets = list(_tool_targets(tool, home, registry=registry))
@@ -269,7 +276,8 @@ def probe(
             path.is_file() and path.stat().st_size > 0 for path in targets
         )
         read_proof, write_proof = latest_proof_receipts(
-            root, tool=tool, expected_project_id=expected_project_id
+            root, tool=tool, expected_project_id=expected_project_id,
+            event_index=event_locations,
         )
         read_receipt = read_proof.to_dict() if read_proof else None
         write_receipt = write_proof.to_dict() if write_proof else None
@@ -287,7 +295,41 @@ def probe(
             "read_receipt": read_receipt if isinstance(read_receipt, dict) else None,
             "write_receipt": write_receipt if isinstance(write_receipt, dict) else None,
             "expected_project_id": expected_project_id,
+            "proof_scope": "host_lifecycle_transport",
         }
+        # Empty session-end callbacks must not hide earlier durable work.
+        work_receipts = [write_receipt] if write_receipt else []
+        history = receipt_history.get(tool, []) if isinstance(receipt_history, dict) else []
+        if isinstance(history, list):
+            work_receipts += [item for item in history if isinstance(item, dict)
+                              and item.get("direction") == "write"
+                              and item.get("status") == "verified"
+                              and is_proof_source(item.get("source", ""))
+                              and is_within_window(item)
+                              and (not expected_project_id or item.get("project_id") == expected_project_id)]
+        work_status = "missing"
+        rank = {"missing": 0, "unverified": 1, "operational_only": 2, "pending_ingest": 3, "accepted": 4, "published": 5}
+        for receipt in work_receipts:
+            write_path = _evidence_file(root, str(receipt.get("evidence_path") or ""), event_index=event_locations)
+            if write_path is None:
+                continue
+            candidate_status = "pending_ingest" if "inbox" in write_path.parts else "operational_only"
+            try:
+                from lwm.project_memory import classify_event, project_page_path
+
+                work = json.loads(write_path.read_text(encoding="utf-8"))
+                if "processed" in write_path.parts and classify_event(work).durability == "durable":
+                    page = project_page_path(root, str(work.get("project_id") or ""))
+                    candidate_status = "accepted"
+                    if page.is_file() and str(work.get("event_id") or "") in page.read_text(encoding="utf-8"):
+                        candidate_status = "published"
+            except (OSError, ValueError, TypeError):
+                candidate_status = "unverified"
+            if rank[candidate_status] > rank[work_status]:
+                work_status = candidate_status
+            if work_status == "published":
+                break
+        out[tool]["useful_memory_status"] = work_status
     return out
 
 

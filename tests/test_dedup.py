@@ -30,3 +30,18 @@ def test_same_tool_session_is_still_deduplicated(tmp_path: Path) -> None:
     record_event(tmp_path, first, bucket="processed", file_path="first.json")
 
     assert evaluate(tmp_path, second).duplicate
+
+
+def test_distinct_sessions_and_turns_are_not_collapsed(tmp_path: Path) -> None:
+    first = _event("opencode", "first")
+    record_event(tmp_path, first, bucket="processed", file_path="first.json")
+    assert not evaluate(tmp_path, {**first, "event_id": "second", "session_id": "different"}).duplicate
+    assert not evaluate(tmp_path, {**first, "event_id": "third", "task_id": "second-turn"}).duplicate
+
+
+def test_full_result_and_changes_participate_in_identity(tmp_path: Path) -> None:
+    first = {**_event("opencode", "first"), "event_type": "verification",
+             "verification": ["x" * 100 + "FAIL"]}
+    record_event(tmp_path, first, bucket="processed", file_path="first.json")
+    assert not evaluate(tmp_path, {**first, "event_id": "second", "verification": ["x" * 100 + "PASS"]}).duplicate
+    assert not evaluate(tmp_path, {**first, "event_id": "third", "changes": ["Actual change"]}).duplicate

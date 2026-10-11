@@ -1,11 +1,29 @@
 {
   "mcpServers": {
     "codegraph": {
-      "command": "/opt/homebrew/bin/codegraph",
       "args": [
         "serve",
         "--mcp"
-      ]
+      ],
+      "command": "/opt/homebrew/bin/codegraph",
+      "disabled": true
+    },
+    "google-home-developer": {
+      "disabled": true,
+      "serverUrl": "https://homedevelopers.googleapis.com/mcp"
+    },
+    "mcp-server-neon": {
+      "args": [
+        "-y",
+        "mcp-remote",
+        "https://mcp.neon.tech/sse"
+      ],
+      "command": "npx",
+      "disabled": true
+    },
+    "miro": {
+      "disabled": true,
+      "serverUrl": "https://mcp.miro.com/"
     }
   }
 }

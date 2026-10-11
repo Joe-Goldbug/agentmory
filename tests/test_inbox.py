@@ -79,7 +79,7 @@ def test_dedup_evaluates_duplicate(tmp_path: Path) -> None:
     assert decision.duplicate is True
 
 
-def test_dedup_session_window(tmp_path: Path) -> None:
+def test_session_start_and_end_are_distinct_boundaries(tmp_path: Path) -> None:
     first = make_event(
         tool="claude-code",
         project_path=str(tmp_path),
@@ -98,7 +98,7 @@ def test_dedup_session_window(tmp_path: Path) -> None:
         session_id="abc",
     )
     decision = dedup.evaluate(tmp_path, second)
-    assert decision.duplicate is True
+    assert decision.duplicate is False
 
 
 def test_lockfile_acquire_release(tmp_path: Path) -> None:

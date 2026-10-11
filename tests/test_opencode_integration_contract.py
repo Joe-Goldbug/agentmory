@@ -52,6 +52,8 @@ def test_generated_opencode_plugin_delivers_context_and_captures_bounded_activit
 
     assert '"experimental.chat.system.transform"' in text
     assert '"chat.message"' in text
-    assert 'event_type: "session_summary"' in text
-    assert "lastPromptBySession" in text
+    assert '"tool.execute.after"' in text
+    assert '"experimental.text.complete"' in text
+    assert "turn.finalized" in text
+    assert "finalizedSessions" not in text
     assert "parts" in text

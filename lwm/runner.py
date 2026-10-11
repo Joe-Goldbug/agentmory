@@ -536,6 +536,14 @@ def _sha256_file(path: Path) -> str:
 
 
 def _source_revision(root: Path) -> str:
+    manifest = Path(sys.prefix).parent / "runtime-manifest.json"
+    try:
+        payload = json.loads(manifest.read_text(encoding="utf-8"))
+        revision = str(payload.get("source_revision") or "")
+        if revision and revision != "unknown":
+            return revision
+    except (OSError, json.JSONDecodeError):
+        pass
     try:
         result = subprocess.run(
             ["git", "rev-parse", "HEAD"],
@@ -699,6 +707,7 @@ def _run_cycle_unlocked(root: Path) -> int:
     """Run one bounded collection cycle after the writer lock is held."""
 
     root = root.resolve()
+    started_at = datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
     loop = begin_loop(
         "scheduled memory refresh",
         constraints=("one bounded cycle", "preserve source evidence"),
@@ -710,7 +719,6 @@ def _run_cycle_unlocked(root: Path) -> int:
     try:
         report = _run_cycle_stages(root)
         cycle_id = make_cycle_id()
-        started_at = datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
         finished_at = datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
         context_artifact = _write_context_artifact(root, cycle_id, report.context_output)
         candidate_core = derive_core_status(

@@ -1,34 +1,25 @@
 {
-  "id": "69c4a706-8a9d-4f09-b60e-bdd3940ed478",
-  "name": "Sentinel",
-  "projectResources": {
-    "resources": [
+  "id":  "69c4a706-8a9d-4f09-b60e-bdd3940ed478",
+  "name":  "Sentinel",
+  "projectResources":  {
+    "resources":  [
       {
-        "gitFolder": {
-          "folderUri": "file:///Users/ethan/Library/Mobile%20Documents/com~apple~CloudDocs/Downloads/Sentinel",
-          "defaultBranch": "main"
+        "gitFolder":  {
+          "folderUri":  "file:///Users/ethan/Library/Mobile%20Documents/com~apple~CloudDocs/Downloads/Sentinel",
+          "defaultBranch":  "main"
         }
       }
     ]
   },
-  "permissionGrants": {
-    "permissionGrants": {
-      "allow": [
-        "command(ls)",
-        "command(find)",
-        "command(npx)",
-        "command(npm run)",
-        "command(mv)",
-        "command(bun install)",
-        "command(bun packages/cli/src/index.ts)"
-      ]
-    }
+  "permissionGrants":  {
+    "permissionGrants":  {},
+    "v2Migrated":  true
   },
-  "settings": {
-    "fileAccessPolicy": "AGENT_SETTING_POLICY_ASK",
-    "internetPolicy": "AGENT_SETTING_POLICY_ASK",
-    "autoExecutionPolicy": "CASCADE_COMMANDS_AUTO_EXECUTION_OFF",
-    "artifactReviewMode": "ARTIFACT_REVIEW_MODE_ALWAYS"
+  "settings":  {
+    "fileAccessPolicy":  "AGENT_SETTING_POLICY_ASK",
+    "internetPolicy":  "AGENT_SETTING_POLICY_ASK",
+    "autoExecutionPolicy":  "CASCADE_COMMANDS_AUTO_EXECUTION_OFF",
+    "artifactReviewMode":  "ARTIFACT_REVIEW_MODE_ALWAYS"
   },
-  "updatedAt": "2026-05-27T14:15:25.172744Z"
+  "updatedAt":  "2026-05-27T14:15:25.172744Z"
 }

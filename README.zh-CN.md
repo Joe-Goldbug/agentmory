@@ -1,5 +1,7 @@
 # llm-workmem
 
+> **最新备份设计（2026-10-11）**：Team 与企业可选 LWM 公司托管、受支持的去中心化存储或双副本，链上存证独立选择。以 [最新战略](docs/business_plan/WEB2_WEB3_BACKUP_STRATEGY_AND_TOKENOMICS.md) 替代下文旧备份、合规与金融结论。下文相关 CLI 示例、性能和 Web3 功能描述须经实现与恢复验证后，才能作为已上线能力；不构成永久保存或合规保证。
+
 <p align="center">
   <img src="assets/logo.svg" alt="llm-workmem" width="480" /><br />
   <sub>跨 Agent 统一工作记忆与知识管理和备份系统</sub>
@@ -8,7 +10,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python: >=3.11](https://img.shields.io/badge/Python->=3.11-green.svg)](pyproject.toml)
 
-一个与你共同演进的 LLM 工作记忆、知识管理与去中心化备份系统。源自 [Karpathy 的 LLM-WorkMem 哲学](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)，现已全面升级为面向现代 AI 编程工作流的**跨 Agent 工作记忆、任务交接（Handoff）、证据联邦与 Web2-Web3 丝滑无瑕区块链备份引擎**。
+LLM-WorkMem 的产品方向是跨 Agent 统一工作记忆、知识管理与备份系统，整合有来源的任务交接、可恢复加密备份和可选独立验真。具体功能可用性以实现和验收记录为准。
 
 [English Documentation](README.md)
 

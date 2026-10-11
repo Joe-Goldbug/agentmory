@@ -1035,12 +1035,21 @@ def register_project_cmd(
     typer.echo(json.dumps(lwm_registry.register(root.resolve(), project), ensure_ascii=False, indent=2))
 
 
+@hub_app.command("recover-privacy")
+def recover_privacy_cmd(
+    root: Path = typer.Option(Path("."), "--root"),
+    apply: bool = typer.Option(False, "--apply", help="Requeue safe originals; otherwise report only."),
+) -> None:
+    """Revalidate old privacy quarantine without bypassing current protection."""
+    typer.echo(json.dumps(lwm_ingest.recover_false_privacy_rejections(root.resolve(), apply=apply)))
+
+
 @hub_app.command("run-supervisor")
 def run_supervisor_cmd(
     root: Path = typer.Argument(Path("."), help="Wiki root.", exists=False),
-    force: bool = typer.Option(False, "--force", help="Run a full cycle now, regardless of the 12-hour due check."),
+    force: bool = typer.Option(False, "--force", help="Run a full cycle now, regardless of the six-hour due check."),
 ) -> None:
-    """Run the supervisor; execute the full cycle only when the 12-hour window is due."""
+    """Run the supervisor; execute the full cycle when the six-hour window is due."""
 
     resolved = root.resolve()
     issues = mutable_ownership_issues(resolved)
