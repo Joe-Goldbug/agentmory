@@ -11,6 +11,25 @@ from lwm.harvest import write_schedule_bundle
 from lwm.privacy import sanitize_event
 
 
+def test_core_cli_does_not_require_unpublished_optional_backup():
+    import subprocess
+    import sys
+
+    code = """
+import builtins
+original = builtins.__import__
+def without_backup(name, globals=None, locals=None, fromlist=(), level=0):
+    if name == 'lwm.backup' or (name == 'lwm' and 'backup' in (fromlist or ())):
+        raise ImportError('optional backup module unavailable')
+    return original(name, globals, locals, fromlist, level)
+builtins.__import__ = without_backup
+import lwm.cli
+"""
+    result = subprocess.run([sys.executable, "-c", code], cwd=Path(__file__).parents[1],
+                            text=True, capture_output=True)
+    assert result.returncode == 0, result.stderr
+
+
 def test_host_conversation_id_is_not_an_authentication_secret():
     event = make_event(tool="codex", project_path="/work/project", project_id="git-project", event_type="session_start")
     event["session_id"] = "01a126a4-40f4-7fc1-bf3b-75372adf10bb"

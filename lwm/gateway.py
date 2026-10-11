@@ -34,7 +34,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, unquote, urlparse
 
-from lwm import backup, health as lwm_health
+from lwm import health as lwm_health
 from lwm import hub_service, memory_compiler
 
 DEFAULT_HOST = "127.0.0.1"
@@ -373,6 +373,8 @@ def _handle_subscription(root: Path, params: dict[str, list[str]], body: Any) ->
 
 
 def _handle_backup_bundle(root: Path, params: dict[str, list[str]], body: Any) -> Any:
+    from lwm import backup
+
     return backup.export_snapshot(root.resolve())
 
 
@@ -380,6 +382,7 @@ def _handle_backup_restore(root: Path, params: dict[str, list[str]], body: Any) 
     if not isinstance(body, dict) or "tar_base64" not in body or "sha256" not in body:
         raise ValueError("missing required fields: tar_base64, sha256")
     import base64
+    from lwm import backup
 
     tar_bytes = base64.b64decode(str(body["tar_base64"]))
     return backup.restore_snapshot(root.resolve(), tar_bytes, str(body["sha256"]))
