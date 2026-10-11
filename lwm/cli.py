@@ -24,6 +24,11 @@ from lwm.init_scaffold import DEFAULT_SOURCE_TYPES, init_wiki_tree
 from lwm.raw_tracker import run_raw_status, run_raw_sync
 from lwm.analysis import analyze_wiki, render_analysis_report, write_analysis_report
 from lwm.dashboard import serve_wiki, write_dashboard_html
+from lwm.gateway import (
+    DEFAULT_HOST as DEFAULT_GATEWAY_HOST,
+    DEFAULT_PORT as DEFAULT_GATEWAY_PORT,
+    serve_gateway,
+)
 from lwm.export import render_export_report, write_ai_exports
 from lwm.review import build_review_report, render_review_report, write_review_page
 from lwm.schema import render_schema_report, validate_schema
@@ -1022,6 +1027,20 @@ def serve_cmd(
 ) -> None:
     """Run a local desktop-like workspace in the browser."""
     serve_wiki(root.resolve(), host=host, port=port, open_browser=open_browser)
+
+
+@app.command("gateway")
+def gateway_cmd(
+    root: Path = typer.Argument(
+        Path("."),
+        help="LLM-WorkMem data root (on Windows use a real dir, not the checkout: raw/wiki are symlinks)",
+        exists=True,
+    ),
+    host: str = typer.Option(DEFAULT_GATEWAY_HOST, "--host", help="Host to bind"),
+    port: int = typer.Option(DEFAULT_GATEWAY_PORT, "--port", help="Port to bind"),
+) -> None:
+    """Serve the JSON API used by the web/ frontend (see docs/api-contract.md)."""
+    serve_gateway(root.resolve(), host=host, port=port)
 
 
 @raw_app.command("status")
