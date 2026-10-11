@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Token, TokenAccount, Transfer};
 
-declare_id!("WMEMs11111111111111111111111111111111111111");
+declare_id!("3xNGfnr9cTmDQAArx5p7PcdzuS91H9Yuyx1tgU7qaMNJ");
 
 #[program]
 pub mod workmem_storage {
@@ -47,6 +47,48 @@ pub mod workmem_storage {
         emit!(QuotaPurchasedEvent {
             user: ctx.accounts.user.key(),
             token_amount,
+            quota_added: quota_to_add,
+            total_available: quota.available_commits,
+            timestamp: Clock::get()?.unix_timestamp,
+        });
+
+        Ok(())
+    }
+
+    /// 用户直接使用原生 SOL 购买上链存储额度 (Solana Devnet / Mainnet)
+    pub fn buy_quota_with_sol(
+        ctx: Context<BuyQuotaWithSol>,
+        lamports: u64,
+        quota_to_add: u64,
+    ) -> Result<()> {
+        require!(lamports > 0, ErrorCode::InvalidAmount);
+        require!(quota_to_add > 0, ErrorCode::InvalidQuota);
+
+        // 原生 SOL 转账：从用户转到国库
+        let ix = anchor_lang::solana_program::system_instruction::transfer(
+            &ctx.accounts.user.key(),
+            &ctx.accounts.treasury.key(),
+            lamports,
+        );
+        anchor_lang::solana_program::program::invoke(
+            &ix,
+            &[
+                ctx.accounts.user.to_account_info(),
+                ctx.accounts.treasury.to_account_info(),
+                ctx.accounts.system_program.to_account_info(),
+            ],
+        )?;
+
+        // 增加用户的可用配额
+        let quota = &mut ctx.accounts.user_quota;
+        quota.available_commits = quota
+            .available_commits
+            .checked_add(quota_to_add)
+            .ok_or(ErrorCode::Overflow)?;
+
+        emit!(QuotaPurchasedWithSolEvent {
+            user: ctx.accounts.user.key(),
+            lamports,
             quota_added: quota_to_add,
             total_available: quota.available_commits,
             timestamp: Clock::get()?.unix_timestamp,
@@ -132,6 +174,22 @@ pub struct BuyQuotaWithTokens<'info> {
 }
 
 #[derive(Accounts)]
+pub struct BuyQuotaWithSol<'info> {
+    #[account(
+        mut,
+        seeds = [b"quota", user.key().as_ref()],
+        bump = user_quota.bump
+    )]
+    pub user_quota: Account<'info, UserQuota>,
+    #[account(mut)]
+    pub user: Signer<'info>,
+    /// CHECK: 国库收款账户，接收原生 SOL
+    #[account(mut)]
+    pub treasury: AccountInfo<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
 #[instruction(project_id: [u8; 32], version: u32)]
 pub struct CommitSnapshot<'info> {
     #[account(
@@ -186,6 +244,15 @@ pub struct SnapshotRecord {
 pub struct QuotaPurchasedEvent {
     pub user: Pubkey,
     pub token_amount: u64,
+    pub quota_added: u64,
+    pub total_available: u64,
+    pub timestamp: i64,
+}
+
+#[event]
+pub struct QuotaPurchasedWithSolEvent {
+    pub user: Pubkey,
+    pub lamports: u64,
     pub quota_added: u64,
     pub total_available: u64,
     pub timestamp: i64,

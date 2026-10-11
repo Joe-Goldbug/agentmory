@@ -434,6 +434,14 @@ def _handle_solana_config(root: Path, params: dict[str, list[str]], body: Any) -
     return solana_storage.get_solana_config(root)
 
 
+def _handle_solana_config_update(root: Path, body: Any) -> Any:
+    from lwm import solana_storage
+    new_cfg = body or {}
+    if not isinstance(new_cfg, dict):
+        raise ApiError(HTTPStatus.BAD_REQUEST, "E_BAD_PARAMS", "配置格式须为 JSON 对象")
+    return solana_storage.update_solana_config(root, new_cfg)
+
+
 def _handle_solana_quota(root: Path, params: dict[str, list[str]], body: Any) -> Any:
     from lwm import solana_storage
     wallet = ((params.get("wallet") or [""])[0]).strip()
@@ -473,7 +481,9 @@ def _handle_solana_purchase(root: Path, body: Any) -> Any:
     tx_hash = str((body or {}).get("tx_hash", "")).strip()
     token_amount = int((body or {}).get("token_amount", 10))
     quota_added = int((body or {}).get("quota_added", 10))
-    verify_rpc = bool((body or {}).get("verify_rpc", False))
+    config = solana_storage.get_solana_config(root)
+    default_verify = bool(config.get("enforce_rpc_verification", False))
+    verify_rpc = bool((body or {}).get("verify_rpc", default_verify))
     if not wallet or not tx_hash:
         raise ApiError(HTTPStatus.BAD_REQUEST, "E_BAD_PARAMS", "缺少 wallet 或 tx_hash")
     try:
@@ -493,7 +503,9 @@ def _handle_solana_commit(root: Path, body: Any) -> Any:
     snapshot_hash = str((body or {}).get("snapshot_hash", "")).strip()
     tx_hash = str((body or {}).get("tx_hash", "")).strip()
     slot = (body or {}).get("slot")
-    verify_rpc = bool((body or {}).get("verify_rpc", False))
+    config = solana_storage.get_solana_config(root)
+    default_verify = bool(config.get("enforce_rpc_verification", False))
+    verify_rpc = bool((body or {}).get("verify_rpc", default_verify))
     if not wallet or not event_id or not snapshot_hash or not tx_hash:
         raise ApiError(HTTPStatus.BAD_REQUEST, "E_BAD_PARAMS", "缺少必要参数")
     try:
@@ -520,6 +532,30 @@ def _handle_vault_upload(root: Path, body: Any) -> Any:
             packed_ciphertext_base64=packed_b64,
             wallet=wallet,
             metadata=metadata,
+        )
+    except ValueError as exc:
+        raise ApiError(HTTPStatus.BAD_REQUEST, "E_VAULT_ERROR", str(exc)) from exc
+
+
+def _handle_vault_pin_ipfs(root: Path, body: Any) -> Any:
+    from lwm import solana_storage, vault
+    payload = body or {}
+    snapshot_hash = str(payload.get("snapshot_hash", "")).strip()
+    packed_b64 = str(payload.get("packed_ciphertext_base64", "")).strip()
+    wallet = str(payload.get("wallet", "")).strip()
+    metadata = payload.get("metadata")
+    cfg = solana_storage.get_solana_config(root)
+    pinata_jwt = cfg.get("pinata_jwt")
+    if not snapshot_hash or not packed_b64:
+        raise ApiError(HTTPStatus.BAD_REQUEST, "E_BAD_PARAMS", "缺少 snapshot_hash 或 packed_ciphertext_base64")
+    try:
+        return vault.pin_snapshot_ipfs(
+            root,
+            snapshot_hash=snapshot_hash,
+            packed_ciphertext_base64=packed_b64,
+            wallet=wallet,
+            metadata=metadata,
+            pinata_jwt=pinata_jwt,
         )
     except ValueError as exc:
         raise ApiError(HTTPStatus.BAD_REQUEST, "E_VAULT_ERROR", str(exc)) from exc
@@ -647,6 +683,10 @@ def _dispatch(
     if method == "POST" and path.startswith(REVIEW_PREFIX) and path.endswith(REVIEW_SUFFIX):
         candidate_id = unquote(path[len(REVIEW_PREFIX) : -len(REVIEW_SUFFIX)])
         return _handle_review(root, candidate_id, body)
+    if method == "POST" and path == "/api/solana/config":
+        return _handle_solana_config_update(root, body)
+    if method == "POST" and path == "/api/vault/pin_ipfs":
+        return _handle_vault_pin_ipfs(root, body)
     if method == "POST" and path == "/api/solana/purchase":
         return _handle_solana_purchase(root, body)
     if method == "POST" and path == "/api/solana/commit":

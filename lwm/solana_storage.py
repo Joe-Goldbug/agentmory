@@ -56,37 +56,40 @@ SOLANA_STATE_FILE = "state/solana_state.json"
 DEFAULT_CONFIG: dict[str, Any] = {
     "cluster": "devnet",
     "rpc_url": "https://api.devnet.solana.com",
-    "program_id": "WMEMs11111111111111111111111111111111111111",
+    "rpc_fallback_urls": [
+        "https://api.devnet.solana.com",
+        "https://solana-devnet.rpc.extrnode.com",
+    ],
+    "program_id": "3xNGfnr9cTmDQAArx5p7PcdzuS91H9Yuyx1tgU7qaMNJ",
     "token_mint": "DevWMEMMint11111111111111111111111111111111",
     "token_symbol": "$WMEM",
-    "treasury_pubkey": "WMEMTReasury11111111111111111111111111111111",
-    "price_per_package": 10,  # 10 $WMEM 或 0.05 SOL
+    "treasury_pubkey": "5GAD1BTsmLBpB4ZQjDCKtCXedfnqYbeijyq7atnsT1sQ",
+    "price_per_package": 10,  # 10 $WMEM 或 0.01 SOL
     "quota_per_package": 10,  # 可获得 10 次链上不可变存证
+    "enforce_rpc_verification": False,
 }
 
 
 def verify_solana_tx_on_chain(
     tx_hash: str,
     rpc_url: str = "https://api.devnet.solana.com",
+    fallback_urls: list[str] | None = None,
     timeout: float = 6.0,
 ) -> dict[str, Any]:
     """通过 Solana JSON-RPC 验证交易哈希是否在链上真实存在且成功执行。
 
     标准库实现：使用 urllib.request POST 调用 getSignatureStatuses。
-    返回:
-        {
-            "tx_hash": tx_hash,
-            "slot": int,
-            "confirmation_status": "confirmed" | "finalized" | ...,
-            "err": None,
-            "verified": True,
-        }
-    抛出:
-        ValueError: 交易未在链上查到、交易执行失败或超时。
+    具备多 RPC 故障自动转移能力。
     """
     clean_tx = tx_hash.strip()
     if not clean_tx or len(clean_tx) < 32:
         raise ValueError(f"无效的 Solana 交易哈希格式: {tx_hash}")
+
+    urls_to_try = [rpc_url]
+    if fallback_urls:
+        for u in fallback_urls:
+            if u not in urls_to_try:
+                urls_to_try.append(u)
 
     req_body = json.dumps({
         "jsonrpc": "2.0",
@@ -98,40 +101,46 @@ def verify_solana_tx_on_chain(
         ]
     }).encode("utf-8")
 
-    req = urllib.request.Request(
-        rpc_url,
-        data=req_body,
-        headers={"Content-Type": "application/json"},
-    )
+    last_error = ""
+    for candidate_rpc in urls_to_try:
+        req = urllib.request.Request(
+            candidate_rpc,
+            data=req_body,
+            headers={"Content-Type": "application/json"},
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+        except (urllib.error.URLError, OSError, TimeoutError) as exc:
+            last_error = f"连接 Solana RPC 失败 ({candidate_rpc}): {exc}"
+            continue
 
-    try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-    except (urllib.error.URLError, OSError, TimeoutError) as exc:
-        raise ValueError(f"连接 Solana RPC 失败 ({rpc_url}): {exc}") from exc
+        if "error" in data:
+            last_error = f"Solana RPC 返回错误: {data['error']}"
+            continue
 
-    if "error" in data:
-        raise ValueError(f"Solana RPC 返回错误: {data['error']}")
+        result = data.get("result", {})
+        statuses = result.get("value", []) if isinstance(result, dict) else []
+        if not statuses or statuses[0] is None:
+            raise ValueError(f"Solana 链上未查到该交易或尚在网络广播中: {clean_tx}")
 
-    result = data.get("result", {})
-    statuses = result.get("value", []) if isinstance(result, dict) else []
-    if not statuses or statuses[0] is None:
-        raise ValueError(f"Solana 链上未查到该交易或尚在网络广播中: {clean_tx}")
+        status_obj = statuses[0]
+        if status_obj.get("err") is not None:
+            raise ValueError(f"Solana 链上交易执行失败 (Error): {status_obj.get('err')}")
 
-    status_obj = statuses[0]
-    if status_obj.get("err") is not None:
-        raise ValueError(f"Solana 链上交易执行失败 (Error): {status_obj.get('err')}")
+        slot = int(status_obj.get("slot", 0))
+        conf_status = str(status_obj.get("confirmationStatus", "processed"))
 
-    slot = int(status_obj.get("slot", 0))
-    conf_status = str(status_obj.get("confirmationStatus", "processed"))
+        return {
+            "tx_hash": clean_tx,
+            "slot": slot,
+            "confirmation_status": conf_status,
+            "err": None,
+            "verified": True,
+            "rpc_used": candidate_rpc,
+        }
 
-    return {
-        "tx_hash": clean_tx,
-        "slot": slot,
-        "confirmation_status": conf_status,
-        "err": None,
-        "verified": True,
-    }
+    raise ValueError(last_error or f"所有可用 RPC 节点均未能完成验证: {clean_tx}")
 
 
 def _now_iso() -> str:
@@ -176,6 +185,17 @@ def _save(root: Path, data: dict[str, Any]) -> None:
 def get_solana_config(root: Path) -> dict[str, Any]:
     data = _load(root)
     return data.get("config", DEFAULT_CONFIG)
+
+
+def update_solana_config(root: Path, new_cfg: dict[str, Any]) -> dict[str, Any]:
+    """更新并持久化 Solana 运行时配置（RPC 节点、国库地址等）。"""
+    data = _load(root)
+    cfg = data.setdefault("config", dict(DEFAULT_CONFIG))
+    for k, v in (new_cfg or {}).items():
+        if v is not None:
+            cfg[k] = v
+    _save(root, data)
+    return cfg
 
 
 def get_wallet_quota(root: Path, wallet: str) -> dict[str, Any]:

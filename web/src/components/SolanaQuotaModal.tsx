@@ -8,6 +8,7 @@ import {
   getSolBalance,
   purchaseStorageQuota,
   requestDevnetAirdrop,
+  updateSolanaConfig,
   type SolanaConfig,
   type WalletQuota,
 } from '../api/solana';
@@ -27,11 +28,32 @@ export default function SolanaQuotaModal({ onClose, onSuccess }: Props) {
   const [solBalance, setSolBalance] = useState<number>(0);
   const [loading, setLoading] = useState(false);
   const [statusMsg, setStatusMsg] = useState<{ type: 'ok' | 'err'; text: string; link?: string } | null>(null);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [customRpc, setCustomRpc] = useState('');
+  const [savingConfig, setSavingConfig] = useState(false);
 
   useEffect(() => {
-    fetchSolanaConfig().then(setConfig).catch(console.warn);
+    fetchSolanaConfig()
+      .then((c) => {
+        setConfig(c);
+        if (c.rpc_url) setCustomRpc(c.rpc_url);
+      })
+      .catch(console.warn);
     refreshData();
   }, [wallet]);
+
+  async function handleSaveConfig() {
+    setSavingConfig(true);
+    try {
+      const updated = await updateSolanaConfig({ rpc_url: customRpc });
+      setConfig(updated);
+      setStatusMsg({ type: 'ok', text: 'Solana RPC 节点与网络配置已更新！' });
+    } catch (err) {
+      setStatusMsg({ type: 'err', text: `保存配置失败: ${(err as Error).message}` });
+    } finally {
+      setSavingConfig(false);
+    }
+  }
 
   async function refreshData() {
     try {
@@ -189,6 +211,49 @@ export default function SolanaQuotaModal({ onClose, onSuccess }: Props) {
               <span>💧</span>
               <span>{t('solana.airdropBtn')}</span>
             </button>
+          </div>
+
+          {/* Advanced RPC & Treasury Config */}
+          <div className="pt-2 border-t border-white/10">
+            <button
+              onClick={() => setShowAdvanced(!showAdvanced)}
+              className="text-xs text-gray-400 hover:text-white flex items-center justify-between w-full transition"
+            >
+              <span>⚙️ 专业级网络与合约配置 (RPC / Helius / Program)</span>
+              <span>{showAdvanced ? '▲' : '▼'}</span>
+            </button>
+
+            {showAdvanced && (
+              <div className="mt-3 p-3 rounded-xl bg-white/[0.02] border border-white/10 space-y-2.5 text-xs animate-fade-in">
+                <div>
+                  <label className="text-gray-400 block mb-1">自定义 Solana RPC (支持 Helius / QuickNode):</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={customRpc}
+                      onChange={(e) => setCustomRpc(e.target.value)}
+                      placeholder="https://api.devnet.solana.com"
+                      className="flex-1 bg-black/40 border border-white/15 rounded-lg px-2.5 py-1 text-xs text-white font-mono outline-none"
+                    />
+                    <button
+                      onClick={handleSaveConfig}
+                      disabled={savingConfig}
+                      className="btn-mini btn-mini-primary !py-1 !px-2.5 text-xs whitespace-nowrap"
+                    >
+                      {savingConfig ? '保存中…' : '保存'}
+                    </button>
+                  </div>
+                </div>
+                <div className="text-[11px] text-gray-500 font-mono space-y-1">
+                  <div>
+                    Program ID: <span className="text-purple-300">{config?.program_id || '3xNGfn...'}</span>
+                  </div>
+                  <div>
+                    Treasury: <span className="text-gray-400">{config?.treasury_pubkey || '5GAD1B...'}</span>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 

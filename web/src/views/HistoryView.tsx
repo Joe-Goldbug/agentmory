@@ -4,7 +4,12 @@ import { useAsyncData } from '../hooks/useAsyncData';
 import { fetchHistory } from '../api/adapters/eventAdapter';
 import { useI18n } from '../i18n';
 import { useAuth } from '../auth/AuthContext';
-import { commitSnapshotOnSolana, executeColdBackup, executeColdRestore } from '../api/solana';
+import {
+  commitSnapshotOnSolana,
+  executeColdBackup,
+  executeColdRestore,
+  executeCrossDeviceRestoreFromChain,
+} from '../api/solana';
 import type { HistoryItem } from '../types';
 
 export default function HistoryView() {
@@ -20,6 +25,7 @@ export default function HistoryView() {
   const [coldBackupStatus, setColdBackupStatus] = useState<string>('');
   const [restoringId, setRestoringId] = useState<string>('');
   const [restoreMsg, setRestoreMsg] = useState<string>('');
+  const [crossRestoreLoading, setCrossRestoreLoading] = useState(false);
 
   const all = data ?? [];
   const projects = Array.from(new Set(all.map((i) => i.project).filter(Boolean)));
@@ -57,6 +63,27 @@ export default function HistoryView() {
       setRestoreMsg(`⚠️ 还原失败: ${(err as Error).message}`);
     } finally {
       setRestoringId('');
+    }
+  }
+
+  async function handleCrossDeviceRestore() {
+    const wallet = user?.wallets?.[0] || '7xKXtg9P4WMEMdemoDevnetWallet111111111111111';
+    setCrossRestoreLoading(true);
+    setRestoreMsg(
+      lang === 'zh'
+        ? '正在从 Solana 链上与去中心化网络检索并复原最新记忆…'
+        : 'Retrieving and restoring memory from Solana chain...'
+    );
+    try {
+      const res = await executeCrossDeviceRestoreFromChain(wallet, current?.project || 'llm-workmem');
+      setRestoreMsg(
+        `✅ 链上跨设备找回成功！已安全解密还原 ${res.restored.restored_files} 个工作记忆文件（Slot: #${res.attestation.slot}）`
+      );
+      reload();
+    } catch (err) {
+      setRestoreMsg(`⚠️ 跨设备链上找回失败: ${(err as Error).message}`);
+    } finally {
+      setCrossRestoreLoading(false);
     }
   }
 
@@ -137,6 +164,17 @@ export default function HistoryView() {
             className="btn-mini btn-mini-primary !py-1 !px-3 text-xs"
           >
             {coldBackupLoading ? '备份中…' : '创建加密冷备'}
+          </button>
+
+          <button
+            onClick={handleCrossDeviceRestore}
+            disabled={crossRestoreLoading}
+            className="btn-mini text-xs text-blue-300 hover:text-white border border-blue-500/30 !py-1 !px-2.5"
+            title="全新设备连接钱包后，一键穿透 Solana 账本拉取快照并解密复原"
+          >
+            {crossRestoreLoading
+              ? (lang === 'zh' ? '链上检索中…' : 'Restoring...')
+              : (lang === 'zh' ? '🌐 链上跨设备找回' : '🌐 Restore from Chain')}
           </button>
         </div>
       </div>

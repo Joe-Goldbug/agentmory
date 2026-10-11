@@ -123,3 +123,27 @@ def test_list_and_delete_encrypted_snapshots(tmp_path: Path) -> None:
     )
     assert vault.get_encrypted_snapshot(tmp_path, "11111111111111111111111111111111") is None
     assert len(vault.list_encrypted_snapshots(tmp_path)) == 1
+
+
+def test_pin_snapshot_ipfs_and_retrieve(tmp_path: Path) -> None:
+    fake_payload = b"123456789012" + b"ciphertext_for_ipfs_pinning"
+    b64_payload = base64.b64encode(fake_payload).decode("ascii")
+    snapshot_hash = "abcdef9999999999abcdef9999999999abcdef9999999999"
+    wallet = "7xKXtg9P4WMEMdemoDevnetWallet111111111111111"
+
+    res = vault.pin_snapshot_ipfs(
+        tmp_path,
+        snapshot_hash=snapshot_hash,
+        packed_ciphertext_base64=b64_payload,
+        wallet=wallet,
+    )
+
+    assert "ipfs://" in res["uri"]
+    assert res["cid"].startswith("bafk")
+    assert res["byte_size"] == len(fake_payload)
+
+    # 通过 ipfs:// URI 读取
+    retrieved = vault.get_encrypted_snapshot(tmp_path, res["uri"])
+    assert retrieved is not None
+    assert retrieved["packed_ciphertext_base64"] == b64_payload
+

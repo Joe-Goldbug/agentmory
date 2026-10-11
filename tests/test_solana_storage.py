@@ -7,12 +7,24 @@ import pytest
 from lwm import solana_storage
 
 
-def test_solana_config_defaults(tmp_path: Path) -> None:
+def test_solana_config_defaults_and_update(tmp_path: Path) -> None:
     cfg = solana_storage.get_solana_config(tmp_path)
     assert cfg["cluster"] == "devnet"
     assert "WMEM" in cfg["token_symbol"]
     assert cfg["price_per_package"] == 10
     assert cfg["quota_per_package"] == 10
+
+    # 更新配置
+    updated = solana_storage.update_solana_config(
+        tmp_path,
+        {"rpc_url": "https://custom.helius-rpc.com/?api-key=test", "treasury_pubkey": "custom_treasury_123"},
+    )
+    assert updated["rpc_url"] == "https://custom.helius-rpc.com/?api-key=test"
+    assert updated["treasury_pubkey"] == "custom_treasury_123"
+
+    # 再次读取验证持久化
+    refetched = solana_storage.get_solana_config(tmp_path)
+    assert refetched["rpc_url"] == "https://custom.helius-rpc.com/?api-key=test"
 
 
 def test_wallet_initial_quota_and_purchase(tmp_path: Path) -> None:

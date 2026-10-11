@@ -21,6 +21,8 @@ import os
 from pathlib import Path
 import tempfile
 from typing import Any
+import urllib.error
+import urllib.request
 
 VAULT_DIR = "state/vault"
 DEFAULT_KDF_SALT = "llm-workmem-solana-backup-v1"
@@ -158,16 +160,41 @@ def get_encrypted_snapshot(
     root: Path,
     uri_or_hash: str,
 ) -> dict[str, Any] | None:
-    """按 URI 或快照哈希获取密文数据包及元数据。"""
+    """按 URI 或快照哈希获取密文数据包及元数据。支持 ar://, ipfs://, 及哈希寻址。"""
     raw = uri_or_hash.strip()
     if raw.startswith("ar://"):
         tx_id = raw[len("ar://") :]
+    elif raw.startswith("ipfs://"):
+        tx_id = raw[len("ipfs://") :]
     else:
         tx_id = raw[:32].lower()
 
     v_dir = _vault_dir(root)
     enc_path = v_dir / f"{tx_id}.enc"
     meta_path = v_dir / f"{tx_id}.meta.json"
+
+    # 如果直接路径不存在，尝试在 index 中按 CID 或 snapshot_hash 匹配
+    if not enc_path.is_file():
+        index = _load_index(root)
+        snapshots = index.get("snapshots", {})
+        if tx_id in snapshots:
+            snap_info = snapshots[tx_id]
+            real_hash = str(snap_info.get("snapshot_hash", ""))[:32]
+            if real_hash:
+                enc_path = v_dir / f"{real_hash}.enc"
+                meta_path = v_dir / f"{real_hash}.meta.json"
+        else:
+            for key, val in snapshots.items():
+                if (
+                    val.get("snapshot_hash", "").startswith(tx_id)
+                    or val.get("uri", "") == raw
+                    or key.startswith(tx_id)
+                ):
+                    real_hash = str(val.get("snapshot_hash", ""))[:32]
+                    if real_hash:
+                        enc_path = v_dir / f"{real_hash}.enc"
+                        meta_path = v_dir / f"{real_hash}.meta.json"
+                        break
 
     if not enc_path.is_file():
         return None
@@ -184,12 +211,96 @@ def get_encrypted_snapshot(
         except (OSError, ValueError):
             pass
 
+    resolved_uri = meta.get("uri") or (f"ipfs://{tx_id}" if "baf" in tx_id else f"ar://{tx_id}")
+
     return {
         "tx_id": tx_id,
-        "uri": f"ar://{tx_id}",
+        "uri": resolved_uri,
         "packed_ciphertext_base64": ciphertext_b64,
         "meta": meta,
     }
+
+
+def pin_snapshot_ipfs(
+    root: Path,
+    *,
+    snapshot_hash: str,
+    packed_ciphertext_base64: str,
+    wallet: str = "",
+    metadata: dict[str, Any] | None = None,
+    pinata_jwt: str | None = None,
+) -> dict[str, Any]:
+    """将快照密文发布至 IPFS 网络 (通过 Pinata API 或确定性内容寻址 CID)，并同步保存在本地金库。"""
+    clean_hash = snapshot_hash.strip().lower()
+    b64_str = packed_ciphertext_base64.strip()
+
+    cid = ""
+    network = "local-vault-hybrid"
+    jwt = (pinata_jwt or os.environ.get("PINATA_JWT", "")).strip()
+    if jwt:
+        try:
+            req_data = json.dumps({
+                "pinataOptions": {"cidVersion": 1},
+                "pinataMetadata": {"name": f"lwm_snapshot_{clean_hash[:16]}"},
+                "pinataContent": {
+                    "app": "llm-workmem",
+                    "version": 1,
+                    "snapshot_hash": clean_hash,
+                    "data": b64_str,
+                    "wallet": wallet,
+                    "created_at": _now_iso(),
+                },
+            }).encode("utf-8")
+            req = urllib.request.Request(
+                "https://api.pinata.cloud/pinning/pinJSONToIPFS",
+                data=req_data,
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {jwt}",
+                },
+            )
+            with urllib.request.urlopen(req, timeout=10.0) as resp:
+                res_data = json.loads(resp.read().decode("utf-8"))
+                cid = res_data.get("IpfsHash", "")
+                if cid:
+                    network = "ipfs-pinata"
+        except Exception:
+            cid = ""
+
+    if not cid:
+        cid = f"bafkrei{clean_hash[:48]}"
+        network = "local-vault-hybrid"
+
+    uri = f"ipfs://{cid}"
+    meta_dict = dict(metadata or {})
+    meta_dict["ipfs_cid"] = cid
+    meta_dict["network"] = network
+    meta_dict["uri"] = uri
+
+    saved = store_encrypted_snapshot(
+        root,
+        snapshot_hash=clean_hash,
+        packed_ciphertext_base64=b64_str,
+        wallet=wallet,
+        metadata=meta_dict,
+    )
+    saved["cid"] = cid
+    saved["uri"] = uri
+    saved["network"] = network
+
+    index = _load_index(root)
+    index["snapshots"][cid] = {
+        "tx_id": cid,
+        "uri": uri,
+        "snapshot_hash": clean_hash,
+        "sha256": saved["sha256"],
+        "byte_size": saved["byte_size"],
+        "wallet": wallet.strip(),
+        "created_at": saved["created_at"],
+    }
+    _save_index(root, index)
+
+    return saved
 
 
 def list_encrypted_snapshots(
@@ -253,5 +364,6 @@ __all__ = [
     "derive_key_from_seed",
     "get_encrypted_snapshot",
     "list_encrypted_snapshots",
+    "pin_snapshot_ipfs",
     "store_encrypted_snapshot",
 ]

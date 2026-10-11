@@ -28,16 +28,73 @@ import {
 import { uploadEncryptedSnapshot, downloadEncryptedSnapshot } from './storage';
 
 export const SPL_MEMO_PROGRAM_ID = new PublicKey('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr');
+export const WORKMEM_PROGRAM_ID = new PublicKey('3xNGfnr9cTmDQAArx5p7PcdzuS91H9Yuyx1tgU7qaMNJ');
+
+// Anchor instruction discriminators (sha256('global:<name>')[0..8])
+export const ANCHOR_DISCRIMINATORS = {
+  initializeQuota: new Uint8Array([0x26, 0xe9, 0x1c, 0xcc, 0xe2, 0xc5, 0x7a, 0x39]),
+  buyQuotaWithSol: new Uint8Array([0xac, 0xcc, 0x09, 0x58, 0xf1, 0x3c, 0x22, 0xa8]),
+  commitSnapshot: new Uint8Array([0xfd, 0xbf, 0x24, 0xd3, 0xab, 0xc5, 0xb1, 0x3e]),
+};
+
+/** 派生用户配额账户 PDA (seeds = [b"quota", user.key()]) */
+export function deriveUserQuotaPDA(user: PublicKey, programId = WORKMEM_PROGRAM_ID): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync([new TextEncoder().encode('quota'), user.toBuffer()], programId);
+}
+
+/** 派生快照记录 PDA (seeds = [b"snapshot", user.key(), project_id, &version.to_le_bytes()]) */
+export function deriveSnapshotRecordPDA(
+  user: PublicKey,
+  projectId32: Uint8Array,
+  version: number,
+  programId = WORKMEM_PROGRAM_ID
+): [PublicKey, number] {
+  const versionBytes = new Uint8Array(4);
+  new DataView(versionBytes.buffer).setUint32(0, version, true);
+  return PublicKey.findProgramAddressSync(
+    [new TextEncoder().encode('snapshot'), user.toBuffer(), projectId32, versionBytes],
+    programId
+  );
+}
+
+/** 构建 Anchor buy_quota_with_sol 指令 */
+export function buildBuyQuotaWithSolInstruction(
+  user: PublicKey,
+  treasury: PublicKey,
+  lamports: bigint,
+  quotaToAdd: bigint,
+  programId = WORKMEM_PROGRAM_ID
+): TransactionInstruction {
+  const [userQuota] = deriveUserQuotaPDA(user, programId);
+  const data = new Uint8Array(8 + 8 + 8);
+  data.set(ANCHOR_DISCRIMINATORS.buyQuotaWithSol, 0);
+  const dv = new DataView(data.buffer);
+  dv.setBigUint64(8, lamports, true);
+  dv.setBigUint64(16, quotaToAdd, true);
+
+  return new TransactionInstruction({
+    programId,
+    keys: [
+      { pubkey: userQuota, isSigner: false, isWritable: true },
+      { pubkey: user, isSigner: true, isWritable: true },
+      { pubkey: treasury, isSigner: false, isWritable: true },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+    ],
+    data: data as unknown as Buffer,
+  });
+}
 
 export interface SolanaConfig {
   cluster: string;
   rpc_url: string;
+  rpc_fallback_urls?: string[];
   program_id: string;
   token_mint: string;
   token_symbol: string;
   treasury_pubkey: string;
   price_per_package: number;
   quota_per_package: number;
+  pinata_jwt?: string;
 }
 
 export interface WalletQuota {
@@ -96,6 +153,14 @@ export function getSolanaConnection(rpcUrl: string = DEVNET_RPC): Connection {
 /** 获取 Solana 服务配置 */
 export async function fetchSolanaConfig(): Promise<SolanaConfig> {
   return request<SolanaConfig>('/api/solana/config');
+}
+
+/** 更新 Solana 运行时配置 (RPC / 国库 / Pinata) */
+export async function updateSolanaConfig(newCfg: Partial<SolanaConfig>): Promise<SolanaConfig> {
+  return request<SolanaConfig>('/api/solana/config', {
+    method: 'POST',
+    body: JSON.stringify(newCfg),
+  });
 }
 
 /** 获取钱包配额 */
@@ -257,7 +322,7 @@ export async function executeColdBackup(
   const encrypted = await encryptBytes(plainBytes, key);
 
   // 4. 上传密文包
-  const storageRes = await uploadEncryptedSnapshot(encrypted.packedBase64, bundle.sha256);
+  const storageRes = await uploadEncryptedSnapshot(encrypted.packedBase64, bundle.sha256, walletAddress);
 
   // 5. 广播 SPL Memo 存证
   const memoPayload: MemoPayload = {
@@ -281,6 +346,7 @@ export async function executeColdBackup(
       tx_hash: txHash,
       slot,
       tool: 'LWM-Web3',
+      verify_rpc: true,
     }),
   });
 
@@ -318,7 +384,7 @@ export async function executeColdRestore(
 }
 
 /**
- * 购买上链存储配额 (保留支持 $WMEM / SOL 购买额度)
+ * 购买上链存储配额 (结合 Anchor buy_quota_with_sol 指令与原生 SOL 支付)
  */
 export async function purchaseStorageQuota(
   walletAddress: string,
@@ -348,6 +414,25 @@ export async function purchaseStorageQuota(
         })
       );
 
+      // 尝试绑定 Anchor 智能合约指令
+      try {
+        const anchorProgId = new PublicKey(config.program_id || WORKMEM_PROGRAM_ID);
+        const progInfo = await conn.getAccountInfo(anchorProgId);
+        if (progInfo && progInfo.executable) {
+          tx.add(
+            buildBuyQuotaWithSolInstruction(
+              payer,
+              treasury,
+              BigInt(Math.floor(0.01 * LAMPORTS_PER_SOL)),
+              BigInt(quotaToAdd),
+              anchorProgId
+            )
+          );
+        }
+      } catch (_e) {
+        // 合约尚在编译或 Devnet 状态，原生 transfer 确保 100% 支付成功
+      }
+
       const latest = await conn.getLatestBlockhash();
       tx.recentBlockhash = latest.blockhash;
       tx.feePayer = payer;
@@ -376,6 +461,7 @@ export async function purchaseStorageQuota(
         tx_hash: signature,
         token_amount: tokenAmount,
         quota_added: quotaToAdd,
+        verify_rpc: true,
       }),
     }
   );
@@ -416,6 +502,88 @@ export async function commitSnapshotOnSolana(
       tx_hash: txHash,
       slot,
       tool,
+      verify_rpc: true,
     }),
   });
+}
+
+/**
+ * 跨设备链上记忆找回：从 Solana RPC 穿透账本或网关拉取指定钱包的最新工作记忆快照
+ */
+export async function fetchLatestWalletSnapshot(
+  walletAddress: string,
+  projectId?: string
+): Promise<SolanaAttestation | null> {
+  // 1. 尝试从本地网关获取
+  try {
+    const attestations = await request<SolanaAttestation[]>(
+      `/api/solana/attestations?wallet=${encodeURIComponent(walletAddress)}`
+    );
+    if (attestations && attestations.length > 0) {
+      if (projectId) {
+        const match = attestations.find((a) => a.project_id === projectId);
+        if (match) return match;
+      }
+      return attestations[0];
+    }
+  } catch (_e) {
+    // 全新设备网关本地可能无记录，继续从 Solana RPC 穿透查询
+  }
+
+  // 2. 跨设备穿透查询：直接从 Solana 账本拉取 Memo 存证
+  try {
+    const config = await fetchSolanaConfig();
+    const conn = getSolanaConnection(config.rpc_url);
+    const pubkey = new PublicKey(walletAddress);
+    const sigs = await conn.getSignaturesForAddress(pubkey, { limit: 15 });
+
+    for (const s of sigs) {
+      if (s.memo && s.memo.includes('llm-workmem')) {
+        try {
+          const memoStr = s.memo.replace(/^\[\d+\]\s*/, '');
+          const parsed = JSON.parse(memoStr);
+          if (parsed.app === 'llm-workmem' && parsed.hash) {
+            return {
+              event_id: `chain-${s.signature.slice(0, 8)}`,
+              tx_hash: s.signature,
+              slot: s.slot,
+              cluster: config.cluster,
+              program_id: config.program_id,
+              wallet: walletAddress,
+              project_id: projectId || 'llm-workmem',
+              version: parsed.v || 1,
+              snapshot_hash: parsed.hash,
+              timestamp: new Date(
+                parsed.ts || (s.blockTime ? s.blockTime * 1000 : Date.now())
+              ).toISOString(),
+              explorer_url: `https://explorer.solana.com/tx/${s.signature}?cluster=${config.cluster}`,
+              storage_uri: parsed.uri,
+            };
+          }
+        } catch {
+          // 非 JSON memo，继续
+        }
+      }
+    }
+  } catch (chainErr) {
+    console.warn('从 Solana RPC 拉取链上记录受限:', chainErr);
+  }
+
+  return null;
+}
+
+/**
+ * 跨设备一键还原：连接钱包后从链上自动定位快照，下载并解密复原记忆
+ */
+export async function executeCrossDeviceRestoreFromChain(
+  walletAddress: string,
+  projectId?: string
+): Promise<{ restored: BackupRestoreResponse; attestation: SolanaAttestation }> {
+  const att = await fetchLatestWalletSnapshot(walletAddress, projectId);
+  if (!att) {
+    throw new Error('未在 Solana 链上或本地金库找到该钱包关联的任何工作记忆存证');
+  }
+  const uri = att.storage_uri || `ar://${att.snapshot_hash.slice(0, 32)}`;
+  const restored = await executeColdRestore(uri, att.snapshot_hash);
+  return { restored, attestation: att };
 }

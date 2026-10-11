@@ -26,6 +26,19 @@
       ]
     },
     {
+      "name": "buyQuotaWithSol",
+      "accounts": [
+        { "name": "userQuota", "isMut": true, "isSigner": false },
+        { "name": "user", "isMut": true, "isSigner": true },
+        { "name": "treasury", "isMut": true, "isSigner": false },
+        { "name": "systemProgram", "isMut": false, "isSigner": false }
+      ],
+      "args": [
+        { "name": "lamports", "type": "u64" },
+        { "name": "quotaToAdd", "type": "u64" }
+      ]
+    },
+    {
       "name": "commitSnapshot",
       "accounts": [
         { "name": "userQuota", "isMut": true, "isSigner": false },
@@ -79,6 +92,16 @@
       "fields": [
         { "name": "user", "type": "publicKey", "index": false },
         { "name": "tokenAmount", "type": "u64", "index": false },
+        { "name": "quotaAdded", "type": "u64", "index": false },
+        { "name": "totalAvailable", "type": "u64", "index": false },
+        { "name": "timestamp", "type": "i64", "index": false }
+      ]
+    },
+    {
+      "name": "QuotaPurchasedWithSolEvent",
+      "fields": [
+        { "name": "user", "type": "publicKey", "index": false },
+        { "name": "lamports", "type": "u64", "index": false },
         { "name": "quotaAdded", "type": "u64", "index": false },
         { "name": "totalAvailable", "type": "u64", "index": false },
         { "name": "timestamp", "type": "i64", "index": false }
