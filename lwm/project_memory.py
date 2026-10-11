@@ -27,6 +27,15 @@ from typing import Any, Iterable, Literal
 from lwm.privacy import SECRET_PATTERNS
 
 
+def timestamp_key(value: str) -> datetime:
+    """Compare instants across native host timezone spellings; legacy naive is UTC."""
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return datetime.min.replace(tzinfo=timezone.utc)
+    return parsed.replace(tzinfo=timezone.utc) if parsed.tzinfo is None else parsed.astimezone(timezone.utc)
+
+
 # ---------------------------------------------------------------------------
 # Durable event admission contract
 #
@@ -106,7 +115,7 @@ class EventAdmission:
     section: str | None
 
 
-def _bounded_items(value: Any) -> tuple[str, ...]:
+def _bounded_items(value: Any, *, max_chars: int = MAX_ITEM_CHARS) -> tuple[str, ...]:
     """Normalize a structured field into bounded, non-empty text items."""
 
     if value is None:
@@ -125,7 +134,7 @@ def _bounded_items(value: Any) -> tuple[str, ...]:
         text = " ".join(str(entry).split()).strip()
         if not text:
             continue
-        items.append(text[:MAX_ITEM_CHARS])
+        items.append(text[:max_chars])
     return tuple(items)
 
 
@@ -316,11 +325,19 @@ def _durable_text(event: dict[str, Any], section: str) -> str:
     labels = {
         "decisions": "decisions",
         "changes": "changes",
-        "verification": "verified",
+        "verification": "verification evidence",
         "risks": "risks",
     }
     for key in keys:
-        items = _bounded_items(event.get(key))
+        value = event.get(key)
+        if key == "verification" and event.get("tool") == "antigravity":
+            from adapters.hooks._common import agy_observed_output
+
+            if isinstance(value, str):
+                value = agy_observed_output(value)
+            elif isinstance(value, (list, tuple)):
+                value = [agy_observed_output(item) if isinstance(item, str) else item for item in value]
+        items = _bounded_items(value, max_chars=1000 if key == "verification" else MAX_ITEM_CHARS)
         if not items:
             continue
         budget = (MAX_ENTRY_CHARS - 2 * (len(items) - 1)) // len(items)
@@ -468,7 +485,7 @@ def render_project_page(
     def render_section(name: str, label: str, *, reverse: bool = True) -> str:
         items = entries.get(name) or []
         # Deterministic ordering: timestamp first, event_id as tiebreaker.
-        ordered = sorted(items, key=lambda e: (e.timestamp, e.event_id), reverse=reverse)
+        ordered = sorted(items, key=lambda e: (timestamp_key(e.timestamp), e.event_id), reverse=reverse)
         limit = SECTION_LIMITS.get(name)
         if limit is not None:
             ordered = ordered[:limit]
@@ -627,7 +644,7 @@ def append_event(root: Path, event: dict[str, Any]) -> Path | None:
 
     last_event = event
     previous = re.search(r"^Last event: (.*?) @ (.*?)$", original, re.MULTILINE)
-    if previous and previous[2] > str(event.get("timestamp") or ""):
+    if previous and timestamp_key(previous[2]) > timestamp_key(str(event.get("timestamp") or "")):
         task = re.search(r"^Last task: (.*)$", original, re.MULTILINE)
         last_event = {
             "event_type": previous[1],
@@ -865,7 +882,7 @@ def load_processed_events(
         loaded.append((path, payload))
     loaded.sort(
         key=lambda item: (
-            str(item[1].get("timestamp") or ""),
+            timestamp_key(str(item[1].get("timestamp") or "")),
             _stable_event_id(item[1]),
         )
     )
@@ -920,7 +937,7 @@ def aggregate_project_pages(
         _add_event_entries(sections, normalized, evidence)
 
         timestamp = str(event.get("timestamp") or "")
-        if timestamp >= pages[project_id][2]:
+        if timestamp_key(timestamp) >= timestamp_key(pages[project_id][2]):
             pages[project_id] = (sections, normalized, timestamp)
 
     return pages
@@ -952,7 +969,7 @@ def reconcile_forgotten_event(root: Path, project_id: str, event_id: str) -> boo
     ]
     newest = max(
         surviving,
-        key=lambda event: (str(event.get("timestamp") or ""), str(event.get("event_id") or "")),
+        key=lambda event: (timestamp_key(str(event.get("timestamp") or "")), str(event.get("event_id") or "")),
         default=None,
     )
     last_task = _bounded_task((newest or {}).get("task")) or "(no task recorded)"

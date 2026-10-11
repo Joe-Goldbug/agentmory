@@ -1,5 +1,8 @@
 import type { Plugin } from "@opencode-ai/plugin"
 import { homedir } from "node:os"
+import { createHash } from "node:crypto"
+import { mkdirSync, existsSync, writeFileSync, renameSync } from "node:fs"
+import { join, resolve } from "node:path"
 
 const ROOT = process.env.LWM_ROOT ?? `${homedir()}/Library/Application Support/llm-workmem-runtime/llm-workmem`
 const LWM = process.env.LWM_BIN ?? `${homedir()}/Library/Application Support/llm-workmem-runtime/app/venv/bin/lwm`
@@ -12,6 +15,32 @@ export const LlmWorkmemPlugin: Plugin = async ({ directory, $, client }) => {
   const turns = new Map<string, Turn>()
   const parents = new Map<string, { sessionID: string; parentID: string }>()
   const counts = { messages: 0, parts: 0, matches: 0, sdkMessages: 0 }
+  let identity: { project_id: string; project_path: string } | undefined
+  const persistResults = (id: string, turn: Turn): boolean => {
+    if (!identity || (!turn.results.size && !turn.reports.size)) return false
+    const hex = createHash("sha256").update(`opencode:${id}:${turn.id}`).digest("hex")
+    const eventId = `${hex.slice(0, 8)}-${hex.slice(8, 12)}-5${hex.slice(13, 16)}-8${hex.slice(17, 20)}-${hex.slice(20, 32)}`
+    const timestamp = new Date().toISOString()
+    const target = join(ROOT, "raw", "events", "inbox", timestamp.slice(0, 10), `${eventId}.json`)
+    const event = { schema_version: 2, event_id: eventId, timestamp, tool: "opencode",
+      project_id: identity.project_id, project_path: identity.project_path,
+      event_type: turn.results.size ? "verification" : "project_status", importance: "project", privacy: "sanitized",
+      task: "Observed OpenCode turn results", task_id: `opencode:${id}:${turn.id}`, session_id: id,
+      decisions: [], changes: [], files_touched: [], verification: Array.from(turn.results.values()).slice(-8),
+      risks: Array.from(turn.reports.values()).slice(-8), open_questions: ["Task completion and claim support are unknown unless explicitly verified."],
+      source: { kind: "native-plugin-outbox", path: "opencode/native-message-results", capture: counts },
+      tags: ["opencode", "structured-summary", "native-outbox"] }
+    try {
+      const body = JSON.stringify(event)
+      if (Buffer.byteLength(body) > 16384) return false
+      mkdirSync(join(ROOT, "raw", "events", "inbox", timestamp.slice(0, 10)), { recursive: true, mode: 0o700 })
+      if (existsSync(target)) return true
+      const temporary = `${target}.${process.pid}.tmp`
+      writeFileSync(temporary, body, { flag: "wx", mode: 0o600 })
+      renameSync(temporary, target)
+      return true
+    } catch { return false }
+  }
   const captureParts = (turn: Turn, parts: any[]) => {
     for (const part of parts) {
       if (part.type === "tool" && (part.state?.status === "completed" || part.state?.status === "error")) {
@@ -25,7 +54,14 @@ export const LlmWorkmemPlugin: Plugin = async ({ directory, $, client }) => {
   }
   const bridge = async (request: Record<string, unknown>) => {
     try {
-      return await $`env LWM_HOST_BRIDGE=1 ${LWM} hub bridge ${JSON.stringify(request)} --root ${ROOT}`.quiet().nothrow()
+      const result = await $`env LWM_HOST_BRIDGE=1 ${LWM} hub bridge ${JSON.stringify(request)} --root ${ROOT}`.quiet().nothrow()
+      if (result.exitCode === 0) {
+        try {
+          const response = JSON.parse(result.text())
+          if (typeof response.project_id === "string" && /^[a-zA-Z0-9_-]+$/.test(response.project_id) && typeof response.project_path === "string" && (resolve(directory) === resolve(response.project_path) || resolve(directory).startsWith(resolve(response.project_path) + "/"))) identity = response
+        } catch {}
+      }
+      return result
     } catch { return undefined }
   }
   const sessionID = (event: unknown): string => {
@@ -69,7 +105,8 @@ export const LlmWorkmemPlugin: Plugin = async ({ directory, $, client }) => {
         }
       } catch { /* The host must remain usable if local observation fails. */ }
     }
-    const result = await lifecycle("stop", event, turn)
+    const persisted = persistResults(id, turn)
+    const result = await lifecycle("stop", event, persisted ? { ...turn, results: new Map(), reports: new Map() } : turn)
     // A failed local bridge may retry on the next callback; successful idle,
     // error and deleted callbacks share the same native message identity.
     if (!result || result.exitCode !== 0) turn.finalized = false

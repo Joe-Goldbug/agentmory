@@ -62,6 +62,17 @@ def _assistant_report(value: str) -> str:
     return value.split("<think>", 1)[0].strip()
 
 
+def agy_observed_output(value: str) -> str:
+    """Keep native file values and source ahead of AGY presentation metadata."""
+    file_path = re.search(r"(?m)^File Path: .+$", value)
+    file_lines = re.findall(r"(?m)^\d+: ?(.*)$", value)
+    if not file_path or "\nShowing lines " not in value or not file_lines:
+        return value
+    prefix = "Observed AGY step output (status unknown): "
+    observed = prefix if value.startswith(prefix) else ""
+    return observed + file_path[0][:240] + "\n" + "\n".join(file_lines)
+
+
 def host_results(payload: Mapping[str, Any], *, host: str) -> dict[str, Any] | None:
     """Extract bounded observed outputs, not user requests or inferred success.
 
@@ -100,6 +111,7 @@ def host_results(payload: Mapping[str, Any], *, host: str) -> dict[str, Any] | N
     results: list[str] = []
     assistant = ""
     boundary = ""
+    native_turn = ""
     for row in rows[-160:]:
         if not isinstance(row, dict):
             continue
@@ -107,11 +119,25 @@ def host_results(payload: Mapping[str, Any], *, host: str) -> dict[str, Any] | N
         if not isinstance(msg, dict):
             continue
         kind = msg.get("type", row.get("type"))
+        if host == "antigravity" and kind in {"USER_INPUT", "EPHEMERAL_MESSAGE", "PLANNER_RESPONSE", "GENERIC"}:
+            # AGY's native JSONL is a step log, not a role-based chat transcript.
+            if kind == "USER_INPUT":
+                calls, results, assistant = {}, [], ""
+                boundary = str(row.get("step_index", ""))
+            elif row.get("status") == "DONE":
+                if kind == "GENERIC" and _text(row.get("content")):
+                    output = agy_observed_output(_text(row["content"]))
+                    results.append(f"Observed AGY step output (status unknown): {output}"[:1000])
+                elif kind == "PLANNER_RESPONSE":
+                    assistant = _text(row.get("content")) or assistant
+            continue
+        if kind in {"task_started", "turn_started"} or row.get("type") == "turn_context":
+            native_turn = str(msg.get("turn_id") or native_turn)
         role = msg.get("role", row.get("type"))
         content = msg.get("content")
         blocks = content if isinstance(content, list) else []
         is_result = any(isinstance(b, dict) and b.get("type") == "tool_result" for b in blocks)
-        if (role in {"user", "human"} and not is_result) or kind in {"user_message", "turn_started"}:
+        if (role in {"user", "human"} and not is_result) or kind in {"user_message", "turn_started", "task_started"}:
             calls, results, assistant = {}, [], ""
             boundary = str(row.get("uuid") or msg.get("turn_id") or row.get("timestamp") or "")
         if role == "assistant" or kind == "agent_message":
@@ -145,9 +171,11 @@ def host_results(payload: Mapping[str, Any], *, host: str) -> dict[str, Any] | N
         "risks": [f"Assistant report (unverified): {assistant}"[:240]] if assistant else [],
         "open_questions": ["Task completion and claim support are unknown unless explicitly verified."],
     }
-    turn = payload.get("turn_id") or payload.get("executionNum") or boundary
+    turn = payload.get("turn_id") or payload.get("executionNum") or native_turn or boundary
     fingerprint = hashlib.sha256(json.dumps(summary, sort_keys=True).encode()).hexdigest()[:24]
     summary["task_id"] = f"{host}:{turn or fingerprint}"
+    if host == "antigravity" and payload.get("conversationId"):
+        summary["task_id"] = f"{host}:{payload['conversationId']}:{turn or fingerprint}"
     return summary
 
 

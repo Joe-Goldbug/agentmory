@@ -170,6 +170,7 @@ def _structured_event_from_summary(
         timestamp=payload["timestamp"],
         task=task,
         task_id=task_id,
+        session_id=payload.get("session_id"),
         handoff_id=handoff_id,
         source_receipt_id=payload["event_id"],
         decisions=decisions,
@@ -274,6 +275,26 @@ def stop(
         source_timestamp=source_timestamp,
     )
     canonical_tool = str(payload["tool"])
+    structured_event = None
+    if handoff_summary is not None:
+        try:
+            bounded = dict(handoff_summary)
+            for field in ("decisions", "changes", "risks", "open_questions", "verifications"):
+                value = handoff_summary.get(field) or (
+                    handoff_summary.get("verification") if field == "verifications" else None
+                ) or []
+                if not isinstance(value, (list, tuple)) or any(not isinstance(item, str) for item in value):
+                    raise ValueError(f"{field} must contain strings")
+                bounded[field] = [item.strip()[:1000] for item in value[:8] if item.strip()]
+            structured_event = _structured_event_from_summary(
+                payload=payload, tool=canonical_tool, source=source,
+                summary=bounded, handoff_id="", task_id=task_id or "",
+            )
+            if structured_event is not None:
+                # Work survives host teardown even if receipts/handoff cannot finish.
+                inbox.submit_event(root, structured_event)
+        except (OSError, TypeError, ValueError):
+            structured_event = None
     capabilities.record(
         root,
         tool=canonical_tool,
@@ -300,14 +321,13 @@ def stop(
             )
             handoff_id = packet.handoff_id
             handoff_created = True
-            structured_event = _structured_event_from_summary(
-                payload=payload,
-                tool=canonical_tool,
-                source=source,
-                summary=handoff_summary,
-                handoff_id=packet.handoff_id,
-                task_id=packet.task_id,
-            )
+            if structured_event is None:
+                structured_event = _structured_event_from_summary(
+                    payload=payload, tool=canonical_tool, source=source,
+                    summary=handoff_summary, handoff_id=packet.handoff_id, task_id=packet.task_id,
+                )
+            else:
+                structured_event = {**structured_event, "handoff_id": packet.handoff_id, "task_id": packet.task_id}
             if structured_event is not None:
                 _submit_work(root, structured_event, source)
                 from lwm.handoff import append_handoff_evidence
@@ -320,21 +340,10 @@ def stop(
         except (OSError, TypeError, ValueError) as exc:
             # A malformed summary must not break the host tool's stop hook.
             warning = f"handoff not created: {exc}"
-            # A different active task stays authoritative; results for this
-            # turn are still evidence, not an instruction to replace it.
-            if isinstance(exc, ValueError) and "active handoff belongs" in str(exc):
-                from lwm.handoff import _summary_items
-
-                bounded = dict(handoff_summary)
-                for field in ("decisions", "changes", "risks", "open_questions"):
-                    bounded[field] = _summary_items(handoff_summary, field)
-                bounded["verifications"] = _summary_items(handoff_summary, "verifications", "verification")
-                structured_event = _structured_event_from_summary(
-                    payload=payload, tool=canonical_tool, source=source,
-                    summary=bounded, handoff_id="", task_id=task_id or "",
-                )
-                if structured_event is not None:
-                    _submit_work(root, structured_event, source)
+            # Evidence and a compact handoff have different size contracts.
+            # A rejected handoff never discards a valid observed work event.
+            if structured_event is not None:
+                _submit_work(root, structured_event, source)
     return LifecycleResult(
         payload["project_path"],
         payload["project_id"],

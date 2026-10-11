@@ -1,9 +1,9 @@
 """Antigravity ``hooks.json`` bridge.
 
 Antigravity sends hook payloads on stdin and expects JSON on stdout.  The
-adapter deliberately forwards only the workspace and conversation identity;
-the model name and transcript paths are host metadata, not LLM-WorkMem
-evidence.
+adapter forwards workspace/conversation identity and bounded observed results
+from the native transcript. Requests, ephemeral context, model metadata and
+internal reasoning are not durable evidence.
 """
 
 from __future__ import annotations

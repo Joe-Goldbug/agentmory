@@ -48,7 +48,7 @@ RETRY_DIR = Path("state/analysis/retry")
 
 CONFIG_PATH = Path("state/analysis/config.json")
 PROJECT_DRAFTS_DIR = Path("state/analysis/projects")
-PROMPT_VERSION = 3
+PROMPT_VERSION = 4
 DEFAULT_TIMEOUT_SECONDS = 30
 DEFAULT_DAILY_TOKEN_BUDGET = 50_000
 DEFAULT_MAX_ATTEMPTS = 3
@@ -56,6 +56,7 @@ RETRY_BACKOFF = (60, 300, 1800)
 MAX_PROVIDER_RESPONSE_BYTES = 256 * 1024
 DEFAULT_REQUEST_TOKEN_BUDGET = 16_000
 OUTPUT_TOKEN_ALLOWANCE = 1200
+RESULT_TEXT_BYTE_LIMITS = {"claim": 240, "context": 600, "uncertainty": 360}
 CONFIGURATION_FAILURES = frozenset(
     {
         "analysis_disabled",
@@ -98,11 +99,12 @@ CandidateState = Literal[
     "promotion_pending",
     "promoted",
     "dead_letter",
+    "retired",
 ]
 
 VALID_TRANSITIONS: dict[str, frozenset[str]] = {
-    "pending_analysis": frozenset({"analyzing", "retry_wait", "dead_letter"}),
-    "retry_wait": frozenset({"analyzing", "dead_letter"}),
+    "pending_analysis": frozenset({"analyzing", "retry_wait", "dead_letter", "retired"}),
+    "retry_wait": frozenset({"analyzing", "dead_letter", "retired"}),
     "analyzing": frozenset({"analyzed", "retry_wait", "pending_analysis", "dead_letter"}),
     "analyzed": frozenset({"accepted", "rejected", "promotion_pending", "pending_analysis"}),
     "accepted": frozenset({"promotion_pending"}),
@@ -110,6 +112,7 @@ VALID_TRANSITIONS: dict[str, frozenset[str]] = {
     "rejected": frozenset(),
     "promoted": frozenset(),
     "dead_letter": frozenset(),
+    "retired": frozenset({"pending_analysis"}),
 }
 
 
@@ -293,9 +296,7 @@ def analysis_usability(
         "auth_verified": False,
         "human_review_required": True,
         "hard_provider_token_cap": config.provider != "codex_cli",
-        "budget_policy": "reserve_request_budget_and_reconcile_usage"
-        if config.provider == "codex_cli"
-        else "reserve_input_estimate_and_capped_output",
+        "budget_policy": "reserve_input_estimate_and_output_allowance",
         "internal_job_env": "LWM_ANALYSIS_JOB=1",
     }
 
@@ -730,6 +731,9 @@ def validate_provider_payload(payload: dict[str, Any], *, candidate: Candidate) 
     for field in ("context", "uncertainty"):
         if field in payload and not isinstance(payload[field], str):
             return False, f"invalid_provider_{field}"
+    for field, limit in RESULT_TEXT_BYTE_LIMITS.items():
+        if field in payload and len(payload[field].encode("utf-8")) > limit:
+            return False, f"provider_{field}_limit_exceeded"
     if "validity" in payload and payload["validity"] not in {
         "current",
         "time_bounded",
@@ -983,7 +987,13 @@ def build_analysis_request(
         # Full coverage is retained in the local receipt. Repeated ID arrays
         # add no provider information beyond candidate and evidence IDs.
         "coverage": {key: coverage[key] for key in ("complete", "missing_ids", "compressed_ids")},
+        "result_text_byte_limits": RESULT_TEXT_BYTE_LIMITS,
     }
+    payload["instructions"] += (
+        " Produce concise semantic summaries within result_text_byte_limits (UTF-8 bytes), "
+        "not verbatim transcripts. Preserve failed checks, counterexamples, scope and uncertainty; "
+        "source ID coverage does not mean every original word was delivered."
+    )
     prompt = json.dumps(_safe_json_strings(payload), ensure_ascii=False, sort_keys=True)
     return prompt, coverage
 
@@ -1054,12 +1064,14 @@ def classify_with_codex_cli(
         "required": sorted(PROVIDER_RESULT_FIELDS),
         "properties": {
             "kind": {"type": "string", "enum": ["workflow", "relationship", "conflict", "summary"]},
-            "claim": {"type": "string"},
+            # JSON Schema counts characters; local UTF-8 validation is stricter
+            # for non-ASCII output and applies equally to API/CLI/cache results.
+            "claim": {"type": "string", "maxLength": RESULT_TEXT_BYTE_LIMITS["claim"]},
             "scope": {"type": "array", "items": {"type": "string"}},
             "evidence_ids": {"type": "array", "items": {"type": "string"}},
             "counterevidence_ids": {"type": "array", "items": {"type": "string"}},
-            "context": {"type": "string"},
-            "uncertainty": {"type": "string"},
+            "context": {"type": "string", "maxLength": RESULT_TEXT_BYTE_LIMITS["context"]},
+            "uncertainty": {"type": "string", "maxLength": RESULT_TEXT_BYTE_LIMITS["uncertainty"]},
             "validity": {"type": "string", "enum": ["current", "time_bounded", "unknown"]},
         },
     }
@@ -1377,6 +1389,33 @@ def _bounded_analysis_request(
     return prompt, coverage
 
 
+def _retire_obsolete_reducers(root: Path, parent_id: str) -> None:
+    candidates = {path.stem: item for path in (root / ANALYSIS_DIR).glob("*.json")
+                  if (item := load_candidate(root, path.stem)) is not None}
+    # Completed/human-reviewed content also owns its dependencies, even if a
+    # newer root plan no longer references that completed subtree.
+    owners = {"analyzing", "analyzed", "accepted", "rejected", "promotion_pending",
+              "promoted", "dead_letter"}
+    todo = [cid for cid, item in candidates.items() if item.state != "retired" and (
+        not item.analysis_parent_id or item.state in owners
+    )]
+    reachable: set[str] = set()
+    while todo:
+        cid = todo.pop()
+        if cid in reachable:
+            continue
+        reachable.add(cid)
+        if cid in candidates:
+            todo.extend(candidates[cid].analysis_inputs)
+    for cid, item in candidates.items():
+        if (cid not in reachable and cid.startswith("batch-")
+                and item.analysis_parent_id == parent_id and item.analysis_inputs
+                and item.state in {"pending_analysis", "retry_wait"}):
+            record_transition(root, cid, from_state=item.state, to_state="retired",
+                              note="obsolete unprocessed reducer after plan commit")
+            save_candidate(root, replace(item, state="retired"))
+
+
 def _analysis_batch_plan(
     root: Path, candidate: Candidate, evidence: list[dict[str, Any]], config: AnalysisConfig
 ) -> list[str]:
@@ -1438,6 +1477,10 @@ def _analysis_batch_plan(
                 and leaf.analysis_evidence_hash != _hash_evidence(sanitize_evidence(items)))
         ):
             continue
+        if leaf.state in {"pending_analysis", "retry_wait"}:
+            prompt, _ = _bounded_analysis_request(fresh, items, config)
+            if estimate_tokens(prompt) + OUTPUT_TOKEN_ALLOWANCE > config.request_token_budget:
+                continue
         level.append((leaf, items))
         used.update(ids)
     level.sort(key=lambda pair: source_order(pair[1][0]))
@@ -1473,9 +1516,15 @@ def _analysis_batch_plan(
             following.append((merged, items))
         level = following
     for child in nodes:
-        if load_candidate(root, child.candidate_id) is None:
+        existing = load_candidate(root, child.candidate_id)
+        if existing is None:
             save_candidate(root, child)
+        elif existing.state == "retired":
+            record_transition(root, child.candidate_id, from_state="retired",
+                              to_state="pending_analysis", note="current plan reuses retired reducer")
+            save_candidate(root, replace(existing, state="pending_analysis"))
     save_candidate(root, replace(candidate, analysis_inputs=tuple(child.candidate_id for child, _ in level)))
+    _retire_obsolete_reducers(root, candidate.candidate_id)
     return [child.candidate_id for child in nodes]
 
 
@@ -1500,6 +1549,9 @@ def _analysis_merge_request(
             or _hash_evidence(sanitize_evidence(evidence)) != child.analysis_evidence_hash
         ):
             return None
+        if any(len(getattr(child, field).encode("utf-8")) > limit
+               for field, limit in RESULT_TEXT_BYTE_LIMITS.items()):
+            raise ValueError("merge_summary_limits_exceeded")
         rows.append({
             "event_id": child.candidate_id, "kind": child.kind, "claim": child.claim,
             "scope": list(child.scope), "context": child.context,
@@ -1514,7 +1566,10 @@ def _analysis_merge_request(
     payload = json.loads(prompt)
     payload["stage"] = "merge"
     payload["evidence"] = rows
-    payload["coverage"] = {"complete": True, "missing_ids": [], "compressed_ids": []}
+    payload["coverage"] = {
+        "complete": True, "missing_ids": [], "compressed_ids": [],
+        "source_partition_complete": True, "semantic_summary": True, "verbatim_text": False,
+    }
     payload["instructions"] += (
         " This is synthesis of all supplied child analyses, not raw events. "
         "Use child event_id aliases in the output; their full source partitions are expanded locally. "
@@ -1523,6 +1578,21 @@ def _analysis_merge_request(
         "its counterevidence cannot become support. Keep claim, context and uncertainty concise."
     )
     return proxy, json.dumps(payload, ensure_ascii=False, sort_keys=True), rows, children
+
+
+def _fail_analysis_dependency(
+    root: Path, candidate: Candidate, report: dict[str, Any], coverage: dict[str, Any],
+    *, reason: str, action: str, evidence_hash: str,
+) -> None:
+    updated = replace(candidate, state="dead_letter")
+    record_transition(root, candidate.candidate_id, from_state=candidate.state,
+                      to_state="dead_letter", note=reason, evidence_hash=evidence_hash)
+    save_candidate(root, updated)
+    _dead_letter(root, updated, reason=reason)
+    coverage.update(complete=False, delivered_ids=[], dispatched=False, reason=reason, action=action)
+    report["coverage"][candidate.candidate_id] = coverage
+    report["dead_letter"].append(candidate.candidate_id)
+    report["errors"].append(f"{reason}:{candidate.candidate_id}")
 
 
 def _analyze_pending_unlocked(
@@ -1635,7 +1705,27 @@ def _analyze_pending_unlocked(
         provider_evidence = evidence
         children: list[Candidate] = []
         if candidate.analysis_inputs and coverage["complete"]:
-            merge = _analysis_merge_request(root, candidate, events)
+            failed = [cid for cid in candidate.analysis_inputs
+                      if (child := load_candidate(root, cid)) and child.state == "dead_letter"]
+            if failed:
+                coverage["failed_input_candidate_ids"] = failed
+                _fail_analysis_dependency(
+                    root, candidate, report, coverage, reason="analysis_dependency_failed",
+                    action="Review failed children and explicitly requeue the affected tree after repair.",
+                    evidence_hash=evidence_hash,
+                )
+                continue
+            try:
+                merge = _analysis_merge_request(root, candidate, events)
+            except ValueError as exc:
+                if str(exc) != "merge_summary_limits_exceeded":
+                    raise
+                _fail_analysis_dependency(
+                    root, candidate, report, coverage, reason=str(exc),
+                    action="Explicitly reanalyze legacy children into bounded semantic summaries; do not truncate them.",
+                    evidence_hash=evidence_hash,
+                )
+                continue
             if merge is None:
                 coverage.update(complete=False, delivered_ids=[], dispatched=False,
                                 reason="analysis_batches_incomplete",
@@ -1651,6 +1741,13 @@ def _analyze_pending_unlocked(
         coverage["estimated_tokens"] = estimated_tokens
         coverage["request_token_budget"] = config.request_token_budget
         coverage["dispatched"] = False
+        if children and estimated_tokens > config.request_token_budget:
+            _fail_analysis_dependency(
+                root, candidate, report, coverage, reason="merge_budget_exceeded",
+                action="Review the complete scope/seed envelope or request limit and explicitly requeue; no IDs were dropped.",
+                evidence_hash=evidence_hash,
+            )
+            continue
         if not coverage["complete"] or estimated_tokens > config.request_token_budget:
             coverage["complete"] = False
             coverage["reason"] = (
@@ -1667,9 +1764,10 @@ def _analyze_pending_unlocked(
         cached = _read_cached(root, key=key)
         if cached is not None and not _safe_provider_result(cached, config):
             cached = None
-        reserved_tokens = 0 if cached is not None else (
-            config.request_token_budget if config.provider == "codex_cli" else estimated_tokens
-        )
+        # Codex has no upstream hard output cap. This is estimated admission,
+        # not enforcement; reconciliation may report usage above reservation.
+        reserved_tokens = 0 if cached is not None else estimated_tokens
+        coverage["reserved_tokens"] = reserved_tokens
         if cached is None and not reserve_daily_budget(
             root, token_count=reserved_tokens, budget=config.daily_token_budget
         ):
