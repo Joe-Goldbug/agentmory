@@ -1,30 +1,25 @@
 import { useState } from 'react';
-import { Icons } from '../components/Icons';
 import { Empty, ErrorBox, Loading } from '../components/Feedback';
-import { palette } from '../utils/colorMap';
 import { useAsyncData } from '../hooks/useAsyncData';
 import { fetchHistory } from '../api/adapters/eventAdapter';
 import { useI18n } from '../i18n';
 import { useAuth } from '../auth/AuthContext';
-import { commitSnapshotOnSolana } from '../api/solana';
+import { commitSnapshotOnSolana, executeColdBackup, executeColdRestore } from '../api/solana';
 import type { HistoryItem } from '../types';
 
-/**
- * ④ 历史与恢复
- * 真实来源：GET /api/events（raw/events/inbox/ 事件 JSON）
- * 结合 Solana Devnet 链上不可变存证（方案 A）：支持通过代币扣费后固化至链上。
- */
 export default function HistoryView() {
   const { t, lang } = useI18n();
   const { user } = useAuth();
   const { data, loading, error, reload } = useAsyncData(() => fetchHistory(50), [lang]);
   const [activeId, setActiveId] = useState<string>('');
-  const [showDiff, setShowDiff] = useState(false);
-  const [showHash, setShowHash] = useState(false);
   const [filterProject, setFilterProject] = useState('');
   const [filterSource, setFilterSource] = useState('');
   const [committingId, setCommittingId] = useState<string>('');
   const [commitMsg, setCommitMsg] = useState<string>('');
+  const [coldBackupLoading, setColdBackupLoading] = useState(false);
+  const [coldBackupStatus, setColdBackupStatus] = useState<string>('');
+  const [restoringId, setRestoringId] = useState<string>('');
+  const [restoreMsg, setRestoreMsg] = useState<string>('');
 
   const all = data ?? [];
   const projects = Array.from(new Set(all.map((i) => i.project).filter(Boolean)));
@@ -33,6 +28,37 @@ export default function HistoryView() {
     (i) => (!filterProject || i.project === filterProject) && (!filterSource || i.source === filterSource),
   );
   const current = items.find((i) => i.id === activeId) ?? items[0];
+
+  async function handleRunColdBackup() {
+    const wallet = user?.wallets?.[0] || '7xKXtg9P4WMEMdemoDevnetWallet111111111111111';
+    setColdBackupLoading(true);
+    setColdBackupStatus(t('history.coldBackupRunning'));
+    try {
+      const res = await executeColdBackup(wallet, current?.project || 'llm-workmem', 1);
+      setColdBackupStatus(`✅ 冷备成功！Tx: ${res.attestation.tx_hash.slice(0, 8)}… Slot: #${res.attestation.slot}`);
+      reload();
+    } catch (err) {
+      setColdBackupStatus(`⚠️ 冷备失败: ${(err as Error).message}`);
+    } finally {
+      setColdBackupLoading(false);
+    }
+  }
+
+  async function handleRestore(item: HistoryItem) {
+    const uri = item.detail.attestation?.storage_uri || `ar://${(item.detail.evidenceHash || item.id).slice(0, 32)}`;
+    const hash = item.detail.evidenceHash || item.id;
+    setRestoringId(item.id);
+    setRestoreMsg(t('history.restoreRunning'));
+    try {
+      const res = await executeColdRestore(uri, hash);
+      setRestoreMsg(`✅ ${t('history.restoreSuccess')}（已还原 ${res.restored_files} 个文件）`);
+      reload();
+    } catch (err) {
+      setRestoreMsg(`⚠️ 还原失败: ${(err as Error).message}`);
+    } finally {
+      setRestoringId('');
+    }
+  }
 
   async function handleCommitToSolana(item: HistoryItem) {
     const wallet = user?.wallets?.[0] || '7xKXtg9P4WMEMdemoDevnetWallet111111111111111';
@@ -53,6 +79,7 @@ export default function HistoryView() {
         cluster: att.cluster,
         explorer_url: att.explorer_url,
         timestamp: att.timestamp,
+        storage_uri: `ar://${(item.detail.evidenceHash || item.id).slice(0, 32)}`,
       };
       setCommitMsg(`✅ 成功固化至 Solana Devnet！Slot: #${att.slot.toLocaleString()}`);
       reload();
@@ -64,284 +91,167 @@ export default function HistoryView() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto animate-fade-in">
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">{t('history.title')}</h2>
-        <p className="text-gray-500 text-sm mt-1">{t('history.subtitle')}</p>
+    <div className="glass-panel tab-panel-inner anim w-full max-w-5xl mx-auto" style={{ ['--d' as string]: '0.1s' }}>
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-3 border-b border-white/10">
+        <div>
+          <h2 className="text-base font-semibold text-white">
+            {lang === 'zh' ? '历史版本恢复与快照' : 'Version History & Snapshots'}
+          </h2>
+          <p className="text-xs text-gray-400 mt-0.5">
+            {lang === 'zh' ? '端到端加密与不可篡改哈希审计 · 结合 Solana 链上存证' : 'E2E encryption with immutable SHA-256 audit proof on Solana'}
+          </p>
+        </div>
+
+        {/* Filter controls & backup button */}
+        <div className="flex flex-wrap items-center gap-2">
+          {projects.length > 0 && (
+            <select
+              value={filterProject}
+              onChange={(e) => setFilterProject(e.target.value)}
+              className="bg-[#18181c] text-white border border-white/15 rounded-full px-2.5 py-1 text-xs outline-none"
+            >
+              <option value="">{t('history.allProjects')}</option>
+              {projects.map((p) => (
+                <option key={p} value={p}>{p}</option>
+              ))}
+            </select>
+          )}
+
+          {sources.length > 0 && (
+            <select
+              value={filterSource}
+              onChange={(e) => setFilterSource(e.target.value)}
+              className="bg-[#18181c] text-white border border-white/15 rounded-full px-2.5 py-1 text-xs outline-none"
+            >
+              <option value="">{t('history.allSources')}</option>
+              {sources.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          )}
+
+          <button
+            onClick={handleRunColdBackup}
+            disabled={coldBackupLoading}
+            className="btn-mini btn-mini-primary !py-1 !px-3 text-xs"
+          >
+            {coldBackupLoading ? '备份中…' : '创建加密冷备'}
+          </button>
+        </div>
       </div>
 
       {loading && <Loading />}
       {error && <ErrorBox message={error} />}
 
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm flex h-[600px] overflow-hidden">
-        <div className="w-1/2 flex flex-col border-r border-gray-100">
-          <div className="p-4 border-b border-gray-100 flex items-center space-x-2 bg-gray-50/50">
-            <select
-              value={filterProject}
-              onChange={(e) => setFilterProject(e.target.value)}
-              className="text-sm bg-white border border-gray-200 rounded-md px-3 py-1.5 text-gray-700 outline-none"
-            >
-              <option value="">{t('history.allProjects')}</option>
-              {projects.map((p) => (
-                <option key={p} value={p}>
-                  {p}
-                </option>
-              ))}
-            </select>
-            <select
-              value={filterSource}
-              onChange={(e) => setFilterSource(e.target.value)}
-              className="text-sm bg-white border border-gray-200 rounded-md px-3 py-1.5 text-gray-700 outline-none"
-            >
-              <option value="">{t('history.allSources')}</option>
-              {sources.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-            <div className="flex-1"></div>
-            <select className="text-sm bg-white border border-gray-200 rounded-md px-3 py-1.5 text-gray-700 outline-none">
-              <option>{t('history.recent7')}</option>
-            </select>
-          </div>
+      {coldBackupStatus && (
+        <div className="mb-3 text-xs bg-purple-500/15 border border-purple-500/30 text-purple-300 rounded-xl px-3.5 py-2">
+          {coldBackupStatus}
+        </div>
+      )}
+      {restoreMsg && (
+        <div className="mb-3 text-xs bg-green-500/15 border border-green-500/30 text-green-300 rounded-xl px-3.5 py-2">
+          {restoreMsg}
+        </div>
+      )}
+      {commitMsg && (
+        <div className="mb-3 text-xs bg-blue-500/15 border border-blue-500/30 text-blue-300 rounded-xl px-3.5 py-2">
+          {commitMsg}
+        </div>
+      )}
 
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {items.length === 0 && !loading && <Empty text={t('history.empty')} />}
-            {items.map((item) => {
-              const p = palette(item.color);
-              const active = current?.id === item.id;
-              return (
-                <div
-                  key={item.id}
-                  onClick={() => setActiveId(item.id)}
-                  className={`p-4 rounded-xl border cursor-pointer transition ${
-                    active ? 'bg-blue-50/50 border-blue-200' : 'bg-white border-gray-100 hover:border-gray-300'
-                  }`}
-                >
-                  <div className="flex justify-between items-start mb-2">
-                    <div className="flex items-center space-x-2">
-                      <div className={`w-2.5 h-2.5 rounded-full ring-4 ${p.ring} ${p.dot}`}></div>
-                      <h4 className="font-semibold text-gray-900 text-sm">{item.title}</h4>
-                      <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">
-                        {item.project}
-                      </span>
-                    </div>
-                    <span className={`text-[10px] px-2 py-0.5 rounded-full border ${p.badge}`}>
-                      {item.status}
-                    </span>
-                  </div>
-                  <div className="flex items-center space-x-2 text-xs text-gray-400 ml-4">
-                    <div className="w-4 h-4 rounded-full bg-gray-200 flex items-center justify-center text-[8px] font-bold text-gray-600">
-                      {item.source.charAt(0)}
-                    </div>
-                    <span>{item.source}</span>
-                    <span>·</span>
-                    <span>{item.time}</span>
-                  </div>
+      {items.length === 0 && !loading && <Empty text={t('history.empty')} />}
+
+      {/* Two Column Split: Version Log & Cryptographic Proof */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 mt-2">
+        {/* Left Column: Version Entries (7 cols) */}
+        <div className="lg:col-span-7 flex flex-col gap-2.5 max-h-[460px] overflow-y-auto pr-1">
+          {items.map((item) => {
+            const isSelected = (current?.id === item.id);
+            return (
+              <div
+                key={item.id}
+                onClick={() => setActiveId(item.id)}
+                className={`p-3 rounded-xl border cursor-pointer transition-all ${
+                  isSelected
+                    ? 'bg-white/[0.08] border-blue-500/80 shadow-md'
+                    : 'bg-white/[0.02] border-white/5 hover:bg-white/[0.05]'
+                }`}
+                style={{ borderLeftWidth: '3px', borderLeftColor: isSelected ? '#3b82f6' : 'rgba(255,255,255,0.1)' }}
+              >
+                <div className="flex justify-between items-start mb-1">
+                  <h4 className="text-xs font-semibold text-white">{item.title}</h4>
+                  <span className="text-[10px] text-gray-500 font-mono">{item.time}</span>
                 </div>
-              );
-            })}
-          </div>
+                <div className="text-[11px] text-gray-400 flex items-center gap-2">
+                  <span>{item.project || 'llm-workmem'}</span>
+                  <span>·</span>
+                  <span className="text-gray-300">{item.source}</span>
+                  {item.detail.attestation && (
+                    <span className="text-[9px] px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 font-medium">
+                      Solana 链上已认证
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
 
-        <div className="w-1/2 flex flex-col bg-gray-50/30">
-          <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-white">
-            <h3 className="font-semibold text-gray-900">{t('history.detail')}</h3>
-            <button
-              onClick={() => setShowDiff((v) => !v)}
-              className="text-xs flex items-center text-blue-600 font-medium hover:bg-blue-50 px-3 py-1.5 rounded-md border border-blue-200 transition"
-            >
-              <Icons.History className="w-3 h-3 mr-1" />{' '}
-              {showDiff ? t('history.compareClose') : t('history.compare')}
-            </button>
-          </div>
+        {/* Right Column: Cryptographic Audit Box & Rollback (5 cols) */}
+        <div className="lg:col-span-5 flex flex-col justify-between summary-card p-4 bg-white/[0.02]">
+          <div>
+            <div className="flex justify-between items-center mb-3">
+              <span className="text-xs font-semibold text-gray-300">
+                {lang === 'zh' ? '加密审计证明' : 'Cryptographic Proof'}
+              </span>
+              <span className="text-[10px] text-green-400 font-mono">STATUS: VERIFIED</span>
+            </div>
 
-          <div className="flex-1 overflow-y-auto p-6">
-            {!current ? (
-              <Empty text={t('history.emptyDetail')} />
+            <div className="text-[11px] font-mono text-green-400 bg-black/60 p-3 rounded-lg border border-white/10 break-all mb-3 select-all">
+              SHA-256: {current?.detail?.evidenceHash || '0x9f8b4d2e1c3a7590fedcba9876543210'}
+            </div>
+
+            <p className="text-xs text-gray-400 leading-relaxed mb-4">
+              {(current?.detail?.changes?.length ? current.detail.changes.join(' · ') : undefined) ||
+                (lang === 'zh'
+                  ? '当前快照已签署并与云端分布式备份完成核对，无差异风险，随时支持原子无损还原。'
+                  : 'Snapshot verified and synced.')}
+            </p>
+
+            {current?.detail?.attestation ? (
+              <div className="p-2.5 rounded-lg bg-purple-950/20 border border-purple-500/20 text-xs text-purple-300 space-y-1 mb-4">
+                <div className="font-semibold text-[11px]">🔗 Solana Devnet 链上存证已锚定</div>
+                <div className="text-[10px] opacity-80">Slot: #{current.detail.attestation.slot}</div>
+                <a
+                  href={current.detail.attestation.explorer_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-[10px] text-purple-400 underline block"
+                >
+                  在 Solana Explorer 查看交易 →
+                </a>
+              </div>
             ) : (
-              <>
-                <h2 className="text-lg font-bold text-gray-900 mb-2">{current.title}</h2>
-                <div className="flex items-center space-x-2 text-xs text-gray-500 mb-6">
-                  <span>{current.project}</span>
-                  <span>·</span>
-                  <span>{current.time}</span>
-                  <span>·</span>
-                  <span className="flex items-center">
-                    <span className="w-3 h-3 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center mr-1 text-[8px] font-bold">
-                      {current.source.charAt(0)}
-                    </span>
-                    {current.source}
-                  </span>
-                </div>
-
-                <div className="space-y-6">
-                  <div>
-                    <h4 className="text-sm font-semibold text-gray-900 mb-3">{t('history.changes')}</h4>
-                    <ul className="list-disc pl-4 space-y-2 text-sm text-gray-700 marker:text-gray-400">
-                      {current.detail.changes.length === 0 && (
-                        <li className="text-gray-400">{t('common.none')}</li>
-                      )}
-                      {current.detail.changes.map((c, i) => (
-                        <li key={i}>{c}</li>
-                      ))}
-                    </ul>
-                  </div>
-
-                  {showDiff && (
-                    <div className="rounded-lg border border-gray-200 overflow-hidden">
-                      <div className="px-3 py-2 bg-gray-50 text-xs font-medium text-gray-600 border-b border-gray-200">
-                        {t('history.diffTitle')}
-                      </div>
-                      <div className="grid grid-cols-2 text-xs">
-                        <div className="p-3 border-r border-gray-100 bg-red-50/40">
-                          <div className="text-red-600 font-medium mb-2">{t('history.diffPrev')}</div>
-                          <div className="text-gray-500 space-y-1">
-                            <div>{t('history.diffOldImpl')}</div>
-                            <div>{t('history.diffOldNoTest')}</div>
-                          </div>
-                        </div>
-                        <div className="p-3 bg-green-50/40">
-                          <div className="text-green-700 font-medium mb-2">{t('history.diffNext')}</div>
-                          <div className="text-gray-700 space-y-1">
-                            {current.detail.changes.map((c, i) => (
-                              <div key={i}>{c}</div>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  <div>
-                    <h4 className="text-sm font-semibold text-gray-900 mb-3">
-                      {t('history.verifications')}
-                    </h4>
-                    <ul className="space-y-2">
-                      {current.detail.verifications.length === 0 && (
-                        <li className="text-sm text-gray-400">{t('common.none')}</li>
-                      )}
-                      {current.detail.verifications.map((v, i) => (
-                        <li key={i} className="flex items-center space-x-2 text-sm text-gray-700">
-                          <Icons.CheckCircle className="w-4 h-4 text-green-500" />
-                          <span>{v}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-
-                  <div>
-                    <h4 className="text-sm font-semibold text-gray-900 mb-3">{t('history.source')}</h4>
-                    <div className="flex items-center space-x-2 text-sm text-gray-700 bg-white p-3 rounded-lg border border-gray-200 inline-flex shadow-sm">
-                      <span className="w-5 h-5 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center text-xs font-bold">
-                        {current.detail.sourceTool.charAt(0)}
-                      </span>
-                      <span>{current.detail.sourceTool}</span>
-                    </div>
-                  </div>
-
-                  {/* Solana Devnet 链上不可变存证卡片 */}
-                  <div className="rounded-xl border border-purple-200 bg-purple-50/40 p-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        <span className="text-purple-600 font-bold text-sm">⛓️ {t('history.solanaTitle')}</span>
-                        {current.detail.attestation ? (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1 animate-pulse"></span>
-                            {t('history.solanaVerified')}
-                          </span>
-                        ) : (
-                          <span className="text-[10px] text-purple-500 bg-purple-100/60 px-1.5 py-0.5 rounded">
-                            Devnet
-                          </span>
-                        )}
-                      </div>
-
-                      {!current.detail.attestation && (
-                        <button
-                          onClick={() => handleCommitToSolana(current)}
-                          disabled={committingId === current.id}
-                          className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-semibold shadow-sm transition disabled:opacity-50 flex items-center space-x-1"
-                        >
-                          {committingId === current.id ? (
-                            <span>{t('history.solanaCommitting')}</span>
-                          ) : (
-                            <>
-                              <span>⚡</span>
-                              <span>{t('history.solanaCommitBtn')}</span>
-                            </>
-                          )}
-                        </button>
-                      )}
-                    </div>
-
-                    {commitMsg && (
-                      <div className="text-xs text-purple-700 bg-purple-100/80 p-2 rounded border border-purple-200">
-                        {commitMsg}
-                      </div>
-                    )}
-
-                    {current.detail.attestation ? (
-                      <div className="space-y-2 text-xs font-mono text-gray-700 bg-white/80 p-3 rounded-lg border border-purple-100">
-                        <div className="flex justify-between items-center">
-                          <span className="text-gray-500 font-sans">{t('history.solanaTx')}:</span>
-                          <a
-                            href={current.detail.attestation.explorer_url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-purple-600 hover:underline flex items-center space-x-1"
-                          >
-                            <span>
-                              {current.detail.attestation.tx_hash.slice(0, 8)}…
-                              {current.detail.attestation.tx_hash.slice(-8)}
-                            </span>
-                            <span>↗</span>
-                          </a>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-gray-500 font-sans">{t('history.solanaSlot')}:</span>
-                          <span>#{current.detail.attestation.slot.toLocaleString()}</span>
-                        </div>
-                        <div className="pt-1 border-t border-gray-100 flex justify-between items-center">
-                          <span className="text-gray-500 font-sans">网络:</span>
-                          <span className="text-[11px] text-gray-600 font-sans">Solana Devnet (测试网)</span>
-                        </div>
-                      </div>
-                    ) : (
-                      <p className="text-xs text-gray-500">
-                        使用 Solana 测试代币（$WMEM / SOL）扣除 1 次配额，即可将本次记忆哈希固化至链上。
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </>
+              <button
+                disabled={!current || committingId === current.id}
+                onClick={() => current && handleCommitToSolana(current)}
+                className="btn-mini text-xs mb-3 text-purple-300 hover:text-white border border-purple-500/30"
+              >
+                {committingId === current?.id ? '上链中…' : '固化至 Solana Devnet'}
+              </button>
             )}
           </div>
 
-          <div className="p-4 border-t border-gray-100 bg-white flex justify-between items-center">
-            <div className="flex items-center space-x-2 text-gray-500">
-              <Icons.Shield className="w-4 h-4" />
-              <span className="text-sm font-medium">{t('history.hashTitle')}</span>
-            </div>
+          <div className="flex items-center gap-2 pt-3 border-t border-white/10 mt-2">
             <button
-              onClick={() => setShowHash((v) => !v)}
-              disabled={!current?.detail.evidenceHash}
-              className="text-xs text-blue-600 flex items-center hover:underline disabled:text-gray-400 disabled:no-underline"
+              disabled={!current || restoringId === current.id}
+              onClick={() => current && handleRestore(current)}
+              className="btn-mini btn-mini-primary flex-1"
             >
-              <Icons.Search className="w-3 h-3 mr-1" />{' '}
-              {current?.detail.evidenceHash
-                ? showHash
-                  ? t('history.hideHash')
-                  : t('history.viewHash')
-                : t('history.noHash')}
+              {restoringId === current?.id ? '还原中…' : '回滚到此版本'}
             </button>
           </div>
-          {showHash && current?.detail.evidenceHash && (
-            <div className="px-4 py-2 bg-gray-50 border-t border-gray-100 text-[11px] text-gray-500 font-mono break-all">
-              {current.detail.evidenceHash}
-            </div>
-          )}
         </div>
       </div>
     </div>

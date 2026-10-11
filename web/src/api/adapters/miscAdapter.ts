@@ -34,23 +34,18 @@ export async function fetchTeams(): Promise<TeamState> {
   if (USE_MOCK) return getMocks().TEAM;
   try {
     const t = await request<TeamState>(ENDPOINTS.teams);
-    // 后端无多用户模型；空成员时回退演示成员，保证成员表/权限交互可展示
-    if (!t.members || t.members.length === 0) return { ...getMocks().TEAM, available: true };
-    return t;
+    return t || { available: false, members: [] };
   } catch {
-    return { ...getMocks().TEAM, available: true };
+    return { available: false, members: [] };
   }
 }
 
 export async function fetchSubscription(): Promise<PlanItem[]> {
   if (USE_MOCK) return getMocks().PLANS;
   try {
-    const plans = await request<PlanItem[]>(ENDPOINTS.subscription);
-    // demo 需四档套餐全展示；后端仅返回 Local 占位时回退完整方案表
-    const mocks = getMocks().PLANS;
-    return plans.length >= mocks.length ? plans : mocks;
+    return await request<PlanItem[]>(ENDPOINTS.subscription);
   } catch {
-    return getMocks().PLANS;
+    return [];
   }
 }
 
@@ -58,19 +53,21 @@ export async function fetchStatus(): Promise<StatusBar> {
   if (USE_MOCK) return getMocks().STATUS;
   try {
     const raw = await request<RawHealth>(ENDPOINTS.health);
-    if (raw.status !== 'ok') {
-      // 服务未就绪（degraded 等）时回退演示状态，避免 demo 状态栏全红
-      return getMocks().STATUS;
-    }
     return {
-      serviceLabel: '本地记忆服务',
-      serviceOk: true,
+      serviceLabel: raw.status === 'ok' ? '本地记忆服务' : `服务状态: ${raw.status ?? '未知'}`,
+      serviceOk: raw.status === 'ok',
       syncedAt: raw.checked_at ?? '',
       monthlyEvents: raw.monthly_events ?? 0,
       quotaPercent: raw.token_budget_used_percent ?? null,
     };
   } catch {
-    return getMocks().STATUS;
+    return {
+      serviceLabel: '服务未连接',
+      serviceOk: false,
+      syncedAt: '',
+      monthlyEvents: 0,
+      quotaPercent: null,
+    };
   }
 }
 
@@ -78,12 +75,10 @@ export async function fetchSearch(q: string): Promise<SearchHit[]> {
   if (USE_MOCK) return getMocks().SEARCH_HITS.filter((h) => h.title.includes(q) || q === '');
   if (!q.trim()) return [];
   try {
-    const hits = await request<SearchHit[]>(withQuery(ENDPOINTS.search, { q }));
-    if (hits.length > 0) return hits;
+    return await request<SearchHit[]>(withQuery(ENDPOINTS.search, { q }));
   } catch {
-    // 落入演示兜底
+    return [];
   }
-  return getMocks().SEARCH_HITS.filter((h) => h.title.includes(q) || h.snippet.includes(q));
 }
 
 interface RawBehavior {

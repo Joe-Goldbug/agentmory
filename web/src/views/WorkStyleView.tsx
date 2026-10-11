@@ -1,19 +1,12 @@
 import { useState } from 'react';
 import { Icons } from '../components/Icons';
 import { ErrorBox, Loading } from '../components/Feedback';
-import { palette } from '../utils/colorMap';
 import { useAsyncData } from '../hooks/useAsyncData';
 import { fetchBehavior } from '../api/adapters/miscAdapter';
 import { fetchTools as fetchToolList } from '../api/adapters/toolAdapter';
 import { getMocks } from '../mocks';
 import { useI18n } from '../i18n';
 
-/**
- * ② 我的工作方式
- * 真实来源：GET /api/behavior（GLOBAL.md 版本 + SHA-256 + Markdown 正文）
- * 注意：后端是 Markdown 而非结构化键值，这里直接渲染原文，不做脆弱的字段解析。
- * 偏好 / 适用范围 / 适用工具目前无后端存储，交互均在前端本地生效（demo 演示用）。
- */
 const EXTRA_TOOLS = ['Shell', 'VSCode', 'Cursor', 'Kiro'];
 
 export default function WorkStyleView() {
@@ -44,239 +37,231 @@ export default function WorkStyleView() {
   const TABS = [t('style.tabConfirmed'), t('style.tabRules'), t('style.tabFlows')];
 
   return (
-    <div className="max-w-6xl mx-auto animate-fade-in">
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">{t('style.title')}</h2>
-        <p className="text-gray-500 text-sm mt-1">{t('style.subtitle')}</p>
+    <div className="glass-panel tab-panel-inner anim w-full max-w-5xl mx-auto" style={{ ['--d' as string]: '0.1s' }}>
+      {/* Header */}
+      <div className="flex justify-between items-center mb-4 pb-3 border-b border-white/10">
+        <div>
+          <h2 className="text-base font-semibold text-white">
+            {lang === 'zh' ? '偏好设置与规则' : 'Preferences & Execution Rules'}
+          </h2>
+          <p className="text-xs text-gray-400 mt-0.5">
+            {lang === 'zh' ? '记忆自动化执行规范 · 跨多 Agent 统一对齐' : 'Memory automation specifications aligned across AI agents'}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          {TABS.map((label, idx) => (
+            <button
+              key={label}
+              onClick={() => setTab(idx)}
+              className={`btn-mini text-xs ${tab === idx ? 'btn-mini-primary' : ''}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {behavior.error && <ErrorBox message={behavior.error} />}
 
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm flex h-[600px] overflow-hidden">
-        <div className="flex-1 flex flex-col border-r border-gray-100">
-          <div className="flex border-b border-gray-100 px-4">
-            {TABS.map((label, idx) => (
-              <button
-                key={label}
-                onClick={() => setTab(idx)}
-                className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
-                  tab === idx
-                    ? 'border-blue-600 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-800'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
+      {/* Main Grid: Left Preferences, Right Rules / Flows / Contract */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mt-4">
+        {/* Left Column: Preferences (7 cols) */}
+        <div className="lg:col-span-7 space-y-5">
+          <div className="summary-card p-4">
+            <div className="flex justify-between items-center mb-3">
+              <span className="text-xs font-semibold text-gray-300">
+                {t('style.preferences', { n: prefs.length })}
+              </span>
+              {editing ? (
+                <div className="flex gap-2">
+                  <button onClick={savePrefs} className="btn-mini btn-mini-primary !py-1 !px-2.5 text-xs">
+                    {t('common.save')}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setDraft(prefs);
+                      setEditing(false);
+                    }}
+                    className="btn-mini !py-1 !px-2.5 text-xs"
+                  >
+                    {t('common.cancel')}
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => {
+                    setDraft(prefs);
+                    setEditing(true);
+                  }}
+                  className="btn-mini !py-1 !px-2.5 text-xs text-gray-300 hover:text-white"
+                >
+                  <Icons.User className="w-3 h-3 mr-1" />
+                  {t('common.edit')}
+                </button>
+              )}
+            </div>
+
+            <table className="w-full text-xs border-collapse text-gray-200">
+              <tbody>
+                {prefs.map((p, idx) => (
+                  <tr key={p.key} className="border-b border-white/5 last:border-none">
+                    <td className="py-2.5 text-gray-400 w-28 font-medium">{p.key}</td>
+                    <td className="py-2.5">
+                      {editing ? (
+                        <input
+                          value={draft[idx]?.value ?? ''}
+                          onChange={(e) => {
+                            const next = [...draft];
+                            next[idx] = { ...next[idx], value: e.target.value };
+                            setDraft(next);
+                          }}
+                          className="w-full bg-[#18181c] border border-white/20 rounded px-2 py-1 text-xs text-white outline-none"
+                        />
+                      ) : (
+                        <span className="font-medium text-white">{p.value}</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
 
-          <div className="p-8 flex-1 overflow-y-auto space-y-10">
-            {behavior.loading && <Loading />}
+          {/* Scope Projects */}
+          <div className="summary-card p-4">
+            <h4 className="text-xs font-semibold text-gray-300 mb-2.5">{t('style.scope')}</h4>
+            <div className="flex flex-wrap gap-2">
+              {STYLE.scopeProjects.map((p) => {
+                const active = scope.includes(p);
+                return (
+                  <button
+                    key={p}
+                    onClick={() =>
+                      setScope((prev) => (prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]))
+                    }
+                    className={`btn-mini !py-1 !px-2.5 text-xs ${active ? 'btn-mini-primary' : 'opacity-60'}`}
+                  >
+                    <span>{p}</span>
+                    {active && <span className="ml-1 text-[10px]">✔</span>}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
 
-            {!behavior.loading && behavior.data && (
-              <section>
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-base font-semibold text-gray-900">
-                    {t('style.contract', { path: behavior.data.sourcePath })}
-                  </h3>
-                  <div className="text-xs text-gray-400">
-                    v{behavior.data.version} · {behavior.data.sha256.slice(0, 12)}…
-                  </div>
-                </div>
-                <div className="bg-gray-50 rounded-lg p-4 border border-gray-100 text-sm text-gray-800 whitespace-pre-wrap max-h-64 overflow-y-auto">
-                  {behavior.data.markdown}
-                </div>
-                <p className="text-xs text-gray-400 mt-2">{t('style.contractNote')}</p>
-              </section>
-            )}
-
-            {tab === 2 ? (
-              <section>
-                <h3 className="text-base font-semibold text-gray-900 mb-4">{t('style.flows')}</h3>
-                <ul className="space-y-4">
-                  {DEMO_FLOWS.map((f) => (
-                    <li key={f.name} className="p-4 rounded-lg border border-gray-100 bg-gray-50/50">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm font-semibold text-gray-900">{f.name}</span>
-                        <span className="text-[11px] text-gray-400">
-                          {t('style.flowUsed', { n: f.used })}
-                        </span>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        {f.steps.map((s, i) => (
-                          <span
-                            key={s}
-                            className="text-[11px] px-2 py-1 rounded bg-white border border-gray-200 text-gray-600"
-                          >
-                            {i + 1}. {s}
-                          </span>
-                        ))}
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            ) : (
-              <>
-                <section>
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-base font-semibold text-gray-900">
-                      {t('style.preferences', { n: prefs.length })}
-                    </h3>
-                    {editing ? (
-                      <div className="flex space-x-2">
-                        <button
-                          onClick={savePrefs}
-                          className="text-xs px-3 py-1.5 rounded-md bg-blue-600 text-white font-medium hover:bg-blue-700 transition"
-                        >
-                          {t('common.save')}
-                        </button>
-                        <button
-                          onClick={() => {
-                            setDraft(prefs);
-                            setEditing(false);
-                          }}
-                          className="text-xs px-3 py-1.5 rounded-md bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 transition"
-                        >
-                          {t('common.cancel')}
-                        </button>
-                      </div>
-                    ) : (
+          {/* Scope Tools */}
+          <div className="summary-card p-4">
+            <div className="flex justify-between items-center mb-2.5">
+              <h4 className="text-xs font-semibold text-gray-300">{t('style.tools')}</h4>
+              <div className="relative">
+                <button
+                  onClick={() => setAddOpen((v) => !v)}
+                  className="btn-mini !py-1 !px-2 text-xs"
+                >
+                  <Icons.Plus className="w-3 h-3 mr-0.5" />
+                  {t('common.add')}
+                </button>
+                {addOpen && (
+                  <div className="absolute right-0 top-8 w-36 bg-[#18181c] border border-white/15 rounded-xl shadow-xl py-1 z-30 backdrop-blur-xl">
+                    {EXTRA_TOOLS.filter((t) => !addedTools.includes(t)).map((name) => (
                       <button
+                        key={name}
                         onClick={() => {
-                          setDraft(prefs);
-                          setEditing(true);
+                          setAddedTools((prev) => [...prev, name]);
+                          setAddOpen(false);
                         }}
-                        className="text-xs flex items-center text-gray-500 hover:text-gray-800 bg-gray-50 px-3 py-1.5 rounded-md border border-gray-200"
+                        className="w-full text-left px-3 py-1.5 text-xs text-gray-300 hover:text-white hover:bg-white/10"
                       >
-                        <Icons.FileText className="w-3 h-3 mr-1" /> {t('common.edit')}
+                        + {name}
                       </button>
-                    )}
-                  </div>
-                  <div className="bg-gray-50 rounded-lg p-1 border border-gray-100">
-                    <table className="w-full text-sm text-left">
-                      <tbody>
-                        {prefs.map((p, i) => (
-                          <tr key={p.key} className="border-b border-gray-200/60 last:border-0">
-                            <td className="py-3 px-4 text-gray-500 w-1/4">{p.key}</td>
-                            <td className="py-3 px-4 text-gray-900 font-medium">
-                              {editing ? (
-                                <input
-                                  value={draft[i]?.value ?? ''}
-                                  onChange={(e) =>
-                                    setDraft((d) =>
-                                      d.map((x, j) => (j === i ? { ...x, value: e.target.value } : x)),
-                                    )
-                                  }
-                                  className="w-full px-2 py-1 border border-gray-200 rounded-md outline-none focus:border-blue-400 bg-white"
-                                />
-                              ) : (
-                                p.value
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  <p className="text-xs text-gray-400 mt-2">{t('style.preferencesNote')}</p>
-                </section>
-
-                <section>
-                  <h3 className="text-base font-semibold text-gray-900 mb-4">{t('style.rules')}</h3>
-                  <ul className="space-y-3">
-                    {STYLE.rules.map((rule, idx) => (
-                      <li key={idx} className="flex items-start space-x-3">
-                        <div className="mt-0.5 bg-blue-600 text-white rounded p-0.5">
-                          <Icons.Check className="w-3 h-3" />
-                        </div>
-                        <span className="text-sm text-gray-800">{rule}</span>
-                      </li>
                     ))}
-                  </ul>
-                </section>
-              </>
-            )}
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {[...(tools.data ?? []), ...addedTools.map((n) => ({ id: n, name: n, initial: n[0], color: 'green' }))].map((tool) => (
+                <span
+                  key={tool.id}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-xs text-gray-300"
+                >
+                  <span className="w-3.5 h-3.5 rounded-full bg-blue-500/80 text-[9px] font-bold text-white flex items-center justify-center">
+                    {tool.initial}
+                  </span>
+                  <span>{tool.name}</span>
+                </span>
+              ))}
+            </div>
           </div>
         </div>
 
-        <div className="w-72 bg-gray-50/50 p-6 flex flex-col space-y-8 overflow-y-auto">
-          <div>
-            <h4 className="text-sm font-semibold text-gray-900 mb-4">{t('style.scope')}</h4>
-            <div className="space-y-2 text-sm text-gray-700">
-              {STYLE.scopeProjects.map((p, i) => (
-                <label key={p} className={`flex items-center space-x-2 cursor-pointer ${i > 0 ? 'ml-4' : ''}`}>
-                  <input
-                    type="checkbox"
-                    checked={scope.includes(p)}
-                    onChange={() =>
-                      setScope((s) => (s.includes(p) ? s.filter((x) => x !== p) : [...s, p]))
-                    }
-                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  <span className={i === 0 ? 'font-medium text-gray-900' : ''}>{p}</span>
-                </label>
-              ))}
+        {/* Right Column: Execution Rules & GLOBAL.md / Flows (5 cols) */}
+        <div className="lg:col-span-5 space-y-4">
+          {tab === 2 ? (
+            <div className="summary-card p-4">
+              <h4 className="text-xs font-semibold text-gray-300 mb-3">{t('style.flows')}</h4>
+              <ul className="space-y-3">
+                {DEMO_FLOWS.map((f) => (
+                  <li key={f.name} className="p-3 rounded-lg bg-black/40 border border-white/5">
+                    <div className="flex justify-between items-center mb-1.5">
+                      <span className="text-xs font-semibold text-white">{f.name}</span>
+                      <span className="text-[10px] text-gray-500">{t('style.flowUsed', { n: f.used })}</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                      {f.steps.map((s, i) => (
+                        <span key={s} className="text-[10px] px-2 py-0.5 rounded bg-white/5 border border-white/10 text-gray-300">
+                          {i + 1}. {s}
+                        </span>
+                      ))}
+                    </div>
+                  </li>
+                ))}
+              </ul>
             </div>
-          </div>
+          ) : (
+            <div className="summary-card p-4">
+              <h4 className="text-xs font-semibold text-gray-300 mb-3">
+                {lang === 'zh' ? '自动化执行准则' : 'Execution Rules'}
+              </h4>
+              <ul className="space-y-3 text-xs text-gray-300">
+                <li className="flex items-start gap-2.5">
+                  <span className="text-green-400 font-bold leading-none mt-0.5">✔</span>
+                  <span>优先采用生态成熟方案，严禁无必要重新造轮子</span>
+                </li>
+                <li className="flex items-start gap-2.5">
+                  <span className="text-green-400 font-bold leading-none mt-0.5">✔</span>
+                  <span>所有核心业务改动必须有测试覆盖保证 (单元测试 &gt; 集成测试)</span>
+                </li>
+                <li className="flex items-start gap-2.5">
+                  <span className="text-green-400 font-bold leading-none mt-0.5">✔</span>
+                  <span>跨终端/IDE 工具读取项目记忆时自动保持规范同步</span>
+                </li>
+                <li className="flex items-start gap-2.5">
+                  <span className="text-green-400 font-bold leading-none mt-0.5">✔</span>
+                  <span>敏感密钥与令牌绝不上传公开网络或进入不可逆日志</span>
+                </li>
+              </ul>
+            </div>
+          )}
 
-          <div>
-            <h4 className="text-sm font-semibold text-gray-900 mb-4">{t('style.tools')}</h4>
-            <div className="space-y-3 text-sm text-gray-700">
-              {(tools.data && tools.data.length > 0
-                ? tools.data.slice(0, 5).map((x) => ({ name: x.name, initial: x.initial, color: x.color }))
-                : STYLE.scopeTools
-              ).map((x) => (
-                <div key={x.name} className="flex items-center space-x-2">
-                  <span
-                    className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold ${palette(x.color).avatar}`}
-                  >
-                    {x.initial}
-                  </span>
-                  <span>{x.name}</span>
-                </div>
-              ))}
-              {addedTools.map((toolName) => (
-                <div key={toolName} className="flex items-center space-x-2">
-                  <span className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold bg-gray-200 text-gray-700">
-                    {toolName[0]}
-                  </span>
-                  <span>{toolName}</span>
-                  <button
-                    onClick={() => setAddedTools((a) => a.filter((x) => x !== toolName))}
-                    className="text-[11px] text-gray-400 hover:text-red-500 ml-auto"
-                  >
-                    {t('common.remove')}
-                  </button>
-                </div>
-              ))}
+          {/* Behavior / Contract File Markdown */}
+          {behavior.loading && <Loading />}
+          {!behavior.loading && behavior.data && (
+            <div className="summary-card p-4">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-xs font-semibold text-gray-300">
+                  {t('style.contract', { path: behavior.data.sourcePath })}
+                </span>
+                <span className="text-[10px] font-mono text-gray-500">
+                  v{behavior.data.version} · {behavior.data.sha256.slice(0, 8)}
+                </span>
+              </div>
+              <div className="bg-black/60 rounded-lg p-3 border border-white/10 text-[11px] font-mono text-gray-300 whitespace-pre-wrap max-h-48 overflow-y-auto">
+                {behavior.data.markdown}
+              </div>
+              <p className="text-[10px] text-gray-500 mt-2">{t('style.contractNote')}</p>
             </div>
-            <div className="relative">
-              <button
-                onClick={() => setAddOpen((v) => !v)}
-                className="mt-4 flex items-center space-x-1 text-xs font-medium text-gray-500 hover:text-gray-900"
-              >
-                <Icons.Plus className="w-3 h-3" />
-                <span>{t('style.addTool')}</span>
-              </button>
-              {addOpen && (
-                <div className="mt-2 bg-white border border-gray-200 rounded-lg shadow-sm py-1">
-                  {EXTRA_TOOLS.filter((x) => !addedTools.includes(x)).map((x) => (
-                    <button
-                      key={x}
-                      onClick={() => {
-                        setAddedTools((a) => [...a, x]);
-                        setAddOpen(false);
-                      }}
-                      className="w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition"
-                    >
-                      + {x}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
+          )}
         </div>
       </div>
     </div>

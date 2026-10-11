@@ -34,28 +34,9 @@ export async function fetchHistory(limit = 50, projectId?: string): Promise<Hist
     // 忽略未配置
   }
 
-  // 后端暂无事件时回退演示数据，保证版本详情/证据哈希等交互可展示
+  // 后端无事件时返回真实空数组，真实展示空状态
   if (raw.length === 0) {
-    const mockList = getMocks().HISTORY;
-    return mockList.map((m) => {
-      const att = attestationsMap[m.id];
-      if (att) {
-        return {
-          ...m,
-          detail: {
-            ...m.detail,
-            attestation: {
-              tx_hash: att.tx_hash,
-              slot: att.slot,
-              cluster: att.cluster,
-              explorer_url: att.explorer_url,
-              timestamp: att.timestamp,
-            },
-          },
-        };
-      }
-      return m;
-    });
+    return [];
   }
 
   return raw.map((e) => {

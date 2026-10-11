@@ -54,6 +54,7 @@ export function getMocks(lang: Lang = getLang()): Mocks {
       { id: 'history', label: m('nav.history') },
       { id: 'tools', label: m('nav.tools') },
       { id: 'team', label: m('nav.team') },
+      { id: 'plans', label: m('nav.plans') },
     ],
 
     PROJECTS: [

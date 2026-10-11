@@ -26,10 +26,7 @@ export async function fetchCandidates(): Promise<CandidateItem[]> {
     source: c.source_tool ?? '未知来源',
     time: c.created_at ?? '',
   }));
-  // 后端暂无候选时回退演示数据，保证 demo 可完整走通确认/拒绝流程
-  if (items.length === 0) {
-    return getMocks().CONFIRM_ITEMS.map((c) => ({ ...c, id: DEMO_PREFIX + c.id }));
-  }
+  // 真实返回候选列表，后端为空即展示真实空状态
   return items;
 }
 

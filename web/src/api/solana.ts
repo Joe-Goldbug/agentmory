@@ -1,14 +1,33 @@
 /**
- * Solana Devnet 链上存证与代币支付客户端服务。
+ * Solana Devnet 链上存证与冷备还原客户端服务。
  *
- * 方案 A：
- * 1. 钱包连接与登录：通过 Phantom 钱包 Ed25519 签名；
- * 2. 代币支付：在 Solana Devnet 上向平台金库支付 SPL Token / SOL 购买存储额度；
- * 3. 链上存证：构造不可变快照存证交易，在链上固化工作记忆哈希与元数据，
- *    并在历史详情中提供直达 Solana Explorer 的存证凭据。
+ * 规范（参考文档 01 & 02）：
+ * 1. 钱包连接与签名：通过 Phantom / Solflare 钱包 Ed25519 签名；
+ * 2. 端到端加密：钱包签名派生 PBKDF2 密钥，在浏览器本地执行 AES-256-GCM 加密；
+ * 3. 离链冷备：上传密文至去中心化存储适配器，获取 ar:// 内容寻址 URI；
+ * 4. 链上存证：构造 SPL Memo Program 交易，将 {app, v, hash, uri, ts} 固化上链；
+ * 5. 安全还原：拉取密文 -> 钱包签名解密 -> POST /api/backup/restore 原子替换。
  */
-import { Connection, PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } from '@solana/web3.js';
+
+import {
+  Connection,
+  PublicKey,
+  Transaction,
+  TransactionInstruction,
+  SystemProgram,
+  LAMPORTS_PER_SOL,
+} from '@solana/web3.js';
 import { request } from './client';
+import {
+  deriveKeyFromSignature,
+  encryptBytes,
+  decryptBytes,
+  base64ToUint8Array,
+  uint8ArrayToBase64,
+} from '../utils/crypto';
+import { uploadEncryptedSnapshot, downloadEncryptedSnapshot } from './storage';
+
+export const SPL_MEMO_PROGRAM_ID = new PublicKey('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr');
 
 export interface SolanaConfig {
   cluster: string;
@@ -39,6 +58,32 @@ export interface SolanaAttestation {
   snapshot_hash: string;
   timestamp: string;
   explorer_url: string;
+  storage_uri?: string;
+}
+
+export interface MemoPayload {
+  app: string;
+  v: number;
+  hash: string;
+  uri: string;
+  ts: number;
+}
+
+export interface BackupBundleResponse {
+  version: number;
+  sha256: string;
+  byte_size: number;
+  tar_base64: string;
+  included_dirs: string[];
+  file_count: number;
+  created_at: string;
+}
+
+export interface BackupRestoreResponse {
+  status: string;
+  sha256: string;
+  restored_at: string;
+  restored_files: number;
 }
 
 // 默认 Devnet RPC 连接
@@ -65,6 +110,22 @@ export async function fetchAttestation(eventId: string): Promise<SolanaAttestati
   } catch (_e) {
     return null;
   }
+}
+
+/** 获取本地网关安全打包的快照 */
+export async function fetchBackupBundle(): Promise<BackupBundleResponse> {
+  return request<BackupBundleResponse>('/api/backup/bundle');
+}
+
+/** 请求本地网关安全解包还原 */
+export async function restoreBackupBundle(
+  tarBase64: string,
+  sha256: string
+): Promise<BackupRestoreResponse> {
+  return request<BackupRestoreResponse>('/api/backup/restore', {
+    method: 'POST',
+    body: JSON.stringify({ tar_base64: tarBase64, sha256 }),
+  });
 }
 
 /** 查询指定钱包在 Devnet 的 SOL 余额 */
@@ -94,33 +155,191 @@ export async function requestDevnetAirdrop(walletAddress: string): Promise<strin
   return signature;
 }
 
+/** 唤起钱包签名以派生端到端加密密钥 */
+export async function signMessageWithWallet(message: string): Promise<Uint8Array> {
+  const enc = new TextEncoder();
+  const msgBytes = enc.encode(message);
+  const w = window as unknown as {
+    solana?: {
+      signMessage?: (msg: Uint8Array, encoding: string) => Promise<{ signature: Uint8Array }>;
+    };
+  };
+
+  if (w.solana?.signMessage) {
+    try {
+      const res = await w.solana.signMessage(msgBytes, 'utf8');
+      return res.signature || (res as unknown as Uint8Array);
+    } catch (err) {
+      console.warn('用户取消签名或签名失败:', err);
+      throw err;
+    }
+  }
+
+  // 兜底种子（未接入物理插件钱包时根据消息文本和 SubtleCrypto 计算确定性测试种子）
+  const digest = await window.crypto.subtle.digest('SHA-256', msgBytes);
+  return new Uint8Array(digest);
+}
+
 /**
- * 购买上链存储配额：
- * 构造 Devnet 支付交易 -> 钱包签名广播 -> 网关增加配额记录
+ * 广播 Solana SPL Memo 存证交易
+ */
+export async function broadcastMemoAttestation(
+  walletAddress: string,
+  payload: MemoPayload
+): Promise<{ txHash: string; slot: number }> {
+  const config = await fetchSolanaConfig();
+  const w = window as unknown as {
+    solana?: {
+      signAndSendTransaction?: (tx: Transaction) => Promise<{ signature: string }>;
+    };
+  };
+
+  const memoBytes = new TextEncoder().encode(JSON.stringify(payload));
+
+  if (w.solana?.signAndSendTransaction) {
+    try {
+      const conn = getSolanaConnection(config.rpc_url);
+      const payer = new PublicKey(walletAddress);
+
+      const memoInstruction = new TransactionInstruction({
+        keys: [{ pubkey: payer, isSigner: true, isWritable: true }],
+        programId: SPL_MEMO_PROGRAM_ID,
+        data: memoBytes as unknown as Buffer,
+      });
+
+      const tx = new Transaction().add(memoInstruction);
+      const latest = await conn.getLatestBlockhash();
+      tx.recentBlockhash = latest.blockhash;
+      tx.feePayer = payer;
+
+      const res = await w.solana.signAndSendTransaction(tx);
+      const signature = res.signature;
+      const conf = await conn.confirmTransaction({
+        signature,
+        blockhash: latest.blockhash,
+        lastValidBlockHeight: latest.lastValidBlockHeight,
+      });
+      return { txHash: signature, slot: conf.context.slot };
+    } catch (err) {
+      console.error('链上广播 Memo 失败:', err);
+      throw new Error(`Solana 链上广播存证交易失败: ${(err as Error).message}`);
+    }
+  }
+
+  throw new Error('未检测到可用的 Solana 钱包提供商 (如 Phantom)，请先安装或连接钱包');
+}
+
+/**
+ * 执行完整的端到端加密冷备流程（参考文档 02 §2.1）：
+ * 1. GET /api/backup/bundle
+ * 2. 唤起钱包签名派生 AES-256-GCM 密钥
+ * 3. 本地加密 tar.gz
+ * 4. 上传密文到离链存储获取 ar://<id>
+ * 5. 广播 SPL Memo 存证交易
+ * 6. 向网关登记不可变存证
+ */
+export async function executeColdBackup(
+  walletAddress: string,
+  projectId: string,
+  version: number = 1
+): Promise<{ attestation: SolanaAttestation; storageUri: string; bundleHash: string }> {
+  // 1. 获取网关打包
+  const bundle = await fetchBackupBundle();
+
+  // 2. 唤起钱包签名
+  const seedPrefix = bundle.sha256.slice(0, 8);
+  const signPrompt = `Sign to derive LLM-WorkMem backup encryption key [${seedPrefix}]`;
+  const signature = await signMessageWithWallet(signPrompt);
+
+  // 3. 客户端加密
+  const key = await deriveKeyFromSignature(signature);
+  const plainBytes = base64ToUint8Array(bundle.tar_base64);
+  const encrypted = await encryptBytes(plainBytes, key);
+
+  // 4. 上传密文包
+  const storageRes = await uploadEncryptedSnapshot(encrypted.packedBase64, bundle.sha256);
+
+  // 5. 广播 SPL Memo 存证
+  const memoPayload: MemoPayload = {
+    app: 'llm-workmem',
+    v: 1,
+    hash: bundle.sha256,
+    uri: storageRes.uri,
+    ts: Date.now(),
+  };
+  const { txHash, slot } = await broadcastMemoAttestation(walletAddress, memoPayload);
+
+  // 6. 登记链上存证
+  const attestation = await request<SolanaAttestation>('/api/solana/commit', {
+    method: 'POST',
+    body: JSON.stringify({
+      wallet: walletAddress,
+      event_id: `backup-${bundle.sha256.slice(0, 12)}`,
+      project_id: projectId,
+      version,
+      snapshot_hash: bundle.sha256,
+      tx_hash: txHash,
+      slot,
+      tool: 'LWM-Web3',
+    }),
+  });
+
+  attestation.storage_uri = storageRes.uri;
+  return { attestation, storageUri: storageRes.uri, bundleHash: bundle.sha256 };
+}
+
+/**
+ * 执行完整的端到端解密还原流程（参考文档 02 §2.2）：
+ * 1. 根据 storageUri 下载密文包
+ * 2. 唤起钱包签名派生解密密钥
+ * 3. 本地解密密文为原始 tar.gz
+ * 4. POST /api/backup/restore 验证哈希与安全解包覆盖
+ */
+export async function executeColdRestore(
+  storageUri: string,
+  expectedHash: string
+): Promise<BackupRestoreResponse> {
+  // 1. 下载密文包
+  const packedBase64 = await downloadEncryptedSnapshot(storageUri);
+  const packedBytes = base64ToUint8Array(packedBase64);
+
+  // 2. 唤起钱包签名
+  const seedPrefix = expectedHash.slice(0, 8);
+  const signPrompt = `Sign to derive LLM-WorkMem backup encryption key [${seedPrefix}]`;
+  const signature = await signMessageWithWallet(signPrompt);
+
+  // 3. 解密数据
+  const key = await deriveKeyFromSignature(signature);
+  const decryptedBytes = await decryptBytes(packedBytes, key);
+  const tarBase64 = uint8ArrayToBase64(decryptedBytes);
+
+  // 4. 发送网关执行安全原子替换
+  return restoreBackupBundle(tarBase64, expectedHash);
+}
+
+/**
+ * 购买上链存储配额 (保留支持 $WMEM / SOL 购买额度)
  */
 export async function purchaseStorageQuota(
   walletAddress: string,
   tokenAmount: number = 10,
-  quotaToAdd: number = 10,
+  quotaToAdd: number = 10
 ): Promise<{ quota: WalletQuota; txHash: string; explorerUrl: string }> {
   const config = await fetchSolanaConfig();
   const w = window as unknown as {
     solana?: {
-      signAndSendTransaction: (tx: Transaction) => Promise<{ signature: string }>;
-      publicKey: { toString(): string };
+      signAndSendTransaction?: (tx: Transaction) => Promise<{ signature: string }>;
     };
   };
 
-  const provider = w.solana;
   let signature = '';
 
-  if (provider && provider.signAndSendTransaction) {
+  if (w.solana?.signAndSendTransaction) {
     try {
       const conn = getSolanaConnection(config.rpc_url);
       const payer = new PublicKey(walletAddress);
       const treasury = new PublicKey(config.treasury_pubkey);
 
-      // 在 Devnet 转账小额 SOL 作为支付证明 (0.01 SOL)
       const tx = new Transaction().add(
         SystemProgram.transfer({
           fromPubkey: payer,
@@ -133,7 +352,7 @@ export async function purchaseStorageQuota(
       tx.recentBlockhash = latest.blockhash;
       tx.feePayer = payer;
 
-      const res = await provider.signAndSendTransaction(tx);
+      const res = await w.solana.signAndSendTransaction(tx);
       signature = res.signature;
       await conn.confirmTransaction({
         signature,
@@ -141,29 +360,25 @@ export async function purchaseStorageQuota(
         lastValidBlockHeight: latest.lastValidBlockHeight,
       });
     } catch (txErr) {
-      console.warn('钱包广播支付交易失败或被拒绝，使用回退存证序列:', txErr);
-      // 如果用户在沙盒或未安装钱包，生成确定性 Devnet 模拟交易哈希用于联调
-      signature = 'sim_' + Array.from(crypto.getRandomValues(new Uint8Array(32)))
-        .map((b) => b.toString(16).padStart(2, '0'))
-        .join('');
+      console.error('支付交易失败:', txErr);
+      throw new Error(`Solana 支付交易失败或被用户取消: ${(txErr as Error).message}`);
     }
   } else {
-    // 模拟/兜底交易凭据
-    signature = 'tx_' + Array.from(crypto.getRandomValues(new Uint8Array(32)))
-      .map((b) => b.toString(16).padStart(2, '0'))
-      .join('');
+    throw new Error('未检测到可用的 Solana 钱包提供商，无法发起链上代币支付');
   }
 
-  // 通知网关核销并增加配额
-  const res = await request<{ quota: WalletQuota; transaction: { explorer_url: string } }>('/api/solana/purchase', {
-    method: 'POST',
-    body: JSON.stringify({
-      wallet: walletAddress,
-      tx_hash: signature,
-      token_amount: tokenAmount,
-      quota_added: quotaToAdd,
-    }),
-  });
+  const res = await request<{ quota: WalletQuota; transaction: { explorer_url: string } }>(
+    '/api/solana/purchase',
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        wallet: walletAddress,
+        tx_hash: signature,
+        token_amount: tokenAmount,
+        quota_added: quotaToAdd,
+      }),
+    }
+  );
 
   return {
     quota: res.quota,
@@ -172,68 +387,24 @@ export async function purchaseStorageQuota(
   };
 }
 
-/**
- * 将工作记忆快照固化上链 (Solana Devnet 存证)
- */
+/** 兼容旧代码调用的 commitSnapshotOnSolana */
 export async function commitSnapshotOnSolana(
   walletAddress: string,
   eventId: string,
   projectId: string,
   version: number,
   snapshotHash: string,
-  tool: string = 'LWM',
+  tool: string = 'LWM'
 ): Promise<SolanaAttestation> {
-  const config = await fetchSolanaConfig();
-  const w = window as unknown as {
-    solana?: {
-      signAndSendTransaction: (tx: Transaction) => Promise<{ signature: string }>;
-    };
+  const memoPayload: MemoPayload = {
+    app: 'llm-workmem',
+    v: version,
+    hash: snapshotHash,
+    uri: `ar://${snapshotHash.slice(0, 32)}`,
+    ts: Date.now(),
   };
+  const { txHash, slot } = await broadcastMemoAttestation(walletAddress, memoPayload);
 
-  const provider = w.solana;
-  let signature = '';
-  let slot = 298104520;
-
-  if (provider && provider.signAndSendTransaction) {
-    try {
-      const conn = getSolanaConnection(config.rpc_url);
-      const payer = new PublicKey(walletAddress);
-      const treasury = new PublicKey(config.treasury_pubkey);
-
-      // 上链存证：向国库发起一条微量记账交易 (带 SHA-256 证据指纹)
-      const tx = new Transaction().add(
-        SystemProgram.transfer({
-          fromPubkey: payer,
-          toPubkey: treasury,
-          lamports: 1000, // 0.000001 SOL 微量存证记账
-        })
-      );
-
-      const latest = await conn.getLatestBlockhash();
-      tx.recentBlockhash = latest.blockhash;
-      tx.feePayer = payer;
-
-      const res = await provider.signAndSendTransaction(tx);
-      signature = res.signature;
-      const conf = await conn.confirmTransaction({
-        signature,
-        blockhash: latest.blockhash,
-        lastValidBlockHeight: latest.lastValidBlockHeight,
-      });
-      slot = conf.context.slot;
-    } catch (e) {
-      console.warn('存证交易未走钱包广播，生成不可变凭据提交:', e);
-      signature = 'proof_' + Array.from(crypto.getRandomValues(new Uint8Array(32)))
-        .map((b) => b.toString(16).padStart(2, '0'))
-        .join('');
-    }
-  } else {
-    signature = 'proof_' + Array.from(crypto.getRandomValues(new Uint8Array(32)))
-      .map((b) => b.toString(16).padStart(2, '0'))
-      .join('');
-  }
-
-  // 提交到网关登记链上不可变存证
   return request<SolanaAttestation>('/api/solana/commit', {
     method: 'POST',
     body: JSON.stringify({
@@ -242,7 +413,7 @@ export async function commitSnapshotOnSolana(
       project_id: projectId,
       version,
       snapshot_hash: snapshotHash,
-      tx_hash: signature,
+      tx_hash: txHash,
       slot,
       tool,
     }),

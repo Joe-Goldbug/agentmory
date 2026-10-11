@@ -1,253 +1,191 @@
-import { useEffect, useState } from 'react';
-import { Icons } from '../components/Icons';
+import { useState } from 'react';
 import { Empty, ErrorBox, Loading } from '../components/Feedback';
-import { palette } from '../utils/colorMap';
 import { useAsyncData } from '../hooks/useAsyncData';
 import { fetchTools } from '../api/adapters/toolAdapter';
 import { useI18n } from '../i18n';
 import type { ToolItem } from '../types';
 
-/**
- * ⑤ 工具连接
- * 真实来源：GET /api/tools/coverage（hub_service.coverage_report）
- * 关键：Demo 的"已连接"被替换为项目真实的三级 Proof 等级。
- * 开关 / 授权 / 添加工具在后端无对应存储，点击后仅前端本地生效（demo 演示）。
- */
-const CANDIDATES = ['cursor', 'windsurf', 'zed', 'aider'];
+const TOOL_ICONS: Record<string, { icon: string; color: string }> = {
+  'claude-code': { icon: 'C', color: '#f97316' },
+  'codex': { icon: 'C', color: '#3b82f6' },
+  'opencode': { icon: 'O', color: '#a855f7' },
+  'cursor': { icon: 'C', color: '#06b6d4' },
+  'windsurf': { icon: 'W', color: '#10b981' },
+  'zed': { icon: 'Z', color: '#ec4899' },
+  'aider': { icon: 'A', color: '#eab308' },
+};
 
 export default function ToolsView() {
   const { t, lang } = useI18n();
   const { data, loading, error } = useAsyncData(() => fetchTools(), [lang]);
-  const tools = data ?? [];
-
-  const [selected, setSelected] = useState<string>('');
-  const [cleared, setCleared] = useState(false);
   const [extra, setExtra] = useState<ToolItem[]>([]);
-  const [allowed, setAllowed] = useState<string[]>([]);
+  const [enabledMap, setEnabledMap] = useState<Record<string, boolean>>({});
   const [autoRecord, setAutoRecord] = useState(true);
-  const [advanced, setAdvanced] = useState(false);
+  const [cloudSync, setCloudSync] = useState(true);
   const [addOpen, setAddOpen] = useState(false);
-  const [note, setNote] = useState('');
+  const [candidateName, setCandidateName] = useState('');
 
-  const all = [...tools, ...extra];
-  // 数据异步到达后再补默认选中（首帧 tools 为空）
-  const current = cleared ? undefined : all.find((x) => x.id === selected) ?? all[0];
+  const tools = [...(data ?? []), ...extra];
 
-  // 语言切换会重建演示项目名，重置授权勾选
-  useEffect(() => {
-    setAllowed(
-      lang === 'zh' ? ['项目1', '项目2', '项目3'] : ['Project 1', 'Project 2', 'Project 3'],
-    );
-  }, [lang]);
+  function toggleTool(id: string, currentVal: boolean) {
+    setEnabledMap((prev) => ({
+      ...prev,
+      [id]: prev[id] !== undefined ? !prev[id] : !currentVal,
+    }));
+  }
 
-  function addTool(name: string) {
+  function handleAddTool(name: string) {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    const id = trimmed.toLowerCase().replace(/\s+/g, '-');
     const item: ToolItem = {
-      id: name,
-      name,
+      id,
+      name: trimmed,
       proof: 'watcher-observed',
       proofLabel: t('proof.watcherObserved'),
       lastUsed: t('tools.justAdded'),
-      initial: name[0].toUpperCase(),
+      initial: trimmed[0].toUpperCase(),
       color: 'green',
       enabled: true,
     };
     setExtra((prev) => [...prev, item]);
-    setSelected(item.id);
-    setCleared(false);
+    setCandidateName('');
     setAddOpen(false);
-    setNote(t('tools.added', { tool: name }));
   }
 
   return (
-    <div className="max-w-5xl mx-auto animate-fade-in">
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">{t('tools.title')}</h2>
-        <p className="text-gray-500 text-sm mt-1">{t('tools.subtitle')}</p>
-      </div>
-
-      {loading && <Loading />}
-      {error && <ErrorBox message={error} />}
-      {note && (
-        <div className="mb-4 bg-blue-50 border border-blue-100 text-blue-700 text-sm rounded-lg px-4 py-2.5">
-          {note}
+    <div className="glass-panel tab-panel-inner anim w-full max-w-5xl mx-auto" style={{ ['--d' as string]: '0.1s' }}>
+      {/* Header */}
+      <div className="flex justify-between items-center mb-4 pb-3 border-b border-white/10">
+        <div>
+          <h2 className="text-base font-semibold text-white">
+            {lang === 'zh' ? 'AI 开发工具连接' : 'AI Tool Connections'}
+          </h2>
+          <p className="text-xs text-gray-400 mt-0.5">
+            {lang === 'zh' ? '允许受信任的编码助手双向读取/写入工作记忆' : 'Enable trusted IDE assistants to read & write shared working memory'}
+          </p>
         </div>
-      )}
-
-      <div className="flex space-x-6 h-[500px]">
-        <div className="w-1/2 flex flex-col space-y-4 overflow-y-auto pr-1">
-          {all.length === 0 && !loading && <Empty text={t('tools.empty')} />}
-          {all.map((tool) => {
-            const p = palette(tool.color);
-            const active = current?.id === tool.id;
-            return (
-              <div
-                key={tool.id}
-                onClick={() => {
-                  setCleared(false);
-                  setSelected(tool.id);
+        <div className="relative">
+          <button
+            onClick={() => setAddOpen((v) => !v)}
+            className="btn-mini btn-mini-primary text-xs"
+          >
+            + {lang === 'zh' ? '添加新工具连接' : 'Add Tool'}
+          </button>
+          {addOpen && (
+            <div className="absolute right-0 top-9 w-60 bg-[#18181c] border border-white/15 rounded-xl shadow-2xl p-3 z-30 backdrop-blur-xl">
+              <div className="text-xs font-semibold text-white mb-2">添加工具</div>
+              <input
+                value={candidateName}
+                onChange={(e) => setCandidateName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleAddTool(candidateName);
+                  if (e.key === 'Escape') setAddOpen(false);
                 }}
-                className={`bg-white p-5 rounded-xl border flex items-center justify-between cursor-pointer transition ${
-                  active ? 'border-blue-500 shadow-sm ring-1 ring-blue-500' : 'border-gray-200 hover:border-gray-300'
-                }`}
-              >
-                <div className="flex items-center space-x-4">
-                  <div
-                    className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-xl border ${p.tile}`}
-                  >
-                    {tool.initial}
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-gray-900">{tool.name}</h3>
-                    <p className="text-xs text-gray-500">
-                      {tool.proofLabel} · {tool.lastUsed}
-                    </p>
-                  </div>
-                </div>
+                placeholder="例如: Cursor, Zed..."
+                className="w-full bg-[#121214] border border-white/20 rounded px-2.5 py-1 text-xs text-white outline-none mb-2"
+                autoFocus
+              />
+              <div className="flex gap-2 justify-end">
                 <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setNote(
-                      t(tool.enabled ? 'tools.toggleOn' : 'tools.toggleOff', { tool: tool.name }),
-                    );
-                  }}
-                  className={`w-10 h-6 rounded-full relative transition ${tool.enabled ? 'bg-blue-600' : 'bg-gray-300'}`}
-                  aria-label="toggle"
+                  onClick={() => handleAddTool(candidateName)}
+                  className="btn-mini btn-mini-primary !py-1 text-xs"
                 >
-                  <div
-                    className={`w-4 h-4 bg-white rounded-full absolute top-1 shadow-sm transition-all ${
-                      tool.enabled ? 'right-1' : 'left-1'
-                    }`}
-                  ></div>
+                  添加
                 </button>
-              </div>
-            );
-          })}
-          <div className="relative">
-            <button
-              onClick={() => setAddOpen((v) => !v)}
-              className="w-full border-2 border-dashed border-gray-300 rounded-xl p-4 flex items-center justify-center text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition"
-            >
-              <Icons.Plus className="w-5 h-5 mr-2" />
-              <span className="font-medium">{t('tools.addTool')}</span>
-            </button>
-            {addOpen && (
-              <div className="mt-2 bg-white border border-gray-200 rounded-lg shadow-sm py-1">
-                {CANDIDATES.filter((c) => !all.some((x) => x.id === c)).map((c) => (
-                  <button
-                    key={c}
-                    onClick={() => addTool(c)}
-                    className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition"
-                  >
-                    + {c}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="w-1/2 bg-white rounded-xl border border-gray-200 shadow-sm p-8 overflow-y-auto">
-          <div className="flex justify-between items-center mb-6">
-            <h3 className="text-lg font-bold text-gray-900">{t('tools.connection')}</h3>
-            <button
-              onClick={() => {
-                setCleared(true);
-                setNote(t('tools.cleared'));
-              }}
-              className="text-gray-400 hover:text-gray-600"
-              aria-label="close"
-            >
-              <Icons.Plus className="w-5 h-5 transform rotate-45" />
-            </button>
-          </div>
-
-          {!current ? (
-            <Empty text={t('tools.selectHint')} />
-          ) : (
-            <div className="space-y-8">
-              <div className="flex items-center space-x-3 text-sm text-gray-700">
-                <span className="font-semibold">{current.name}</span>
-                <span className="text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-500">
-                  {current.proofLabel}
-                </span>
-              </div>
-
-              <div>
-                <h4 className="text-sm font-semibold text-gray-900 mb-4">{t('tools.allowedProjects')}</h4>
-                <div className="space-y-3 bg-gray-50 p-4 rounded-lg border border-gray-100">
-                  {allowed.map((p) => (
-                    <label key={p} className="flex items-center space-x-3 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked
-                        onChange={() => setAllowed((a) => a.filter((x) => x !== p))}
-                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                      />
-                      <span className="text-sm text-gray-800">{p}</span>
-                    </label>
-                  ))}
-                  {allowed.length === 0 && (
-                    <span className="text-xs text-gray-400">{t('common.none')}</span>
-                  )}
-                </div>
-                <p className="text-xs text-gray-400 mt-2">{t('tools.allowedNote')}</p>
-              </div>
-
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="text-sm font-medium text-gray-900">{t('tools.autoRecord')}</h4>
-                    <p className="text-xs text-gray-500 mt-0.5">{t('tools.autoRecordHint')}</p>
-                  </div>
-                  <button
-                    onClick={() => setAutoRecord((v) => !v)}
-                    className={`w-10 h-6 rounded-full relative transition ${autoRecord ? 'bg-blue-600' : 'bg-gray-300'}`}
-                    aria-label="auto record"
-                  >
-                    <div
-                      className={`w-4 h-4 bg-white rounded-full absolute top-1 shadow-sm transition-all ${
-                        autoRecord ? 'right-1' : 'left-1'
-                      }`}
-                    ></div>
-                  </button>
-                </div>
-                <div className="flex items-center justify-between opacity-60">
-                  <div>
-                    <h4 className="text-sm font-medium text-gray-900">{t('tools.cloudSync')}</h4>
-                    <p className="text-xs text-gray-500 mt-0.5">{t('tools.cloudSyncHint')}</p>
-                  </div>
-                  <div className="w-10 h-6 bg-gray-300 rounded-full relative cursor-not-allowed">
-                    <div className="w-4 h-4 bg-white rounded-full absolute left-1 top-1 shadow-sm"></div>
-                  </div>
-                </div>
-                <p className="text-xs text-gray-400">{t('tools.cloudDisabled')}</p>
-              </div>
-
-              <div className="pt-4 border-t border-gray-100">
                 <button
-                  onClick={() => setAdvanced((v) => !v)}
-                  className="text-sm text-blue-600 hover:underline flex items-center font-medium"
+                  onClick={() => setAddOpen(false)}
+                  className="btn-mini !py-1 text-xs"
                 >
-                  {advanced ? t('tools.advancedClose') : t('tools.advanced')}
-                  <Icons.ChevronRight
-                    className={`w-4 h-4 ml-1 transition-transform ${advanced ? 'rotate-90' : ''}`}
-                  />
+                  取消
                 </button>
-                {advanced && (
-                  <pre className="mt-3 bg-gray-50 border border-gray-100 rounded-lg p-3 text-[11px] text-gray-600 overflow-x-auto">
-{`{
-  "tool": "${current.id}",
-  "proof": "${current.proof}",
-  "mode": "hook",
-  "projects": [${allowed.map((a) => `"${a}"`).join(', ')}],
-  "auto_record": ${autoRecord}
-}`}
-                  </pre>
-                )}
               </div>
             </div>
           )}
         </div>
+      </div>
+
+      {loading && <Loading />}
+      {error && <ErrorBox message={error} />}
+      {tools.length === 0 && !loading && <Empty text={t('tools.empty')} />}
+
+      {/* 3-Column Tools Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+        {tools.map((tItem) => {
+          const isEnabled = enabledMap[tItem.id] !== undefined ? enabledMap[tItem.id] : tItem.enabled;
+          const meta = TOOL_ICONS[tItem.id] || {
+            icon: tItem.initial || tItem.name[0].toUpperCase(),
+            color: '#3b82f6',
+          };
+
+          return (
+            <div
+              key={tItem.id}
+              className="summary-card p-4 transition-all hover:border-white/20"
+            >
+              <div className="flex justify-between items-center mb-2.5">
+                <div className="flex items-center gap-2.5">
+                  <div
+                    className="w-7 h-7 rounded-lg text-white font-bold text-xs flex items-center justify-center"
+                    style={{ backgroundColor: meta.color }}
+                  >
+                    {meta.icon}
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold text-white leading-tight">{tItem.name}</h3>
+                    <span className="text-[10px] text-gray-500 font-mono">{tItem.proofLabel || 'Watcher'}</span>
+                  </div>
+                </div>
+
+                <input
+                  type="checkbox"
+                  checked={isEnabled}
+                  onChange={() => toggleTool(tItem.id, isEnabled)}
+                  className="w-4 h-4 rounded cursor-pointer accent-white"
+                  title="启用/禁用工具连接"
+                />
+              </div>
+
+              <div className="text-[11px] mt-2 pt-2 border-t border-white/5 flex items-center justify-between">
+                <span style={{ color: isEnabled ? '#22c55e' : '#777' }}>
+                  {isEnabled ? `● 状态正常 · ${tItem.lastUsed}` : '○ 未连接'}
+                </span>
+                <span className="text-[10px] text-gray-500">双向读写</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Bottom Quick Setting Bar */}
+      <div className="mt-4 pt-3 border-t border-white/10 flex flex-wrap justify-between items-center gap-3 text-xs text-gray-400">
+        <div className="flex items-center gap-6">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={autoRecord}
+              onChange={(e) => setAutoRecord(e.target.checked)}
+              className="accent-white cursor-pointer"
+            />
+            <span>自动记录任务成果: <strong className="text-white">{autoRecord ? '开启' : '关闭'}</strong></span>
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={cloudSync}
+              onChange={(e) => setCloudSync(e.target.checked)}
+              className="accent-white cursor-pointer"
+            />
+            <span>跨终端同步云端记忆: <strong className="text-white">{cloudSync ? '开启' : '关闭'}</strong></span>
+          </label>
+        </div>
+
+        <button
+          onClick={() => setAddOpen(true)}
+          className="btn-mini text-xs"
+        >
+          配置受信任范围
+        </button>
       </div>
     </div>
   );

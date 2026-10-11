@@ -89,62 +89,62 @@ export default function SolanaQuotaModal({ onClose, onSuccess }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fade-in"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden border border-gray-100 flex flex-col">
+      <div className="glass-panel w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden border border-white/15 bg-[#141418] flex flex-col">
         {/* Header */}
-        <div className="flex justify-between items-center p-5 border-b border-gray-100 bg-purple-50/50">
-          <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 rounded-lg bg-purple-600 text-white flex items-center justify-center font-bold text-sm">
+        <div className="flex justify-between items-center p-5 border-b border-white/10 bg-[#16161c]">
+          <div className="flex items-center space-x-2.5">
+            <div className="w-8 h-8 rounded-lg bg-purple-600/30 border border-purple-500/40 text-purple-300 flex items-center justify-center font-bold text-sm">
               ◎
             </div>
             <div>
-              <h3 className="font-bold text-gray-900 text-base">{t('solana.topUpTitle')}</h3>
-              <span className="text-[11px] text-purple-600 font-medium">Solana Devnet (测试网)</span>
+              <h3 className="font-bold text-white text-base">{t('solana.topUpTitle')}</h3>
+              <span className="text-[11px] text-purple-400 font-medium">Solana Devnet (测试网不可篡改存证)</span>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-200/60 text-gray-400 transition"
+            className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/10 text-gray-400 hover:text-white transition"
           >
             <Icons.X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Content */}
-        <div className="p-6 space-y-5">
-          <p className="text-xs text-gray-500 leading-relaxed">{t('solana.topUpDesc')}</p>
+        <div className="p-6 space-y-4">
+          <p className="text-xs text-gray-400 leading-relaxed">{t('solana.topUpDesc')}</p>
 
-          {/* 账户卡片 */}
-          <div className="p-4 rounded-xl bg-gray-50 border border-gray-200/80 space-y-2 text-xs">
+          {/* Account card */}
+          <div className="p-4 rounded-xl bg-white/[0.03] border border-white/10 space-y-2 text-xs">
             <div className="flex justify-between items-center">
-              <span className="text-gray-500 font-medium">绑定钱包:</span>
-              <span className="font-mono text-gray-800 font-semibold truncate max-w-[240px]">
+              <span className="text-gray-400 font-medium">绑定钱包:</span>
+              <span className="font-mono text-purple-300 font-semibold truncate max-w-[240px]">
                 {wallet.slice(0, 8)}…{wallet.slice(-8)}
               </span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-gray-500 font-medium">测试网 SOL 余额:</span>
-              <span className="font-mono text-gray-800 font-bold">{solBalance.toFixed(4)} SOL</span>
+              <span className="text-gray-400 font-medium">测试网 SOL 余额:</span>
+              <span className="font-mono text-white font-bold">{solBalance.toFixed(4)} SOL</span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-gray-500 font-medium">当前可用上链存证:</span>
-              <span className="text-purple-700 font-bold text-sm">
+              <span className="text-gray-400 font-medium">当前可用上链存证:</span>
+              <span className="text-purple-400 font-bold text-sm">
                 {quota ? `${quota.available} 次` : '加载中…'}
               </span>
             </div>
           </div>
 
-          {/* 状态提醒 */}
+          {/* Status Message */}
           {statusMsg && (
             <div
-              className={`p-3 rounded-lg text-xs leading-relaxed border ${
+              className={`p-3 rounded-xl text-xs leading-relaxed border ${
                 statusMsg.type === 'ok'
-                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                  : 'bg-red-50 text-red-700 border-red-200'
+                  ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                  : 'bg-red-500/15 text-red-300 border-red-500/30'
               }`}
             >
               <div>{statusMsg.text}</div>
@@ -155,36 +155,36 @@ export default function SolanaQuotaModal({ onClose, onSuccess }: Props) {
                   rel="noreferrer"
                   className="inline-block mt-1 underline font-mono text-[11px]"
                 >
-                  查看 Solana Explorer 交易 ↗
+                  在 Solana Explorer 查看交易 ↗
                 </a>
               )}
             </div>
           )}
 
-          {/* 购买包展示 */}
-          <div className="border border-purple-200 rounded-xl p-4 bg-gradient-to-br from-purple-50/30 to-white flex justify-between items-center">
+          {/* Quota Package */}
+          <div className="border border-purple-500/30 rounded-xl p-4 bg-purple-950/15 flex justify-between items-center">
             <div>
-              <div className="text-sm font-bold text-gray-900">10 次链上存证包</div>
-              <div className="text-xs text-gray-500 mt-0.5">
+              <div className="text-sm font-bold text-white">10 次链上存证包</div>
+              <div className="text-xs text-gray-400 mt-0.5">
                 扣除: 10 {config?.token_symbol || '$WMEM'} / 0.01 SOL
               </div>
             </div>
             <button
               onClick={handlePurchase}
               disabled={loading}
-              className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-semibold shadow-sm transition disabled:opacity-50"
+              className="btn-mini btn-mini-primary !py-2 !px-3 text-xs"
             >
               {loading ? '交易确认中…' : t('solana.topUpBtn')}
             </button>
           </div>
 
-          {/* 水龙头快捷操作 */}
-          <div className="pt-2 border-t border-gray-100 flex justify-between items-center text-xs">
-            <span className="text-gray-400">缺少 Devnet 测试币？</span>
+          {/* Faucet shortcut */}
+          <div className="pt-2 border-t border-white/10 flex justify-between items-center text-xs">
+            <span className="text-gray-500">缺少 Devnet 测试币？</span>
             <button
               onClick={handleAirdrop}
               disabled={loading}
-              className="text-purple-600 hover:text-purple-800 font-medium flex items-center space-x-1 transition disabled:opacity-50"
+              className="text-purple-400 hover:text-purple-300 font-medium flex items-center space-x-1 transition disabled:opacity-50"
             >
               <span>💧</span>
               <span>{t('solana.airdropBtn')}</span>
@@ -193,10 +193,10 @@ export default function SolanaQuotaModal({ onClose, onSuccess }: Props) {
         </div>
 
         {/* Footer */}
-        <div className="p-4 bg-gray-50/80 border-t border-gray-100 flex justify-end">
+        <div className="p-4 bg-[#16161c] border-t border-white/10 flex justify-end">
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-100 transition"
+            className="btn-mini text-xs"
           >
             {t('common.cancel')}
           </button>

@@ -15,9 +15,9 @@ export function DegradedBanner() {
   }, []);
   if (!degraded) return null;
   return (
-    <div className="bg-orange-50 border-b border-orange-200 px-6 py-2 text-xs text-orange-700 flex items-center">
-      <Icons.AlertTriangle className="w-4 h-4 mr-2" />
-      {t('feed.degraded')}
+    <div className="w-full bg-orange-500/15 border border-orange-500/30 px-4 py-2 rounded-xl text-xs text-orange-300 flex items-center mb-3">
+      <Icons.AlertTriangle className="w-4 h-4 mr-2 flex-shrink-0" />
+      <span>{t('feed.degraded')}</span>
     </div>
   );
 }
@@ -27,26 +27,26 @@ export function MockBanner() {
   const { t } = useI18n();
   if (!USE_MOCK) return null;
   return (
-    <div className="bg-blue-50 border-b border-blue-200 px-6 py-2 text-xs text-blue-700 flex items-center">
-      <Icons.Shield className="w-4 h-4 mr-2" />
-      {t('feed.mock')}
+    <div className="w-full bg-blue-500/15 border border-blue-500/30 px-4 py-2 rounded-xl text-xs text-blue-300 flex items-center mb-3">
+      <Icons.Shield className="w-4 h-4 mr-2 flex-shrink-0" />
+      <span>{t('feed.mock')}</span>
     </div>
   );
 }
 
 export function Loading() {
   const { t } = useI18n();
-  return <div className="text-sm text-gray-400 py-10">{t('common.loading')}</div>;
+  return <div className="text-xs text-gray-500 py-6 text-center animate-pulse">{t('common.loading')}</div>;
 }
 
 export function ErrorBox({ message }: { message: string }) {
   return (
-    <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3">
+    <div className="bg-red-500/15 border border-red-500/30 text-red-300 text-xs rounded-xl px-4 py-3 mb-3">
       {message}
     </div>
   );
 }
 
 export function Empty({ text }: { text: string }) {
-  return <div className="text-sm text-gray-400 py-10">{text}</div>;
+  return <div className="text-xs text-gray-500 py-8 text-center">{text}</div>;
 }

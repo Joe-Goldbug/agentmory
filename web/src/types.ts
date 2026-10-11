@@ -72,6 +72,7 @@ export interface HistoryItem {
       cluster: string;
       explorer_url: string;
       timestamp: string;
+      storage_uri?: string;
     };
   };
 }

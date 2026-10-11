@@ -357,7 +357,7 @@ def _handle_teams(root: Path, params: dict[str, list[str]], body: Any) -> Any:
 
 
 def _handle_subscription(root: Path, params: dict[str, list[str]], body: Any) -> Any:
-    # 无计费模块；Local 档即项目真实形态 —— 见集成文档 §3.1⑦
+    # 按照商业化产品定价规范提供 4 档订阅方案定义
     return [
         {
             "name": "Local",
@@ -368,7 +368,37 @@ def _handle_subscription(root: Path, params: dict[str, list[str]], body: Any) ->
             "buttonText": "当前套餐",
             "highlight": False,
             "disabled": True,
-        }
+        },
+        {
+            "name": "Personal",
+            "price": "¥39",
+            "desc": "¥39 / 月",
+            "target": "工作不丢、换电脑能继续、少维护",
+            "features": ["加密云备份", "跨设备同步", "版本恢复", "自动整理额度", "运行异常提醒"],
+            "buttonText": "升级 Personal",
+            "highlight": True,
+            "disabled": False,
+        },
+        {
+            "name": "Pro",
+            "price": "¥89",
+            "desc": "¥89 / 月",
+            "target": "多个项目和多个工具之间更可靠地衔接",
+            "features": ["Personal 全部功能", "更多语义整理额度", "跨项目经验综合", "冲突与影响分析"],
+            "buttonText": "升级 Pro",
+            "highlight": False,
+            "disabled": False,
+        },
+        {
+            "name": "Team",
+            "price": "¥69",
+            "desc": "¥69 / 人 / 月起 (3人起)",
+            "target": "团队不用反复传背景，也能控制谁写入什么",
+            "features": ["共享项目记忆", "成员权限管理", "审批与审计日志", "团队交接流水线"],
+            "buttonText": "联系团队版",
+            "highlight": False,
+            "disabled": False,
+        },
     ]
 
 
@@ -424,15 +454,34 @@ def _handle_solana_attestations(root: Path, params: dict[str, list[str]], body: 
     return solana_storage.list_attestations(root, wallet or None)
 
 
+def _handle_solana_verify(root: Path, params: dict[str, list[str]], body: Any) -> Any:
+    from lwm import solana_storage
+    tx_hash = ((params.get("tx_hash") or [""])[0]).strip()
+    if not tx_hash:
+        raise ApiError(HTTPStatus.BAD_REQUEST, "E_BAD_PARAMS", "缺少 tx_hash 参数")
+    config = solana_storage.get_solana_config(root)
+    rpc_url = config.get("rpc_url", solana_storage.DEFAULT_CONFIG["rpc_url"])
+    try:
+        return solana_storage.verify_solana_tx_on_chain(tx_hash, rpc_url=rpc_url)
+    except ValueError as exc:
+        raise ApiError(HTTPStatus.BAD_REQUEST, "E_VERIFICATION_FAILED", str(exc)) from exc
+
+
 def _handle_solana_purchase(root: Path, body: Any) -> Any:
     from lwm import solana_storage
     wallet = str((body or {}).get("wallet", "")).strip()
     tx_hash = str((body or {}).get("tx_hash", "")).strip()
     token_amount = int((body or {}).get("token_amount", 10))
     quota_added = int((body or {}).get("quota_added", 10))
+    verify_rpc = bool((body or {}).get("verify_rpc", False))
     if not wallet or not tx_hash:
         raise ApiError(HTTPStatus.BAD_REQUEST, "E_BAD_PARAMS", "缺少 wallet 或 tx_hash")
-    return solana_storage.record_quota_purchase(root, wallet, tx_hash, token_amount, quota_added)
+    try:
+        return solana_storage.record_quota_purchase(
+            root, wallet, tx_hash, token_amount, quota_added, verify_rpc=verify_rpc
+        )
+    except ValueError as exc:
+        raise ApiError(HTTPStatus.BAD_REQUEST, "E_PURCHASE_FAILED", str(exc)) from exc
 
 
 def _handle_solana_commit(root: Path, body: Any) -> Any:
@@ -444,14 +493,115 @@ def _handle_solana_commit(root: Path, body: Any) -> Any:
     snapshot_hash = str((body or {}).get("snapshot_hash", "")).strip()
     tx_hash = str((body or {}).get("tx_hash", "")).strip()
     slot = (body or {}).get("slot")
+    verify_rpc = bool((body or {}).get("verify_rpc", False))
     if not wallet or not event_id or not snapshot_hash or not tx_hash:
         raise ApiError(HTTPStatus.BAD_REQUEST, "E_BAD_PARAMS", "缺少必要参数")
     try:
         return solana_storage.record_attestation(
-            root, wallet, event_id, project_id, version, snapshot_hash, tx_hash, slot
+            root, wallet, event_id, project_id, version, snapshot_hash, tx_hash, slot, verify_rpc=verify_rpc
         )
     except ValueError as exc:
         raise ApiError(HTTPStatus.BAD_REQUEST, "E_QUOTA_EXCEEDED", str(exc)) from exc
+
+
+def _handle_vault_upload(root: Path, body: Any) -> Any:
+    from lwm import vault
+    payload = body or {}
+    snapshot_hash = str(payload.get("snapshot_hash", "")).strip()
+    packed_b64 = str(payload.get("packed_ciphertext_base64", "")).strip()
+    wallet = str(payload.get("wallet", "")).strip()
+    metadata = payload.get("metadata")
+    if not snapshot_hash or not packed_b64:
+        raise ApiError(HTTPStatus.BAD_REQUEST, "E_BAD_PARAMS", "缺少 snapshot_hash 或 packed_ciphertext_base64")
+    try:
+        return vault.store_encrypted_snapshot(
+            root,
+            snapshot_hash=snapshot_hash,
+            packed_ciphertext_base64=packed_b64,
+            wallet=wallet,
+            metadata=metadata,
+        )
+    except ValueError as exc:
+        raise ApiError(HTTPStatus.BAD_REQUEST, "E_VAULT_ERROR", str(exc)) from exc
+
+
+def _handle_vault_download(root: Path, params: dict[str, list[str]], body: Any) -> Any:
+    from lwm import vault
+    uri = ((params.get("uri") or [""])[0]).strip()
+    snapshot_hash = ((params.get("snapshot_hash") or [""])[0]).strip()
+    target = uri or snapshot_hash
+    if not target:
+        raise ApiError(HTTPStatus.BAD_REQUEST, "E_BAD_PARAMS", "缺少 uri 或 snapshot_hash 参数")
+    res = vault.get_encrypted_snapshot(root, target)
+    if not res:
+        raise ApiError(HTTPStatus.NOT_FOUND, "E_NOT_FOUND", "未找到指定快照密文")
+    return res
+
+
+def _handle_vault_list(root: Path, params: dict[str, list[str]], body: Any) -> Any:
+    from lwm import vault
+    wallet = ((params.get("wallet") or [""])[0]).strip()
+    return vault.list_encrypted_snapshots(root, wallet or None)
+
+
+def _handle_backup_bundle(root: Path, params: dict[str, list[str]], body: Any) -> Any:
+    from lwm import backup
+
+    return backup.create_backup_bundle(root)
+
+
+def _handle_backup_restore(root: Path, body: Any) -> Any:
+    from lwm import backup
+
+    payload = body or {}
+    tar_b64 = str(payload.get("tar_base64", "")).strip()
+    sha256 = str(payload.get("sha256", "")).strip()
+    if not tar_b64 or not sha256:
+        raise ApiError(HTTPStatus.BAD_REQUEST, "E_BAD_PARAMS", "缺少 tar_base64 或 sha256")
+    try:
+        return backup.restore_backup_bundle(root, tar_b64, sha256)
+    except PermissionError as exc:
+        raise ApiError(HTTPStatus.FORBIDDEN, "E_ZIP_SLIP", str(exc)) from exc
+    except ValueError as exc:
+        raise ApiError(HTTPStatus.BAD_REQUEST, "E_RESTORE_FAILED", str(exc)) from exc
+
+
+def _handle_leases_active(root: Path, params: dict[str, list[str]], body: Any) -> Any:
+    from lwm import lease
+
+    project_id = (params.get("project_id") or [""])[0]
+    return lease.get_active_lease(root, project_id)
+
+
+def _handle_leases_list(root: Path, params: dict[str, list[str]], body: Any) -> Any:
+    from lwm import lease
+
+    return lease.list_active_leases(root)
+
+
+def _handle_leases_acquire(root: Path, body: Any) -> Any:
+    from lwm import lease
+
+    payload = body or {}
+    project_id = str(payload.get("project_id", "")).strip()
+    agent_name = str(payload.get("agent_name", "")).strip()
+    objective = str(payload.get("objective", "")).strip()
+    ttl = int(payload.get("ttl_seconds", lease.DEFAULT_TTL_SECONDS))
+    force = bool(payload.get("force", False))
+    if not project_id or not agent_name:
+        raise ApiError(HTTPStatus.BAD_REQUEST, "E_BAD_PARAMS", "缺少 project_id 或 agent_name")
+    return lease.acquire_lease(root, project_id, agent_name, objective, ttl, force)
+
+
+def _handle_leases_release(root: Path, body: Any) -> Any:
+    from lwm import lease
+
+    payload = body or {}
+    project_id = str(payload.get("project_id", "")).strip()
+    lease_id = payload.get("lease_id")
+    if not project_id:
+        raise ApiError(HTTPStatus.BAD_REQUEST, "E_BAD_PARAMS", "缺少 project_id")
+    return lease.release_lease(root, project_id, lease_id)
 
 
 # --------------------------------------------------------------------------
@@ -474,6 +624,12 @@ ROUTES: dict[str, Callable[[Path, dict[str, list[str]], Any], Any]] = {
     "/api/solana/config": _handle_solana_config,
     "/api/solana/quota": _handle_solana_quota,
     "/api/solana/attestations": _handle_solana_attestations,
+    "/api/solana/verify": _handle_solana_verify,
+    "/api/vault/download": _handle_vault_download,
+    "/api/vault/list": _handle_vault_list,
+    "/api/backup/bundle": _handle_backup_bundle,
+    "/api/leases/active": _handle_leases_active,
+    "/api/leases": _handle_leases_list,
 }
 
 REVIEW_PREFIX = "/api/candidates/"
@@ -495,6 +651,14 @@ def _dispatch(
         return _handle_solana_purchase(root, body)
     if method == "POST" and path == "/api/solana/commit":
         return _handle_solana_commit(root, body)
+    if method == "POST" and path == "/api/vault/upload":
+        return _handle_vault_upload(root, body)
+    if method == "POST" and path == "/api/backup/restore":
+        return _handle_backup_restore(root, body)
+    if method == "POST" and path == "/api/leases/acquire":
+        return _handle_leases_acquire(root, body)
+    if method == "POST" and path == "/api/leases/release":
+        return _handle_leases_release(root, body)
     # webauth 依赖本模块的 ApiError，延迟导入避免循环
     from lwm import webauth
 

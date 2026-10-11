@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import Sidebar from './components/Sidebar';
-import TopBar from './components/TopBar';
-import StatusBar from './components/StatusBar';
+import Header from './components/Header';
+import StatsFooter from './components/StatsFooter';
 import SubscriptionModal from './components/SubscriptionModal';
+import SolanaQuotaModal from './components/SolanaQuotaModal';
 import { DegradedBanner, MockBanner } from './components/Feedback';
 import WorkspaceView from './views/WorkspaceView';
 import WorkStyleView from './views/WorkStyleView';
@@ -10,6 +10,7 @@ import ConfirmView from './views/ConfirmView';
 import HistoryView from './views/HistoryView';
 import ToolsView from './views/ToolsView';
 import TeamView from './views/TeamView';
+import PlansView from './views/PlansView';
 import { useAsyncData } from './hooks/useAsyncData';
 import { fetchCandidates } from './api/adapters/candidateAdapter';
 import { fetchStatus, fetchSubscription, fetchSearch } from './api/adapters/miscAdapter';
@@ -35,6 +36,7 @@ function Shell() {
   const { t, lang } = useI18n();
   const [activeTab, setActiveTab] = useState('workspace');
   const [showSubscription, setShowSubscription] = useState(false);
+  const [showQuotaModal, setShowQuotaModal] = useState(false);
   const [query, setQuery] = useState('');
 
   const status = useAsyncData(() => fetchStatus(), [lang]);
@@ -44,49 +46,73 @@ function Shell() {
   // 搜索防抖
   const [debounced, setDebounced] = useState('');
   useEffect(() => {
-    const t = setTimeout(() => setDebounced(query), 300);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setDebounced(query), 300);
+    return () => clearTimeout(timer);
   }, [query]);
   const search = useAsyncData(() => fetchSearch(debounced), [debounced, lang]);
 
   if (!ready) {
     return (
-      <div className="h-screen w-full flex items-center justify-center bg-[#f8f9fa] text-gray-400 text-sm">
-        {t('app.restoring')}
+      <div className="h-screen w-full flex items-center justify-center bg-black text-gray-400 text-xs">
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-2 rounded-full bg-white animate-ping" />
+          <span>{t('app.restoring')}</span>
+        </div>
       </div>
     );
   }
+
   if (!user) return <LoginView />;
 
   return (
-    <div className="flex h-screen w-full bg-[#f8f9fa] font-sans text-gray-800 overflow-hidden">
-      <Sidebar
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
-        pendingCount={candidates.data?.length ?? 0}
-        onUpgrade={() => setShowSubscription(true)}
-      />
+    <>
+      {/* Pure solid black & ambient layered background */}
+      <div className="bg-layer" />
 
-      <main className="flex-1 flex flex-col relative bg-[#f8f9fa] overflow-hidden">
-        <TopBar query={query} onQuery={setQuery} hits={search.data ?? []} />
-        <DegradedBanner />
-        <MockBanner />
+      {/* Main Single-Viewport Page Layout */}
+      <main className="page-container">
+        {/* 1) Floating Header: Flowmory Logo + 7-Module Pill Nav + User Chip */}
+        <Header
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          pendingCount={candidates.data?.length ?? 0}
+          query={query}
+          onQuery={setQuery}
+          hits={search.data ?? []}
+          onOpenQuota={() => setShowQuotaModal(true)}
+          onOpenUpgrade={() => setShowSubscription(true)}
+        />
 
-        <div className="flex-1 overflow-y-auto p-8 relative">
-          {activeTab === 'workspace' && <WorkspaceView tool={TOOL} projectPath={PROJECT_PATH} />}
-          {activeTab === 'style' && <WorkStyleView />}
-          {activeTab === 'confirm' && <ConfirmView />}
-          {activeTab === 'history' && <HistoryView />}
-          {activeTab === 'tools' && <ToolsView />}
-          {activeTab === 'team' && <TeamView />}
-        </div>
+        {/* 2) Center Hero / Stage Container */}
+        <section className="hero-stage">
+          <div className="w-full max-w-5xl px-2">
+            <DegradedBanner />
+            <MockBanner />
+          </div>
 
-        <StatusBar status={status.data} />
+          <div className="stage-content">
+            {activeTab === 'workspace' && <WorkspaceView tool={TOOL} projectPath={PROJECT_PATH} />}
+            {activeTab === 'style' && <WorkStyleView />}
+            {activeTab === 'confirm' && <ConfirmView />}
+            {activeTab === 'history' && <HistoryView />}
+            {activeTab === 'tools' && <ToolsView />}
+            {activeTab === 'team' && <TeamView />}
+            {activeTab === 'plans' && <PlansView />}
+          </div>
+        </section>
+
+        {/* 3) Stats Footer (4 Metrics with Retro Dot-Matrix Display & Count-Up) */}
+        <StatsFooter status={status.data} />
       </main>
 
+      {/* Modals */}
       {showSubscription && plans.data && (
         <SubscriptionModal plans={plans.data} onClose={() => setShowSubscription(false)} />
       )}
-    </div>
+
+      {showQuotaModal && (
+        <SolanaQuotaModal onClose={() => setShowQuotaModal(false)} />
+      )}
+    </>
   );
 }

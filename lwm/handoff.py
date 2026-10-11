@@ -23,11 +23,61 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 
+import subprocess
+
 HANDOFFS_DIR = Path("state/handoffs")
 ACTIVE_POINTER = "active.json"
 MAX_HANDOFF_TEXT_CHARS = 480
 MAX_HANDOFF_ITEMS = 8
 MAX_HANDOFF_ITEM_CHARS = 240
+
+
+class HandoffConflictError(ValueError):
+    """Raised on concurrent handoff collision when supersedes does not match active."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        active_id: str | None = None,
+        fork_path: Path | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.active_id = active_id
+        self.fork_path = fork_path
+
+
+def resolve_project_branch(project_path: Path | str | None) -> tuple[str, str]:
+    """Resolve git branch and head commit for a project path without crashing."""
+    if not project_path:
+        return "", ""
+    p = Path(project_path)
+    if not p.is_dir():
+        return "", ""
+    try:
+        res = subprocess.run(
+            ["git", "-C", str(p), "rev-parse", "--abbrev-ref", "HEAD"],
+            capture_output=True,
+            text=True,
+            timeout=2,
+            check=False,
+            env={"GIT_TERMINAL_PROMPT": "0"},
+        )
+        branch = res.stdout.strip() if res.returncode == 0 else ""
+        if branch == "HEAD":
+            branch = ""
+        head_res = subprocess.run(
+            ["git", "-C", str(p), "rev-parse", "--short", "HEAD"],
+            capture_output=True,
+            text=True,
+            timeout=2,
+            check=False,
+            env={"GIT_TERMINAL_PROMPT": "0"},
+        )
+        head = head_res.stdout.strip() if head_res.returncode == 0 else ""
+        return branch, head
+    except (OSError, subprocess.SubprocessError):
+        return "", ""
 
 
 def _now() -> str:
@@ -52,6 +102,10 @@ class HandoffPacket:
     created_at: str = ""
     supersedes: str | None = None
     closed_at: str | None = None
+    git_branch: str = ""
+    head_commit: str = ""
+    version: int = 1
+    conflict_status: str | None = None
     schema_version: int = 2
 
     def to_dict(self) -> dict[str, Any]:
@@ -77,6 +131,10 @@ class HandoffPacket:
             created_at=str(payload.get("created_at") or _now()),
             supersedes=payload.get("supersedes"),
             closed_at=payload.get("closed_at"),
+            git_branch=str(payload.get("git_branch") or ""),
+            head_commit=str(payload.get("head_commit") or ""),
+            version=int(payload.get("version") or 1),
+            conflict_status=payload.get("conflict_status"),
             schema_version=int(payload.get("schema_version") or 2),
         )
 
@@ -85,8 +143,11 @@ def _handoffs_dir(root: Path) -> Path:
     return root / HANDOFFS_DIR
 
 
-def _active_path(root: Path, *, project_id: str) -> Path:
+def _active_path(root: Path, *, project_id: str, branch: str | None = None) -> Path:
     safe = "".join(ch if ch.isalnum() or ch in ("-", "_") else "_" for ch in project_id)
+    if branch and branch.strip() and branch.strip() != "HEAD":
+        safe_branch = "".join(ch if ch.isalnum() or ch in ("-", "_") else "_" for ch in branch.strip())
+        return _handoffs_dir(root) / f"active-{safe}--{safe_branch}.json"
     return _handoffs_dir(root) / f"active-{safe}.json"
 
 
@@ -142,7 +203,24 @@ def _summary_items(
     return _bounded_items(value, field=present_key)
 
 
-def load_active(root: Path, *, project_id: str) -> HandoffPacket | None:
+def load_active(
+    root: Path,
+    *,
+    project_id: str,
+    branch: str | None = None,
+    fallback_to_project: bool = True,
+) -> HandoffPacket | None:
+    if branch and branch.strip() and branch.strip() != "HEAD":
+        branch_path = _active_path(root, project_id=project_id, branch=branch)
+        if branch_path.is_file():
+            try:
+                payload = json.loads(branch_path.read_text(encoding="utf-8"))
+                if isinstance(payload, dict) and payload.get("project_id") == project_id:
+                    return HandoffPacket.from_dict(payload)
+            except (OSError, ValueError):
+                pass
+        if not fallback_to_project:
+            return None
     path = _active_path(root, project_id=project_id)
     if not path.is_file():
         return None
@@ -192,12 +270,17 @@ def create_handoff(
     open_questions: Iterable[str] = (),
     next_action: str = "",
     evidence_ids: Iterable[str] = (),
+    project_path: Path | str | None = None,
+    git_branch: str = "",
+    head_commit: str = "",
+    allow_fork: bool = False,
 ) -> HandoffPacket:
     """Create and persist a new handoff for ``project_id``.
 
     The active pointer is updated atomically. ``supersedes`` is enforced: if it
     is set, the existing active handoff (if any) must carry that id; otherwise
-    the call is rejected as a stale write.
+    the call is rejected with HandoffConflictError (saving an audit fork file to
+    ensure zero lost updates).
     """
 
     project_id = _bounded_text(project_id, field="project_id", required=True)
@@ -213,14 +296,55 @@ def create_handoff(
     open_questions = _bounded_items(open_questions, field="open_questions")
     evidence_ids = _bounded_items(evidence_ids, field="evidence_ids")
     supersedes = _bounded_text(supersedes, field="supersedes") or None
-    current = load_active(root, project_id=project_id)
+
+    if (not git_branch or not head_commit) and project_path:
+        b, c = resolve_project_branch(project_path)
+        git_branch = git_branch or b
+        head_commit = head_commit or c
+
+    current = load_active(root, project_id=project_id, branch=git_branch or None, fallback_to_project=False)
+    version = (current.version + 1) if current is not None else 1
+
+    base = _handoffs_dir(root)
+    base.mkdir(parents=True, exist_ok=True)
+
     if current is not None and supersedes != current.handoff_id:
-        raise ValueError(
-            f"supersedes must match active handoff {current.handoff_id}; "
-            f"got {supersedes or 'missing'}"
+        fork_id = uuid.uuid4().hex
+        fork_packet = HandoffPacket(
+            handoff_id=fork_id,
+            project_id=project_id,
+            task_id=task_id,
+            objective=objective,
+            current_state=current_state,
+            decisions=tuple(decisions),
+            changes=tuple(changes),
+            verifications=tuple(verifications),
+            risks=tuple(risks),
+            open_questions=tuple(open_questions),
+            next_action=next_action,
+            source_tool=source_tool,
+            evidence_ids=tuple(evidence_ids),
+            created_at=_now(),
+            supersedes=supersedes,
+            git_branch=git_branch,
+            head_commit=head_commit,
+            version=version,
+            conflict_status="fork_supersedes_mismatch",
         )
+        _atomic_write(base / f"{fork_id}.json", fork_packet.to_dict())
+        _atomic_write(base / f"fork-{fork_id}.json", fork_packet.to_dict())
+        if allow_fork:
+            return fork_packet
+        raise HandoffConflictError(
+            f"supersedes must match active handoff {current.handoff_id}; "
+            f"got {supersedes or 'missing'}",
+            active_id=current.handoff_id,
+            fork_path=base / f"fork-{fork_id}.json",
+        )
+
     if current is None and supersedes is not None:
         raise ValueError(f"cannot supersede missing active handoff: {supersedes}")
+
     packet = HandoffPacket(
         handoff_id=uuid.uuid4().hex,
         project_id=project_id,
@@ -237,10 +361,11 @@ def create_handoff(
         evidence_ids=tuple(evidence_ids),
         created_at=_now(),
         supersedes=supersedes,
+        git_branch=git_branch,
+        head_commit=head_commit,
+        version=version,
     )
 
-    base = _handoffs_dir(root)
-    base.mkdir(parents=True, exist_ok=True)
     _atomic_write(base / f"{packet.handoff_id}.json", packet.to_dict())
     _write_active(root, packet)
     return packet
@@ -254,6 +379,10 @@ def create_handoff_from_summary(
     summary: Mapping[str, Any],
     evidence_id: str,
     task_id: str | None = None,
+    project_path: Path | str | None = None,
+    git_branch: str = "",
+    head_commit: str = "",
+    allow_fork: bool = False,
 ) -> HandoffPacket:
     """Create a handoff from bounded structured stop data only.
 
@@ -267,7 +396,13 @@ def create_handoff_from_summary(
         raise ValueError("handoff summary must be an object")
     resolved_task_id = task_id or summary.get("task_id")
     resolved_task_id = _bounded_text(resolved_task_id, field="task_id", required=True)
-    current = load_active(root, project_id=project_id)
+
+    if (not git_branch or not head_commit) and project_path:
+        b, c = resolve_project_branch(project_path)
+        git_branch = git_branch or b
+        head_commit = head_commit or c
+
+    current = load_active(root, project_id=project_id, branch=git_branch or None, fallback_to_project=False)
     if current is not None and current.task_id != resolved_task_id:
         raise ValueError("active handoff belongs to a different task")
     supersedes = summary.get("supersedes")
@@ -290,6 +425,10 @@ def create_handoff_from_summary(
         source_tool=source_tool,
         evidence_ids=evidence,
         supersedes=supersedes,
+        project_path=project_path,
+        git_branch=git_branch,
+        head_commit=head_commit,
+        allow_fork=allow_fork,
     )
 
 
@@ -322,6 +461,9 @@ def _write_active(root: Path, packet: HandoffPacket) -> None:
     target = _active_path(root, project_id=packet.project_id)
     target.parent.mkdir(parents=True, exist_ok=True)
     _atomic_write(target, packet.to_dict())
+    if packet.git_branch:
+        branch_target = _active_path(root, project_id=packet.project_id, branch=packet.git_branch)
+        _atomic_write(branch_target, packet.to_dict())
 
 
 def _atomic_write(path: Path, payload: dict[str, Any]) -> None:
@@ -387,6 +529,15 @@ def close_handoff(root: Path, *, handoff_id: str) -> HandoffPacket:
             current = None
         if isinstance(current, dict) and current.get("handoff_id") == handoff_id:
             active_path.unlink()
+    if packet.git_branch:
+        branch_path = _active_path(root, project_id=packet.project_id, branch=packet.git_branch)
+        if branch_path.is_file():
+            try:
+                curr_b = json.loads(branch_path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                curr_b = None
+            if isinstance(curr_b, dict) and curr_b.get("handoff_id") == handoff_id:
+                branch_path.unlink()
     return packet
 
 
@@ -429,6 +580,7 @@ def render_handoff_markdown(packet: HandoffPacket) -> str:
 __all__ = [
     "ACTIVE_POINTER",
     "HANDOFFS_DIR",
+    "HandoffConflictError",
     "HandoffPacket",
     "ack_handoff",
     "append_handoff_evidence",
@@ -438,4 +590,5 @@ __all__ = [
     "list_handoffs",
     "load_active",
     "render_handoff_markdown",
+    "resolve_project_branch",
 ]

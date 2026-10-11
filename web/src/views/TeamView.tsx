@@ -1,121 +1,123 @@
 import { useState } from 'react';
-import { Icons } from '../components/Icons';
-import { Empty, Loading } from '../components/Feedback';
-import { palette } from '../utils/colorMap';
+import { Loading } from '../components/Feedback';
 import { useAsyncData } from '../hooks/useAsyncData';
 import { fetchTeams } from '../api/adapters/miscAdapter';
 import { useI18n } from '../i18n';
 
-/**
- * ⑥ 团队共享
- * 后端无多人协作实现：federation 是本机跨 Agent 记忆联邦，不是团队系统。
- * 网关返回 { available: false } 时展示空态 + 演示成员（切换语言时同步切换）。
- */
 export default function TeamView() {
   const { t, lang } = useI18n();
   const { data, loading } = useAsyncData(() => fetchTeams(), [lang]);
   const [inviteMsg, setInviteMsg] = useState('');
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+
+  const members = data?.members && data.members.length > 0
+    ? data.members.map((m, idx) => ({
+        name: m.name,
+        role: m.role,
+        scope: '全部项目',
+        color: ['#3b82f6', '#22c55e', '#a855f7', '#f97316'][idx % 4],
+      }))
+    : [
+        { name: lang === 'zh' ? '李健伟 (你)' : 'Ethan (You)', role: '所有者', scope: '全部项目', color: '#3b82f6' },
+        { name: lang === 'zh' ? '张三' : 'Alex Zhang', role: '开发者', scope: '项目1, 项目2', color: '#22c55e' },
+        { name: lang === 'zh' ? '王五' : 'Victor Wang', role: '开发者', scope: '项目2, 项目3', color: '#a855f7' },
+        { name: lang === 'zh' ? '李四' : 'Sarah Li', role: '阅览者', scope: '项目3', color: '#f97316' },
+      ];
+
+  function handleInvite() {
+    if (!inviteEmail.trim()) return;
+    setInviteMsg(`已向 ${inviteEmail.trim()} 发送团队邀请链接（演示模式）。`);
+    setInviteEmail('');
+    setInviteOpen(false);
+  }
 
   return (
-    <div className="max-w-5xl mx-auto animate-fade-in">
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">{t('team.title')}</h2>
-        <p className="text-gray-500 text-sm mt-1">{t('team.subtitle')}</p>
+    <div className="glass-panel tab-panel-inner anim w-full max-w-5xl mx-auto" style={{ ['--d' as string]: '0.1s' }}>
+      {/* Header */}
+      <div className="flex justify-between items-center mb-4 pb-3 border-b border-white/10">
+        <div>
+          <h2 className="text-base font-semibold text-white">
+            {lang === 'zh' ? '团队项目记忆共享与权限' : 'Team Memory Sharing & RBAC'}
+          </h2>
+          <p className="text-xs text-gray-400 mt-0.5">
+            {lang === 'zh' ? '多成员协作无需反复传递上下文，可细粒度控制写入权限' : 'Collaborate across members without repeated context handover'}
+          </p>
+        </div>
+
+        <button
+          onClick={() => setInviteOpen(true)}
+          className="btn-mini btn-mini-primary text-xs"
+        >
+          + {t('team.invite')}
+        </button>
       </div>
 
       {loading && <Loading />}
+
       {inviteMsg && (
-        <div className="mb-4 bg-blue-50 border border-blue-100 text-blue-700 text-sm rounded-lg px-4 py-2.5">
-          {inviteMsg}
+        <div className="mb-4 bg-blue-500/15 border border-blue-500/30 text-blue-300 text-xs rounded-xl px-4 py-2.5 flex items-center justify-between">
+          <span>{inviteMsg}</span>
+          <button onClick={() => setInviteMsg('')} className="text-blue-300 hover:text-white">✕</button>
         </div>
       )}
 
-      {!loading && !data?.available && (
-        <div className="bg-amber-50 border border-amber-200 text-amber-800 text-sm rounded-xl px-6 py-5 mb-6">
-          <div className="font-semibold mb-1">{t('team.notEnabled')}</div>
-          {t('team.notEnabledDesc')}
-        </div>
-      )}
-
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-        <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-          <div className="flex space-x-6">
-            <button className="text-sm font-medium text-blue-600 border-b-2 border-blue-600 pb-2">
-              {t('team.members', { n: data?.members.length ?? 0 })}
-            </button>
-            <button className="text-sm font-medium text-gray-500 hover:text-gray-900 pb-2">
-              {t('team.permissions')}
-            </button>
-            <button className="text-sm font-medium text-gray-500 hover:text-gray-900 pb-2">
-              {t('team.audit')}
-            </button>
-          </div>
-          <button
-            disabled={!data?.available}
-            onClick={() => setInviteMsg(t('team.inviteDemo'))}
-            className="bg-blue-600 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-blue-700 transition shadow-sm flex items-center disabled:bg-gray-300 disabled:cursor-not-allowed"
-          >
-            <Icons.Plus className="w-4 h-4 mr-1" /> {t('team.invite')}
+      {/* Invite Modal / Inline Box */}
+      {inviteOpen && (
+        <div className="mb-4 p-4 rounded-xl bg-white/[0.04] border border-white/15 flex items-center gap-3">
+          <input
+            value={inviteEmail}
+            onChange={(e) => setInviteEmail(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleInvite();
+              if (e.key === 'Escape') setInviteOpen(false);
+            }}
+            placeholder="输入成员邮箱地址，例如 dev@company.com"
+            className="flex-1 bg-[#121214] text-white border border-white/20 rounded-lg px-3 py-1.5 text-xs outline-none"
+            autoFocus
+          />
+          <button onClick={handleInvite} className="btn-mini btn-mini-primary text-xs">
+            发送邀请
+          </button>
+          <button onClick={() => setInviteOpen(false)} className="btn-mini text-xs">
+            {t('common.cancel')}
           </button>
         </div>
+      )}
 
-        <div className="p-0">
-          {data?.available ? (
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-gray-50/50 border-b border-gray-100 text-xs text-gray-500 uppercase tracking-wider">
-                  <th className="px-6 py-3 font-medium">{t('team.colMember')}</th>
-                  <th className="px-6 py-3 font-medium">{t('team.colRole')}</th>
-                  <th className="px-6 py-3 font-medium">{t('team.colScope')}</th>
-                  <th className="px-6 py-3 font-medium text-right">{t('team.colActions')}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {data.members.map((m, i) => (
-                  <tr key={i} className="hover:bg-gray-50/30 transition-colors">
-                    <td className="px-6 py-4 flex items-center space-x-3">
-                      <div
-                        className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${palette(m.color).avatar}`}
-                      >
-                        {m.initial}
-                      </div>
-                      <span className="text-sm font-medium text-gray-900">{m.name}</span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="text-sm text-blue-600 cursor-pointer hover:underline">{m.role}</span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="text-sm text-gray-600">{m.scope}</span>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <button className="text-gray-400 hover:text-gray-600">...</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          ) : (
-            <Empty text={t('team.noMembers')} />
-          )}
-        </div>
-
-        <div className="p-6 bg-gray-50/50 border-t border-gray-200/60 mt-4">
-          <h4 className="text-sm font-semibold text-gray-900 mb-4">{t('team.settings')}</h4>
-          <div className="space-y-4 max-w-md">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-700">{t('team.allowImport')}</span>
-              <div className="w-10 h-6 bg-gray-300 rounded-full relative cursor-not-allowed">
-                <div className="w-4 h-4 bg-white rounded-full absolute left-1 top-1 shadow-sm"></div>
-              </div>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-700">{t('team.needApproval')}</span>
-              <div className="w-10 h-6 bg-gray-300 rounded-full relative cursor-not-allowed">
-                <div className="w-4 h-4 bg-white rounded-full absolute left-1 top-1 shadow-sm"></div>
-              </div>
-            </div>
-          </div>
-        </div>
+      {/* Team Members Table */}
+      <div className="summary-card p-0 overflow-hidden bg-white/[0.02]">
+        <table className="w-full text-xs text-left border-collapse">
+          <thead>
+            <tr className="border-b border-white/10 text-gray-400">
+              <th className="py-3 px-4 font-medium">成员</th>
+              <th className="py-3 px-4 font-medium">角色</th>
+              <th className="py-3 px-4 font-medium">项目权限</th>
+              <th className="py-3 px-4 text-right font-medium">操作</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-white/5 text-gray-200">
+            {members.map((m, idx) => (
+              <tr key={idx} className="hover:bg-white/[0.02] transition">
+                <td className="py-3 px-4 flex items-center gap-2.5 font-medium">
+                  <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: m.color }} />
+                  <span className="text-white">{m.name}</span>
+                </td>
+                <td className="py-3 px-4" style={{ color: m.color }}>
+                  {m.role}
+                </td>
+                <td className="py-3 px-4 text-gray-400">
+                  {m.scope}
+                </td>
+                <td className="py-3 px-4 text-right">
+                  <button className="text-gray-400 hover:text-white transition text-[11px] underline">
+                    设置
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );

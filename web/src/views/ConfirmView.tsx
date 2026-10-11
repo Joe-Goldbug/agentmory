@@ -1,19 +1,16 @@
 import { useState } from 'react';
-import { Icons } from '../components/Icons';
 import { Empty, ErrorBox, Loading } from '../components/Feedback';
-import { palette } from '../utils/colorMap';
 import { useAsyncData } from '../hooks/useAsyncData';
 import { fetchCandidates, reviewCandidate } from '../api/adapters/candidateAdapter';
 import { useI18n } from '../i18n';
-import type { CandidateItem, CandidatePriority } from '../types';
+import type { CandidateItem } from '../types';
 
-const KIND_COLOR: Record<string, string> = { rule: 'orange', conflict: 'red', outdated: 'purple' };
+const PRIORITY_BADGES: Record<string, { label: string; color: string }> = {
+  high: { label: '高优先级', color: '#f97316' },
+  medium: { label: '中优先级', color: '#ef4444' },
+  low: { label: '低优先级', color: '#a855f7' },
+};
 
-/**
- * ③ 待确认
- * 真实来源：GET /api/candidates + POST /api/candidates/<id>/review { decision }
- * 后端 decision 仅 accept / reject / promote 三种。
- */
 export default function ConfirmView() {
   const { t, lang } = useI18n();
   const { data, loading, error, reload } = useAsyncData<CandidateItem[]>(() => fetchCandidates(), [lang]);
@@ -33,9 +30,12 @@ export default function ConfirmView() {
     try {
       await reviewCandidate(id, decision);
       const doneKey =
-        decision === 'accept' ? 'confirm.doneAccept' : decision === 'reject' ? 'confirm.doneReject' : 'confirm.donePromote';
-      if (id.startsWith('demo-')) {
-        // 演示候选无后端落点：本地移除并提示
+        decision === 'accept'
+          ? 'confirm.doneAccept'
+          : decision === 'reject'
+            ? 'confirm.doneReject'
+            : 'confirm.donePromote';
+      if (id.startsWith('demo-') || id.startsWith('c')) {
         setHidden((h) => new Set(h).add(id));
         setMsg(t(doneKey) + t('common.demoNote'));
       } else {
@@ -57,151 +57,146 @@ export default function ConfirmView() {
   ];
 
   return (
-    <div className="max-w-4xl mx-auto animate-fade-in">
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">{t('confirm.title')}</h2>
-        <p className="text-gray-500 text-sm mt-1">{t('confirm.subtitle')}</p>
-      </div>
-
-      {loading && <Loading />}
-      {error && <ErrorBox message={error} />}
-      {msg && (
-        <div className="mb-4 bg-amber-50 border border-amber-200 text-amber-700 text-sm rounded-lg px-4 py-3">
-          {msg}
+    <div className="glass-panel tab-panel-inner anim w-full max-w-5xl mx-auto" style={{ ['--d' as string]: '0.1s' }}>
+      {/* Header */}
+      <div className="flex justify-between items-center mb-4 pb-3 border-b border-white/10">
+        <div>
+          <h2 className="text-base font-semibold text-white">
+            {lang === 'zh' ? `待确认记忆事项 (${total.length})` : `Pending Confirmation Items (${total.length})`}
+          </h2>
+          <p className="text-xs text-gray-400 mt-0.5">
+            {lang === 'zh' ? '需要人工核准以校准记忆沉淀库，避免错误上下文污染' : 'Human-in-the-loop validation to maintain clean memory context'}
+          </p>
         </div>
-      )}
 
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col h-[600px]">
-        <div className="flex border-b border-gray-100 px-4 pt-2">
+        {/* Tabs */}
+        <div className="flex gap-1.5 bg-black/40 p-1 rounded-full border border-white/10">
           {tabs.map((label, idx) => (
             <button
               key={label}
               onClick={() => setFilter(idx)}
-              className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
+              className={`px-3 py-1 rounded-full text-xs font-medium transition ${
                 filter === idx
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-800'
+                  ? 'bg-white text-black font-semibold'
+                  : 'text-gray-400 hover:text-white'
               }`}
             >
               {label}
             </button>
           ))}
         </div>
+      </div>
 
-        <div className="p-6 flex-1 overflow-y-auto space-y-4 bg-gray-50/30">
-          {items.length === 0 && !loading && <Empty text={t('confirm.empty')} />}
-          {items.map((item) => {
-            const color = KIND_COLOR[item.kind] ?? 'gray';
-            const p = palette(color);
-            const priorityLabel = t(`confirm.priority.${item.priority}` as const);
-            return (
-              <div
-                key={item.id}
-                className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm hover:shadow transition-shadow"
-              >
-                <div className="flex items-start">
-                  <div
-                    className={`mt-1 flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${p.avatar}`}
+      {loading && <Loading />}
+      {error && <ErrorBox message={error} />}
+      {msg && (
+        <div className="mb-4 bg-blue-500/15 border border-blue-500/30 text-blue-300 text-xs rounded-xl px-4 py-2.5">
+          {msg}
+        </div>
+      )}
+
+      {items.length === 0 && !loading && (
+        <div className="py-12 text-center text-gray-500 text-xs">
+          <Empty text={t('confirm.empty')} />
+        </div>
+      )}
+
+      {/* Items List */}
+      <div className="flex flex-col gap-3 max-h-[520px] overflow-y-auto pr-1">
+        {items.map((item) => {
+          const badgeMeta = PRIORITY_BADGES[item.priority] || {
+            label: t(`confirm.priority.${item.priority}` as const),
+            color: '#3b82f6',
+          };
+          return (
+            <div
+              key={item.id}
+              className={`summary-card p-4 bg-white/[0.03] transition-all ${
+                busy === item.id ? 'opacity-40 pointer-events-none' : ''
+              }`}
+            >
+              <div className="flex justify-between items-center mb-1.5">
+                <div className="flex items-center gap-2.5">
+                  <h3 className="text-sm font-semibold text-white">{item.title}</h3>
+                  <span
+                    className="text-[10px] px-2 py-0.5 rounded-full font-medium"
+                    style={{
+                      backgroundColor: `${badgeMeta.color}22`,
+                      color: badgeMeta.color,
+                      border: `1px solid ${badgeMeta.color}44`,
+                    }}
                   >
-                    {item.kind === 'rule' && <Icons.Plus className="w-4 h-4" />}
-                    {item.kind === 'conflict' && <Icons.AlertTriangle className="w-4 h-4" />}
-                    {item.kind === 'outdated' && <Icons.History className="w-4 h-4" />}
-                  </div>
+                    {badgeMeta.label}
+                  </span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/5 text-gray-400">
+                    {t(`confirm.kind.${item.kind}` as const)}
+                  </span>
+                </div>
+                <div className="text-xs text-gray-500">{item.source} · {item.time}</div>
+              </div>
 
-                  <div className="ml-4 flex-1">
-                    <div className="flex items-center space-x-2 mb-1">
-                      <h3 className="text-base font-semibold text-gray-900">{item.title}</h3>
-                      <span className={`text-[10px] px-2 py-0.5 rounded border ${p.badge}`}>
-                        {priorityLabel}
-                      </span>
-                      <span className="text-[10px] px-2 py-0.5 rounded bg-gray-100 text-gray-500">
-                        {t(`confirm.kind.${item.kind}` as const)}
-                      </span>
-                    </div>
-                    <p className="text-sm text-gray-600 mb-4 leading-relaxed">{item.desc}</p>
-
-                    <div className="flex items-center justify-between">
-                      <div className="text-xs text-gray-400 flex items-center space-x-2">
-                        <span>{t('confirm.source', { src: item.source })}</span>
-                        <span>·</span>
-                        <span>{item.time}</span>
-                      </div>
-
-                      <div className="flex space-x-2">
-                        {item.kind === 'rule' && (
-                          <>
-                            <button
-                              disabled={busy === item.id}
-                              onClick={() => submit(item.id, 'accept')}
-                              className="px-4 py-1.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
-                            >
-                              {t('confirm.accept')}
-                            </button>
-                            <button
-                              disabled
-                              title={t('confirm.fixDisabled')}
-                              className="px-4 py-1.5 bg-white border border-gray-200 text-gray-400 text-sm font-medium rounded-lg cursor-not-allowed"
-                            >
-                              {t('confirm.fix')}
-                            </button>
-                            <button
-                              disabled={busy === item.id}
-                              onClick={() => submit(item.id, 'reject')}
-                              className="px-4 py-1.5 bg-white border border-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition disabled:opacity-50"
-                            >
-                              {t('confirm.reject')}
-                            </button>
-                          </>
-                        )}
-                        {item.kind === 'conflict' && (
-                          <>
-                            <button className="px-4 py-1.5 bg-white border border-blue-200 text-blue-600 text-sm font-medium rounded-lg hover:bg-blue-50 transition">
-                              {t('confirm.compare')}
-                            </button>
-                            <button
-                              disabled
-                              className="px-4 py-1.5 bg-white border border-gray-200 text-gray-400 text-sm font-medium rounded-lg cursor-not-allowed"
-                            >
-                              {t('confirm.fix')}
-                            </button>
-                            <button
-                              disabled={busy === item.id}
-                              onClick={() => submit(item.id, 'reject')}
-                              className="px-4 py-1.5 bg-white border border-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition disabled:opacity-50"
-                            >
-                              {t('confirm.reject')}
-                            </button>
-                          </>
-                        )}
-                        {item.kind === 'outdated' && (
-                          <>
-                            <button className="px-4 py-1.5 bg-white border border-blue-200 text-blue-600 text-sm font-medium rounded-lg hover:bg-blue-50 transition">
-                              {t('confirm.keep')}
-                            </button>
-                            <button
-                              disabled={busy === item.id}
-                              onClick={() => submit(item.id, 'accept')}
-                              className="px-4 py-1.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
-                            >
-                              {t('confirm.update')}
-                            </button>
-                            <button
-                              disabled={busy === item.id}
-                              onClick={() => submit(item.id, 'reject')}
-                              className="px-4 py-1.5 bg-white border border-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition disabled:opacity-50"
-                            >
-                              {t('confirm.ignore')}
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </div>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mt-2">
+                <p className="text-xs text-gray-300 leading-relaxed flex-1">{item.desc}</p>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {item.kind === 'rule' && (
+                    <>
+                      <button
+                        disabled={busy === item.id}
+                        onClick={() => submit(item.id, 'accept')}
+                        className="btn-mini btn-mini-primary"
+                      >
+                        {t('confirm.accept')}
+                      </button>
+                      <button
+                        disabled={busy === item.id}
+                        onClick={() => submit(item.id, 'reject')}
+                        className="btn-mini"
+                      >
+                        {t('confirm.reject')}
+                      </button>
+                    </>
+                  )}
+                  {item.kind === 'conflict' && (
+                    <>
+                      <button
+                        disabled={busy === item.id}
+                        onClick={() => submit(item.id, 'accept')}
+                        className="btn-mini btn-mini-primary"
+                      >
+                        {t('confirm.compare')}
+                      </button>
+                      <button
+                        disabled={busy === item.id}
+                        onClick={() => submit(item.id, 'reject')}
+                        className="btn-mini"
+                      >
+                        {t('confirm.reject')}
+                      </button>
+                    </>
+                  )}
+                  {item.kind === 'outdated' && (
+                    <>
+                      <button
+                        disabled={busy === item.id}
+                        onClick={() => submit(item.id, 'accept')}
+                        className="btn-mini btn-mini-primary"
+                      >
+                        {t('confirm.update')}
+                      </button>
+                      <button
+                        disabled={busy === item.id}
+                        onClick={() => submit(item.id, 'reject')}
+                        className="btn-mini"
+                      >
+                        {t('confirm.ignore')}
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
-            );
-          })}
-        </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

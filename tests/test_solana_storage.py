@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import pytest
 from lwm import solana_storage
 
 
@@ -62,3 +63,92 @@ def test_record_attestation_and_deduct_quota(tmp_path: Path) -> None:
     saved = solana_storage.get_attestation(tmp_path, "evt-001")
     assert saved is not None
     assert saved["tx_hash"] == "tx_test_snapshot_commit_456"
+
+
+def test_verify_solana_tx_format_validation() -> None:
+    import pytest
+
+    with pytest.raises(ValueError, match="无效的 Solana 交易哈希格式"):
+        solana_storage.verify_solana_tx_on_chain("")
+
+    with pytest.raises(ValueError, match="无效的 Solana 交易哈希格式"):
+        solana_storage.verify_solana_tx_on_chain("short_hash")
+
+
+def test_verify_solana_tx_mocked_rpc(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    import io
+    import json
+    import urllib.request
+
+    valid_tx = "5eHqP9x7Z2L6jK8wY3nM5vQ8xT4rW2yU1oP9sK6jL3mN7vQ8xT4rW2yU1oP9sK6j"
+
+    class FakeResponse:
+        def __init__(self, data: dict):
+            self._bytes = json.dumps(data).encode("utf-8")
+
+        def read(self) -> bytes:
+            return self._bytes
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+    # 1. 模拟链上成功确认
+    def fake_urlopen_success(req, timeout=6.0):
+        return FakeResponse({
+            "jsonrpc": "2.0",
+            "result": {
+                "value": [
+                    {
+                        "slot": 301294812,
+                        "confirmationStatus": "finalized",
+                        "err": None,
+                    }
+                ]
+            },
+            "id": 1,
+        })
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen_success)
+
+    res = solana_storage.verify_solana_tx_on_chain(valid_tx)
+    assert res["verified"] is True
+    assert res["slot"] == 301294812
+    assert res["confirmation_status"] == "finalized"
+
+    # 记录存证时开启 verify_rpc=True，自动填充真实 slot
+    _ = solana_storage.get_wallet_quota(tmp_path, "wallet1")
+    att = solana_storage.record_attestation(
+        tmp_path,
+        wallet="wallet1",
+        event_id="evt-rpc-verified",
+        project_id="proj-1",
+        version=1,
+        snapshot_hash="hash-1234567890abcdef",
+        tx_hash=valid_tx,
+        verify_rpc=True,
+    )
+    assert att["slot"] == 301294812
+
+    # 2. 模拟链上交易报错 (err != None)
+    def fake_urlopen_err(req, timeout=6.0):
+        return FakeResponse({
+            "jsonrpc": "2.0",
+            "result": {
+                "value": [
+                    {
+                        "slot": 301294813,
+                        "confirmationStatus": "processed",
+                        "err": {"InstructionError": [0, "Custom: 1"]},
+                    }
+                ]
+            },
+            "id": 1,
+        })
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen_err)
+    with pytest.raises(ValueError, match="链上交易执行失败"):
+        solana_storage.verify_solana_tx_on_chain(valid_tx)
+

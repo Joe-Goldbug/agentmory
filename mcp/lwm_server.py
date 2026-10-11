@@ -136,6 +136,20 @@ TOOLS = {
         "properties": {"root": {"type": "string"}},
         "required": ["root"],
     },
+    "lwm_lease": {
+        "description": "Acquire, release, or check task leases to avoid multi-agent concurrency conflicts.",
+        "properties": {
+            "root": {"type": "string"},
+            "action": {"type": "string", "enum": ["check", "acquire", "release", "list"]},
+            "project_id": {"type": "string"},
+            "agent_name": {"type": "string"},
+            "objective": {"type": "string"},
+            "lease_id": {"type": "string"},
+            "ttl_seconds": {"type": "integer", "default": 600},
+            "force": {"type": "boolean", "default": False},
+        },
+        "required": ["root", "action"],
+    },
 }
 
 
@@ -311,7 +325,7 @@ def _call_tool(name: str, arguments: dict) -> dict:
         root = Path(arguments["root"]).resolve()
         action = str(arguments.get("action") or "current")
         if action == "current":
-            packet = load_active(root, project_id=str(arguments["project_id"]))
+            packet = load_active(root, project_id=str(arguments["project_id"]), branch=arguments.get("branch"))
             return {"packet": packet.to_dict() if packet else None}
         if action == "create":
             packet_data = dict(arguments.get("packet") or {})
@@ -322,6 +336,32 @@ def _call_tool(name: str, arguments: dict) -> dict:
         if action == "close":
             return close_handoff(root, handoff_id=str(arguments["handoff_id"])).to_dict()
         raise ValueError(f"unknown handoff action: {action}")
+    if name == "lwm_lease":
+        from lwm import lease
+
+        root = Path(arguments["root"]).resolve()
+        action = str(arguments.get("action") or "check")
+        if action == "check":
+            active = lease.get_active_lease(root, project_id=str(arguments.get("project_id", "")))
+            return {"active_lease": active}
+        if action == "acquire":
+            return lease.acquire_lease(
+                root,
+                project_id=str(arguments.get("project_id", "")),
+                agent_name=str(arguments.get("agent_name", "")),
+                objective=str(arguments.get("objective", "")),
+                ttl_seconds=int(arguments.get("ttl_seconds", 600)),
+                force=bool(arguments.get("force", False)),
+            )
+        if action == "release":
+            return lease.release_lease(
+                root,
+                project_id=str(arguments.get("project_id", "")),
+                lease_id=arguments.get("lease_id"),
+            )
+        if action == "list":
+            return {"leases": lease.list_active_leases(root)}
+        raise ValueError(f"unknown lease action: {action}")
     if name == "query_context":
         root = Path(arguments["root"]).resolve()
         report, _receipt = hub_service.context_for_tool(

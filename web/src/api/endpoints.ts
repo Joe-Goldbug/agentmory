@@ -21,4 +21,9 @@ export const ENDPOINTS = {
   search: '/api/search',
   teams: '/api/teams',
   subscription: '/api/subscription',
+  backupBundle: '/api/backup/bundle',
+  backupRestore: '/api/backup/restore',
+  leasesActive: '/api/leases/active',
+  leasesAcquire: '/api/leases/acquire',
+  leasesRelease: '/api/leases/release',
 } as const;

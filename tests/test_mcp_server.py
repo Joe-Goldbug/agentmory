@@ -591,3 +591,44 @@ def test_mcp_receipt_is_observation_only(tmp_path: Path) -> None:
         }, id_=10)],
     )[0]["result"]["content"][0]["data"]
     assert observed_with_evidence["status"] == "observed"
+
+
+def test_mcp_lease_management(tmp_path: Path) -> None:
+    res = _drive(
+        tmp_path,
+        [
+            _rpc(
+                "tools/call",
+                params={
+                    "name": "lwm_lease",
+                    "arguments": {
+                        "root": str(tmp_path),
+                        "action": "acquire",
+                        "project_id": "proj-mcp",
+                        "agent_name": "Claude-Code",
+                        "objective": "MCP task",
+                    },
+                },
+                id_=101,
+            ),
+            _rpc(
+                "tools/call",
+                params={
+                    "name": "lwm_lease",
+                    "arguments": {
+                        "root": str(tmp_path),
+                        "action": "check",
+                        "project_id": "proj-mcp",
+                    },
+                },
+                id_=102,
+            ),
+        ],
+    )
+    acq = res[0]["result"]["content"][0]["data"]
+    assert acq["ok"] is True
+    assert acq["agent_name"] == "Claude-Code"
+
+    chk = res[1]["result"]["content"][0]["data"]
+    assert chk["active_lease"] is not None
+    assert chk["active_lease"]["agent_name"] == "Claude-Code"

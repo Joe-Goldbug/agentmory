@@ -57,16 +57,8 @@ export async function fetchWorkspace(projectPath: string, tool: string): Promise
     openItems: handoff?.next_action ? [handoff.next_action, ...openQuestions] : openQuestions,
   };
 
-  // 真实记忆稀疏时补演示内容，保证 demo 各区块均有可展示数据（仅填充空槽位）
-  const demo = getMocks().WORKSPACE;
-  return {
-    ...detail,
-    goal: detail.goal || demo.goal,
-    outcomes: detail.outcomes.length > 0 ? detail.outcomes : demo.outcomes,
-    decisions: detail.decisions.length > 0 ? detail.decisions : demo.decisions,
-    verifications: detail.verifications.length > 0 ? detail.verifications : demo.verifications,
-    openItems: detail.openItems.length > 0 ? detail.openItems : demo.openItems,
-  };
+  // 真实返回工作台详情，无假数据回退
+  return detail;
 }
 
 // --- 网关返回结构（实测自 lwm hub context --format json） ---

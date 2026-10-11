@@ -48,6 +48,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+import urllib.error
+import urllib.request
+
 SOLANA_STATE_FILE = "state/solana_state.json"
 
 DEFAULT_CONFIG: dict[str, Any] = {
@@ -60,6 +63,75 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "price_per_package": 10,  # 10 $WMEM 或 0.05 SOL
     "quota_per_package": 10,  # 可获得 10 次链上不可变存证
 }
+
+
+def verify_solana_tx_on_chain(
+    tx_hash: str,
+    rpc_url: str = "https://api.devnet.solana.com",
+    timeout: float = 6.0,
+) -> dict[str, Any]:
+    """通过 Solana JSON-RPC 验证交易哈希是否在链上真实存在且成功执行。
+
+    标准库实现：使用 urllib.request POST 调用 getSignatureStatuses。
+    返回:
+        {
+            "tx_hash": tx_hash,
+            "slot": int,
+            "confirmation_status": "confirmed" | "finalized" | ...,
+            "err": None,
+            "verified": True,
+        }
+    抛出:
+        ValueError: 交易未在链上查到、交易执行失败或超时。
+    """
+    clean_tx = tx_hash.strip()
+    if not clean_tx or len(clean_tx) < 32:
+        raise ValueError(f"无效的 Solana 交易哈希格式: {tx_hash}")
+
+    req_body = json.dumps({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "getSignatureStatuses",
+        "params": [
+            [clean_tx],
+            {"searchTransactionHistory": True}
+        ]
+    }).encode("utf-8")
+
+    req = urllib.request.Request(
+        rpc_url,
+        data=req_body,
+        headers={"Content-Type": "application/json"},
+    )
+
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+    except (urllib.error.URLError, OSError, TimeoutError) as exc:
+        raise ValueError(f"连接 Solana RPC 失败 ({rpc_url}): {exc}") from exc
+
+    if "error" in data:
+        raise ValueError(f"Solana RPC 返回错误: {data['error']}")
+
+    result = data.get("result", {})
+    statuses = result.get("value", []) if isinstance(result, dict) else []
+    if not statuses or statuses[0] is None:
+        raise ValueError(f"Solana 链上未查到该交易或尚在网络广播中: {clean_tx}")
+
+    status_obj = statuses[0]
+    if status_obj.get("err") is not None:
+        raise ValueError(f"Solana 链上交易执行失败 (Error): {status_obj.get('err')}")
+
+    slot = int(status_obj.get("slot", 0))
+    conf_status = str(status_obj.get("confirmationStatus", "processed"))
+
+    return {
+        "tx_hash": clean_tx,
+        "slot": slot,
+        "confirmation_status": conf_status,
+        "err": None,
+        "verified": True,
+    }
 
 
 def _now_iso() -> str:
@@ -128,10 +200,15 @@ def record_quota_purchase(
     tx_hash: str,
     token_amount: int,
     quota_added: int,
+    *,
+    verify_rpc: bool = False,
 ) -> dict[str, Any]:
     """记录用户使用 SPL Token 购买上链存储额度。"""
     wallet = wallet.strip()
     data = _load(root)
+    if verify_rpc:
+        rpc_url = data.get("config", {}).get("rpc_url", DEFAULT_CONFIG["rpc_url"])
+        verify_solana_tx_on_chain(tx_hash, rpc_url=rpc_url)
     quotas = data["quotas"]
     current = quotas.get(
         wallet,
@@ -164,10 +241,17 @@ def record_attestation(
     snapshot_hash: str,
     tx_hash: str,
     slot: int | None = None,
+    *,
+    verify_rpc: bool = False,
 ) -> dict[str, Any]:
     """记录一次工作记忆快照上链存证，扣减 1 次配额。"""
     wallet = wallet.strip()
     data = _load(root)
+    if verify_rpc:
+        rpc_url = data.get("config", {}).get("rpc_url", DEFAULT_CONFIG["rpc_url"])
+        rpc_info = verify_solana_tx_on_chain(tx_hash, rpc_url=rpc_url)
+        slot = rpc_info.get("slot") or slot
+
     quotas = data["quotas"]
     current = quotas.get(
         wallet,

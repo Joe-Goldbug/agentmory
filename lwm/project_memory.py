@@ -250,6 +250,7 @@ class ProjectMemoryEntry:
     event_id: str
     tool: str = ""
     evidence_path: str = ""
+    supersedes: str | None = None
 
     def render(self) -> str:
         """Render one bullet plus its provenance line.
@@ -270,6 +271,66 @@ class ProjectMemoryEntry:
         if not provenance:
             return head
         return f"{head}\n  ↳ {provenance}"
+
+
+_SUPERSEDES_TAG_RE = re.compile(
+    r"\[(?:supersedes|replaces):\s*([^\]]+)\]|\((?:supersedes|replaces):\s*([^)]+)\)",
+    re.IGNORECASE,
+)
+
+
+def _extract_superseded_targets(entry: ProjectMemoryEntry) -> set[str]:
+    targets: set[str] = set()
+    if entry.supersedes:
+        targets.add(entry.supersedes.strip())
+    for m in _SUPERSEDES_TAG_RE.finditer(entry.text):
+        target = m.group(1) or m.group(2)
+        if target and target.strip():
+            targets.add(target.strip())
+    return targets
+
+
+def _filter_active_decisions(
+    entries: Iterable[ProjectMemoryEntry],
+) -> list[ProjectMemoryEntry]:
+    """Filter out decisions that have been superseded by newer decisions.
+
+    Ensures outdated decisions never contaminate active agent prompt contexts.
+    """
+    items = list(entries)
+    if not items:
+        return []
+    chronological = sorted(items, key=lambda e: (e.timestamp, e.event_id))
+    superseded_indices: set[int] = set()
+
+    for idx, entry in enumerate(chronological):
+        targets = _extract_superseded_targets(entry)
+        if not targets:
+            continue
+        for prior_idx in range(idx):
+            if prior_idx in superseded_indices:
+                continue
+            prior = chronological[prior_idx]
+            for target in targets:
+                target_clean = target.strip().lower()
+                if not target_clean:
+                    continue
+                # 1. Match event_id directly if not legacy
+                if prior.event_id != "legacy" and prior.event_id.lower() == target_clean:
+                    superseded_indices.add(prior_idx)
+                    break
+                # 2. Match exact text (ignoring case)
+                prior_clean = prior.text.strip().lower()
+                if prior_clean == target_clean:
+                    superseded_indices.add(prior_idx)
+                    break
+                # 3. Match substring if target is sufficiently specific (>= 4 chars)
+                if len(target_clean) >= 4 and target_clean in prior_clean:
+                    superseded_indices.add(prior_idx)
+                    break
+
+    superseded_set = {chronological[i] for i in superseded_indices}
+    return [e for e in items if e not in superseded_set]
 
 
 def _split_section(body: str, section_name: str) -> tuple[str, str, str]:
@@ -352,6 +413,12 @@ def event_entry(
 
     admission = admission or classify_event(event)
     section = admission.section or project_section_for_event(event)
+    supersedes = str(
+        event.get("supersedes_decision")
+        or event.get("supersedes")
+        or event.get("replaces")
+        or ""
+    ).strip() or None
     entry = ProjectMemoryEntry(
         section=section,
         text=_durable_text(event, section),
@@ -359,6 +426,7 @@ def event_entry(
         event_id=str(event.get("event_id") or new_event_id()),
         tool=str(event.get("tool") or ""),
         evidence_path=evidence_path,
+        supersedes=supersedes,
     )
     return section, entry
 
@@ -376,6 +444,23 @@ def _read_existing_entries(body: str) -> dict[str, list[ProjectMemoryEntry]]:
         if line.startswith("## "):
             name = line[3:].strip().lower().replace(" ", "_")
             current = name if name in sections else None
+            continue
+        if current is not None and line.strip().startswith("↳ ") and sections.get(current):
+            parts = [p.strip() for p in line.strip()[2:].split(" · ") if p.strip()]
+            if parts:
+                last_entry = sections[current][-1]
+                tool = parts[0] if len(parts) >= 2 else last_entry.tool
+                eid = parts[1] if len(parts) >= 2 else parts[0]
+                evidence = parts[2] if len(parts) >= 3 else last_entry.evidence_path
+                sections[current][-1] = ProjectMemoryEntry(
+                    section=last_entry.section,
+                    text=last_entry.text,
+                    timestamp=last_entry.timestamp,
+                    event_id=eid or "legacy",
+                    tool=tool,
+                    evidence_path=evidence,
+                    supersedes=last_entry.supersedes,
+                )
             continue
         if current is None or not line.strip().startswith("- "):
             continue
@@ -432,6 +517,8 @@ def render_project_page(
 
     def render_section(name: str, label: str, *, reverse: bool = True) -> str:
         items = entries.get(name) or []
+        if name == "decisions":
+            items = _filter_active_decisions(items)
         # Deterministic ordering: timestamp first, event_id as tiebreaker.
         ordered = sorted(
             items, key=lambda e: (e.timestamp, e.event_id), reverse=reverse
@@ -943,4 +1030,5 @@ __all__ = [
     "prune_empty_pages",
     "rebuild_project_pages",
     "render_project_page",
+    "_filter_active_decisions",
 ]
