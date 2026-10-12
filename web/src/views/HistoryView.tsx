@@ -118,11 +118,10 @@ export default function HistoryView() {
         tx_hash: att.tx_hash,
         slot: att.slot,
         cluster: att.cluster,
+        timestamp: new Date().toISOString(),
         explorer_url: att.explorer_url,
-        timestamp: att.timestamp,
-        storage_uri: att.storage_uri || `solana://devnet/tx/${att.tx_hash}`,
       };
-      setCommitMsg(`✅ 成功固化至 Solana Devnet！Slot: #${att.slot.toLocaleString()}`);
+      setCommitMsg(`✅ 存证上链成功！Slot: #${att.slot} Tx: ${att.tx_hash.slice(0, 8)}…`);
       reload();
     } catch (err) {
       setCommitMsg(`⚠️ 上链失败: ${(err as Error).message}`);
@@ -217,7 +216,7 @@ export default function HistoryView() {
       {/* Two Column Split: Version Log & Cryptographic Proof */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 mt-2">
         {/* Left Column: Version Entries (7 cols) */}
-        <div className="lg:col-span-7 flex flex-col gap-2.5 max-h-[460px] overflow-y-auto pr-1">
+        <div className="lg:col-span-7 flex flex-col gap-2.5 max-h-[500px] overflow-y-auto pr-1">
           {items.map((item) => {
             const isSelected = (current?.id === item.id);
             return (
@@ -252,27 +251,67 @@ export default function HistoryView() {
 
         {/* Right Column: Cryptographic Audit Box & Rollback (5 cols) */}
         <div className="lg:col-span-5 flex flex-col justify-between summary-card p-4 bg-white/[0.02]">
-          <div>
-            <div className="flex justify-between items-center mb-3">
+          <div className="space-y-3.5 overflow-y-auto max-h-[440px] pr-1">
+            <div className="flex justify-between items-center">
               <span className="text-xs font-semibold text-gray-300">
                 {lang === 'zh' ? '加密审计证明' : 'Cryptographic Proof'}
               </span>
               <span className="text-[10px] text-green-400 font-mono">STATUS: VERIFIED</span>
             </div>
 
-            <div className="text-[11px] font-mono text-green-400 bg-black/60 p-3 rounded-lg border border-white/10 break-all mb-3 select-all">
+            <div className="text-[11px] font-mono text-green-400 bg-black/60 p-3 rounded-lg border border-white/10 break-all select-all">
               SHA-256: {current?.detail?.evidenceHash || '0x9f8b4d2e1c3a7590fedcba9876543210'}
             </div>
 
-            <p className="text-xs text-gray-400 leading-relaxed mb-4">
-              {(current?.detail?.changes?.length ? current.detail.changes.join(' · ') : undefined) ||
-                (lang === 'zh'
-                  ? '当前快照已签署并与云端分布式备份完成核对，无差异风险，随时支持原子无损还原。'
-                  : 'Snapshot verified and synced.')}
+            {/* 变更内容 (From lwm-collaboration-20261012 UI update) */}
+            {current?.detail?.changes && current.detail.changes.length > 0 && (
+              <div className="space-y-1">
+                <h5 className="text-[11px] font-semibold text-gray-300">
+                  {lang === 'zh' ? '变更内容' : 'Changes'}
+                </h5>
+                <ul className="list-disc pl-4 space-y-0.5 text-xs text-gray-400 marker:text-gray-600">
+                  {current.detail.changes.map((c, i) => (
+                    <li key={i}>{c}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* 验证结果 (From lwm-collaboration-20261012 UI update) */}
+            {current?.detail?.verifications && current.detail.verifications.length > 0 && (
+              <div className="space-y-1">
+                <h5 className="text-[11px] font-semibold text-gray-300">
+                  {lang === 'zh' ? '验证结果' : 'Verifications'}
+                </h5>
+                <ul className="space-y-1 text-xs text-green-400/90">
+                  {current.detail.verifications.map((v, i) => (
+                    <li key={i} className="flex items-center gap-1.5">
+                      <span className="text-green-400">✓</span>
+                      <span>{v}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* 来源工具 (From lwm-collaboration-20261012 UI update) */}
+            {current?.detail?.sourceTool && (
+              <div className="flex items-center gap-2 text-xs text-gray-400">
+                <span className="text-[11px] text-gray-400">{lang === 'zh' ? '来源工具:' : 'Source:'}</span>
+                <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10 text-gray-300 text-[11px]">
+                  {current.detail.sourceTool}
+                </span>
+              </div>
+            )}
+
+            <p className="text-xs text-gray-400 leading-relaxed">
+              {(lang === 'zh'
+                ? '当前快照已签署并与云端分布式备份完成核对，无差异风险，随时支持原子无损还原。'
+                : 'Snapshot verified and synced.')}
             </p>
 
             {current?.detail?.attestation ? (
-              <div className="p-2.5 rounded-lg bg-purple-950/20 border border-purple-500/20 text-xs text-purple-300 space-y-1 mb-4">
+              <div className="p-2.5 rounded-lg bg-purple-950/20 border border-purple-500/20 text-xs text-purple-300 space-y-1">
                 <div className="font-semibold text-[11px]">🔗 Solana Devnet 链上存证已锚定</div>
                 <div className="text-[10px] opacity-80">Slot: #{current.detail.attestation.slot}</div>
                 <a
@@ -288,14 +327,14 @@ export default function HistoryView() {
               <button
                 disabled={!current || committingId === current.id}
                 onClick={() => current && handleCommitToSolana(current)}
-                className="btn-mini text-xs mb-3 text-purple-300 hover:text-white border border-purple-500/30"
+                className="btn-mini text-xs w-full text-purple-300 hover:text-white border border-purple-500/30"
               >
                 {committingId === current?.id ? '上链中…' : '固化至 Solana Devnet'}
               </button>
             )}
           </div>
 
-          <div className="flex items-center gap-2 pt-3 border-t border-white/10 mt-2">
+          <div className="flex items-center gap-2 pt-3 border-t border-white/10 mt-3">
             <button
               disabled={!current || restoringId === current.id}
               onClick={() => current && handleRestore(current)}

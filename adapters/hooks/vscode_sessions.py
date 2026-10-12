@@ -1,9 +1,9 @@
-"""Observe local VS Code Copilot session metadata without reading prompts.
+"""Observe local VS Code/Copilot boundaries and bounded completed-turn results.
 
 The watcher remains the fallback for hosts that have not fired a native
 integration. The packaged VS Code-compatible companion is the native bridge
-path; until the host fires it, this adapter uses only session headers/event
-types, never message content, and labels receipts ``watcher-observed`` so
+path. This adapter never persists raw prompts or reasoning, and labels
+receipts ``watcher-observed`` so
 capability probing cannot mistake observation for a native callback.
 """
 
@@ -16,6 +16,7 @@ from pathlib import Path
 from urllib.parse import unquote, urlparse
 
 from lwm import lifecycle
+from adapters.hooks._common import host_results
 
 
 def _workspace_path(path: Path) -> str | None:
@@ -45,10 +46,16 @@ def _workspace_storage_path(path: Path) -> str | None:
 def _jsonl_events(path: Path) -> list[dict]:
     events: list[dict] = []
     try:
-        lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+        with path.open("rb") as stream:
+            size = stream.seek(0, 2)
+            stream.seek(max(0, size - 262144))
+            data = stream.read(262144)
+        lines = data.splitlines()
+        if size > 262144:
+            lines = lines[1:]
     except OSError:
         return events
-    for line in lines:
+    for line in lines[-160:]:
         try:
             payload = json.loads(line)
         except json.JSONDecodeError:
@@ -66,8 +73,41 @@ def _observe_cli_sessions(root: Path, sessions: Path, seen: set[str]) -> None:
         events = session / "events.jsonl"
         if not workspace or not events.is_file():
             continue
-        for event in _jsonl_events(events):
+        history = _jsonl_events(events)
+        for event in history:
             _observe_boundary(root, workspace, session.name, event, seen, f"cli:{session}")
+        _observe_results(root, workspace, session.name, history, seen, f"cli:{session}")
+
+
+def _observe_results(root: Path, workspace: str, session_id: str,
+                     events: list[dict], seen: set[str], prefix: str) -> None:
+    rows = []
+    for event in events[-160:]:
+        data = event.get("data")
+        if not isinstance(data, dict):
+            continue
+        kind = event.get("type")
+        if kind == "user.message":
+            rows = []
+        elif kind == "assistant.message":
+            rows.append({"role": "assistant", "content": data.get("content")})
+        elif kind == "tool.execution_complete":
+            result = data.get("result")
+            output = result.get("content") if isinstance(result, dict) else result
+            if output:
+                rows.append({"role": "tool", "content": [{"type": "tool_result",
+                    "content": output, "is_error": data.get("success") is False}]})
+        elif kind == "assistant.turn_end":
+            key = f"result:{prefix}:{event.get('id')}"
+            if not event.get("id") or key in seen:
+                continue
+            summary = host_results({"transcript": rows}, host="vscode")
+            if summary is not None:
+                task_id = f"vscode:{session_id}:{event['id']}"
+                lifecycle.stop(root, tool="vscode", project_path=workspace, session_id=session_id,
+                    source="watcher-observed", task_id=task_id, handoff_summary={**summary, "task_id": task_id},
+                    source_timestamp=event.get("timestamp") if isinstance(event.get("timestamp"),str) else None)
+                seen.add(key)
 
 
 def _observe_workspace_storage(
@@ -92,6 +132,7 @@ def _observe_workspace_storage(
                 _observe_boundary(
                     root, workspace, session_id, event, seen, f"transcript:{transcript}"
                 )
+            _observe_results(root, workspace, session_id, events, seen, f"transcript:{transcript}")
             if started:
                 try:
                     stat = transcript.stat()

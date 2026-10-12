@@ -1,6 +1,6 @@
 """Process-level locks for ingest and scheduled cycle writes.
 
-The LaunchAgent runs at boot and every 12 hours; file-wake/manual invocations
+The LaunchAgent runs at boot and every 6 hours; file-wake/manual invocations
 may also arrive. Without a lock those triggers could overlap and write the
 same wiki pages twice. The
 lockfile lives at ``<root>/state/locks/ingest.lock`` and stores the

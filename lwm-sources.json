@@ -1,11 +1,1 @@
-{
-  "_comment": "LLM-WorkMem source group registry. Each group contributes to harvest. Add project paths under cbmem.projects so the cbmem harvest snapshots them on every launchd run.",
-  "groups": [],
-  "cbmem": {
-    "_comment_projects": "Absolute paths only. Indexed by codebase-memory-mcp on every launchd watch cycle. The wiki's own root is the current self-check project; add real project roots here when they should join CBMEM.",
-    "projects": [
-      "/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem"
-    ],
-    "search_queries": ["<TODO>", "<FIXME>", "<XXX>"]
-  }
-}
+/Users/ethan/Library/Application Support/llm-workmem-runtime/llm-workmem/lwm-sources.json

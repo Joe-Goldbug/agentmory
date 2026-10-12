@@ -14,7 +14,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from adapters.hooks._common import structured_handoff
+from adapters.hooks._common import analysis_job, host_results
 
 
 ROOT_HINT = Path(
@@ -45,6 +45,8 @@ def handle_payload(
     """Handle one Codex lifecycle payload without persisting host text."""
 
     normalized_phase = phase.strip().lower()
+    if analysis_job():
+        return {}
     project_path = _project_path(payload)
     session_id = _session_id(payload)
     if not project_path or not session_id:
@@ -56,7 +58,7 @@ def handle_payload(
     }
     from lwm import lifecycle
 
-    if normalized_phase == "sessionstart":
+    if normalized_phase in {"sessionstart", "userpromptsubmit"}:
         result = lifecycle.start(
             root,
             tool="codex",
@@ -69,19 +71,21 @@ def handle_payload(
             return {}
         return {
             "hookSpecificOutput": {
-                "hookEventName": "SessionStart",
+                    "hookEventName": phase,
                 "additionalContext": result.context_markdown,
             }
         }
 
-    if normalized_phase == "sessionend":
+    if normalized_phase in {"sessionend", "stop"}:
+        summary = host_results(payload, host="codex")
         lifecycle.stop(
             root,
             tool="codex",
             project_path=project_path,
             session_id=session_id,
-            task="Codex execution completed",
-            handoff_summary=structured_handoff(payload),
+            task="Codex host stopped; completion unknown",
+            task_id=str((summary or {}).get("task_id") or payload.get("turn_id") or "") or None,
+            handoff_summary=summary,
             source="native-hook",
             host_proof=host_proof,
         )
@@ -102,7 +106,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", type=Path, default=ROOT_HINT)
     parser.add_argument(
-        "--phase", choices=("SessionStart", "SessionEnd"), required=True
+        "--phase", choices=("SessionStart", "UserPromptSubmit", "SessionEnd", "Stop"), required=True
     )
     args = parser.parse_args()
     payload = _read_payload()

@@ -1,8 +1,10 @@
-"""Launchd supervisor for the boot-and-12-hour full cycle."""
+"""Launchd supervisor for the boot-and-six-hour full cycle."""
 
 from __future__ import annotations
 
 import sys
+import json
+import subprocess
 from pathlib import Path
 
 from lwm.cycle_state import is_due
@@ -11,8 +13,30 @@ from lwm.harvest import mutable_ownership_issues
 from lwm.loop_state import begin_loop, close_loop, record_evaluation, write_state
 
 
-FULL_INTERVAL_SECONDS = 43200
-SCHEDULE_GRACE_SECONDS = 600
+FULL_INTERVAL_SECONDS = 21600
+SCHEDULE_GRACE_SECONDS = 0
+
+
+def _boot_id() -> str:
+    if sys.platform != "darwin":
+        return ""
+    try:
+        result = subprocess.run(["sysctl", "-n", "kern.boottime"], capture_output=True, text=True, timeout=5)
+        return result.stdout.strip() if result.returncode == 0 else ""
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+
+
+def _startup_due(root: Path) -> tuple[Path, dict[str, object], str]:
+    path = root / "state" / "schedule-policy.json"
+    try:
+        policy = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return path, {}, ""
+    if not isinstance(policy, dict) or not policy.get("run_on_boot"):
+        return path, {}, ""
+    boot_id = _boot_id()
+    return path, policy, boot_id if boot_id and boot_id != policy.get("last_boot_id") else ""
 
 
 def run_supervisor(root: Path, *, interval_seconds: int = FULL_INTERVAL_SECONDS, force: bool = False) -> int:
@@ -29,10 +53,11 @@ def run_supervisor(root: Path, *, interval_seconds: int = FULL_INTERVAL_SECONDS,
         return 2
     try:
         with lockfile.cycle_lock(root):
-            # launchd wakes from the previous start; the last receipt is
-            # timestamped at completion. Allow for a bounded cycle duration.
+            policy_path, policy, boot_id = _startup_due(root)
+            # Calendar checks coalesce on wake; the complete-cycle clock is
+            # independent of these cheap checks and never runs early.
             due_interval = max(0, interval_seconds - SCHEDULE_GRACE_SECONDS)
-            if not force and not is_due(root, interval_seconds=due_interval):
+            if not force and not boot_id and not is_due(root, interval_seconds=due_interval):
                 loop = begin_loop(
                     "scheduled memory refresh",
                     success_criteria=("full cycle runs when due",),
@@ -56,6 +81,11 @@ def run_supervisor(root: Path, *, interval_seconds: int = FULL_INTERVAL_SECONDS,
                 from lwm.runner import run_cycle
 
                 code = run_cycle(root)
+                if code == 0 and boot_id:
+                    policy["last_boot_id"] = boot_id
+                    temporary = policy_path.with_suffix(".tmp")
+                    temporary.write_text(json.dumps(policy, indent=2) + "\n", encoding="utf-8")
+                    temporary.replace(policy_path)
             except Exception:  # noqa: BLE001
                 return 1
             # run_cycle owns the health snapshot for a full cycle and hashes

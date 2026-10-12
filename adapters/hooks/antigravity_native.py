@@ -1,9 +1,9 @@
 """Antigravity ``hooks.json`` bridge.
 
 Antigravity sends hook payloads on stdin and expects JSON on stdout.  The
-adapter deliberately forwards only the workspace and conversation identity;
-the model name and transcript paths are host metadata, not LLM-WorkMem
-evidence.
+adapter forwards workspace/conversation identity and bounded observed results
+from the native transcript. Requests, ephemeral context, model metadata and
+internal reasoning are not durable evidence.
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ import sys
 from pathlib import Path
 from typing import Any, Mapping
 
-from adapters.hooks._common import structured_handoff
+from adapters.hooks._common import analysis_job, host_results
 
 
 DEFAULT_ROOT = Path(
@@ -98,6 +98,8 @@ def handle_payload(
 
     if not isinstance(payload, Mapping):
         raise ValueError("hook payload must be a JSON object")
+    if analysis_job():
+        return {"decision": "allow"} if phase.lower() == "stop" else {}
     project_path = _project_path(payload)
     session_id = _session_id(payload)
     if not project_path or not session_id:
@@ -133,7 +135,7 @@ def handle_payload(
         return {"injectSteps": [{"ephemeralMessage": context_markdown}]}
 
     if normalized_phase == "stop":
-        handoff = structured_handoff(payload)
+        handoff = host_results(payload, host="antigravity")
         dispatch(
             root.resolve(),
             {
@@ -141,8 +143,8 @@ def handle_payload(
                 "tool": "antigravity",
                 "project_path": project_path,
                 "session_id": session_id,
-                "task_id": task_id,
-                "task": "Antigravity execution completed",
+                "task_id": (handoff or {}).get("task_id") or f"{task_id}:{payload.get('executionNum', 'stop')}",
+                "task": "Antigravity host stopped; completion unknown",
                 "source": "native-hook",
                 "host_proof": {
                     "integration": "antigravity-hook",

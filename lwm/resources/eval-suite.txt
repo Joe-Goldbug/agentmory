@@ -1,3 +1,10 @@
 # question | expected_slug
+# Live retrieval smoke checks only, not whole-product acceptance.
+# No private project fixtures are required in a user's wiki.
+# Opt-in source-backed columns: expected_fact | expected_project |
+# expected_coverage | expect_conflict | expected_source_glob | forbidden_fact |
+# expected_verification. Use run_recall_eval or run_eval(project_path=...) for these.
+# Isolated code/product acceptance: tests/test_memory_e2e_repair.py.
+# Actual host delivery, production content and scheduler acceptance remain separate.
 workflow memory governance model | memory-governance
 tool harvest automation workflow | tool-harvest

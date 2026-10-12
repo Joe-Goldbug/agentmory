@@ -1,5 +1,7 @@
 # llm-workmem
 
+> **Current backup design / 最新备份设计（2026-10-11）**: Team and Enterprise can select LWM-managed storage, a supported decentralized storage backend, or both. On-chain proof is a separate option. See the [current strategy](docs/business_plan/WEB2_WEB3_BACKUP_STRATEGY_AND_TOKENOMICS.md), which supersedes older backup, compliance and tokenomics claims below. Backup CLI examples, performance figures and Web3 descriptions below require implementation and restore verification before being treated as shipped capabilities. Team 与企业可选公司托管、受支持的去中心化存储或双副本；存证独立选择。下文相关命令和功能描述不得代替真实恢复验收，也不构成永久保存或合规保证。
+
 <p align="center">
   <img src="assets/logo.svg" alt="llm-workmem" width="480" /><br />
   <sub>Universal Cross-Agent Working Memory, Knowledge Management & Backup System</sub><br />
@@ -10,8 +12,8 @@
 [![Python: >=3.11](https://img.shields.io/badge/Python->=3.11-green.svg)](pyproject.toml)
 
 > **Bilingual Documentation / 中英文双语对照文档**
-> An LLM working memory, knowledge management, and decentralized backup platform that evolves with you. Originating from [Karpathy's LLM-WorkMem philosophy](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f), `llm-workmem` has evolved into a comprehensive **cross-agent working memory, task handoff, evidence federation, and seamless Web2-Web3 blockchain backup engine** designed for modern AI engineering workflows.
-> 一个与你共同演进的 LLM 工作记忆、知识管理与去中心化备份系统。源自 [Karpathy 的 LLM-WorkMem 哲学](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)，现已全面升级为面向现代 AI 编程工作流的**跨 Agent 工作记忆、任务交接（Handoff）、证据联邦与 Web2-Web3 丝滑无瑕区块链备份引擎**。
+> LLM-WorkMem is designed as a cross-agent working memory, knowledge management and backup system. Its product direction combines evidence-based handoff, recoverable encrypted backups and optional independent integrity proofs. Availability is determined by verified implementation, not this product description.
+> LLM-WorkMem 的产品方向是跨 Agent 统一工作记忆、知识管理与备份系统，整合有来源的任务交接、可恢复加密备份和可选独立验真。具体功能可用性以实现和验收记录为准。
 
 ---
 
@@ -129,8 +131,11 @@
   - **[EN]** Deterministically rebuilds project pages (`Recent Decisions`, `Recent Bugfixes`, `Verifications`, `Open Questions`) with exact event provenance links.
   - **[ZH]** 依据摄入事件自动生成项目状态页（近期决策、Bugfix、验证记录与遗留问题），每条记忆均带有精确到文件与 UUID 的证据链链接。
 - **Unified Native Memory Federation (`lwm hub federation`) / 统一原生记忆联邦**:
-  - **[EN]** Compiles and reconciles workflow memory from disparate agent sources (e.g. OpenCode `MEMORY.md`, Codex, Claude Code, Antigravity) into immutable, timestamped releases (`release-*.json`).
-  - **[ZH]** 将分散在 OpenCode（`MEMORY.md`）、Codex、Claude Code、Antigravity 中的原生记忆统一抽取、去重并解决冲突，生成带时间戳的不可变发布版本（`release-*.json`）。
+  - **[EN]** Extracts workflow memory from agent sources (e.g. OpenCode `MEMORY.md`, Codex, Claude Code, Antigravity), deduplicates it, applies explicit precedence/supersession rules, and marks unresolved conflict candidates in timestamped releases (`release-*.json`). This is rule-based reconciliation, not a guarantee of semantic correctness.
+  - **[ZH]** 将 OpenCode（`MEMORY.md`）、Codex、Claude Code、Antigravity 等来源的原生记忆抽取、去重，按明确的优先级与替代规则处理，标记未解决的冲突候选并生成带时间戳的发布版本（`release-*.json`）；这不等于自动理解和解决所有语义冲突。
+- **Memory Review & Updates / 记忆审核与更新**:
+  - **[EN]** Review endpoints accept, reject, or promote analysis candidates. Federation distinguishes active, conflicted, stale, and superseded records; explicit source updates can replace earlier records. These mechanisms manage shared memory, not automatically fix project code or determine whether every claim is true. The standalone HTML review/undo interactions are demonstrations, not persistent backend writes, and do not prove immediate revocation across every IDE.
+  - **[ZH]** 审核接口支持接受、拒绝或晋级分析候选；记忆联邦区分有效、冲突、陈旧和已被替代的记录，明确的来源更新可替代旧记录。这里管理的是共享记忆，不是自动修复项目代码，也不保证判断每条说法的真伪。独立 HTML 的采纳／撤回交互仅为演示，不写入真实后台，也不证明所有 IDE 会立即撤销已读取的内容。
 - **Memory Compiler (`lwm hub analyze --pending`) / LLM 记忆编译器**:
   - **[EN]** Optional, token-budgeted LLM analysis identifying recurring workflows, relationships, and contradictions across projects without altering raw events.
   - **[ZH]** 基于每日 Token 预算与重试状态机，分析多项目间的复用工作流与模式，生成结构化候选对象（`candidates-*.md`）。

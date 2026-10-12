@@ -2,7 +2,7 @@
   "name": "llm-workmem-companion",
   "displayName": "LLM-WorkMem Companion",
   "description": "Bounded LLM-WorkMem context and lifecycle bridge for VS Code-compatible hosts.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "ethan-lau",
   "license": "MIT",
   "engines": {
@@ -17,6 +17,10 @@
       {
         "command": "llm-workmem.startSession",
         "title": "LLM-WorkMem: Start Session"
+      },
+      {
+        "command": "llm-workmem.deliverContext",
+        "title": "LLM-WorkMem: Refresh Native Context"
       },
       {
         "command": "llm-workmem.stopSession",

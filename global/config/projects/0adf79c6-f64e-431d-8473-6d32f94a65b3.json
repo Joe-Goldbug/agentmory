@@ -1,34 +1,36 @@
 {
-  "id": "0adf79c6-f64e-431d-8473-6d32f94a65b3",
-  "name": "claude-code-config",
-  "projectResources": {
-    "resources": [
+  "id":  "0adf79c6-f64e-431d-8473-6d32f94a65b3",
+  "name":  "claude-code-config",
+  "projectResources":  {
+    "resources":  [
       {
-        "gitFolder": {
-          "folderUri": "file:///Users/ethan/Library/Mobile%20Documents/com~apple~CloudDocs/Downloads/claude-code-config",
-          "defaultBranch": "main"
+        "gitFolder":  {
+          "folderUri":  "file:///Users/ethan/Library/Mobile%20Documents/com~apple~CloudDocs/Downloads/claude-code-config",
+          "defaultBranch":  "main"
         }
       }
     ]
   },
-  "permissionGrants": {
-    "permissionGrants": {
-      "allow": [
-        "command(echo)",
-        "command(claude)",
-        "command(grep)",
-        "command(cat)",
+  "permissionGrants":  {
+    "permissionGrants":  {
+      "allow":  [
         "read_file(/Users/ethan/.claude.json)",
         "write_file(/Users/ethan/.claude.json)",
-        "command(/Users/ethan/.local/bin/claude)"
+        "read_file(/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/Trae solo配置/dotfiles/claude/settings.json)",
+        "read_url(json.schemastore.org)",
+        "read_file(/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/AntigravitySync/brain/dec5221e-c451-4059-beea-dd67f463d19b/.system_generated/steps/207/content.md)",
+        "unsandboxed(curl -i -X POST \"https://api.deepseek.com/anthropic/v1/messages\" -H \"x-api-key: sk-ac9da5a220e745ddb8e29f6ec0868a42\" -H \"anthropic-version: 2023-06-01\" -H \"content-type: application/json\" -d '{\n    \"model\": \"deepseek-v4-flash\",\n    \"max_tokens\": 50,\n    \"messages\": [{\"role\": \"user\", \"content\": \"Hi\"}]\n  }')",
+        "write_file(/Users/ethan/.zshrc)",
+        "read_file(/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/AntigravitySync/brain/dec5221e-c451-4059-beea-dd67f463d19b/.system_generated/tasks/task-239.log)"
       ]
-    }
+    },
+    "v2Migrated":  true
   },
-  "settings": {
-    "fileAccessPolicy": "AGENT_SETTING_POLICY_ASK",
-    "internetPolicy": "AGENT_SETTING_POLICY_ASK",
-    "autoExecutionPolicy": "CASCADE_COMMANDS_AUTO_EXECUTION_OFF",
-    "artifactReviewMode": "ARTIFACT_REVIEW_MODE_ALWAYS"
+  "settings":  {
+    "fileAccessPolicy":  "AGENT_SETTING_POLICY_ASK",
+    "internetPolicy":  "AGENT_SETTING_POLICY_ASK",
+    "autoExecutionPolicy":  "CASCADE_COMMANDS_AUTO_EXECUTION_OFF",
+    "artifactReviewMode":  "ARTIFACT_REVIEW_MODE_ALWAYS"
   },
-  "updatedAt": "2026-06-24T13:07:46.611149Z"
+  "updatedAt":  "2026-08-05T16:26:19.595151Z"
 }

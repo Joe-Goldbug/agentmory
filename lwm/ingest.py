@@ -127,6 +127,37 @@ def _reject(src: Path, *, reason: str) -> Path:
     return out
 
 
+def recover_false_privacy_rejections(root: Path, *, apply: bool = False) -> dict[str, int]:
+    """Revalidate quarantined events and requeue only now-safe original bytes."""
+    counts = {"eligible": 0, "requeued": 0, "still_blocked": 0, "invalid": 0}
+    archive = root / "state" / "privacy-recovery"
+    with lockfile.ingest_lock(root):
+        for src in inbox.list_events(root, "rejected"):
+            reason_path = src.with_suffix(src.suffix + ".reason")
+            if not reason_path.is_file() or not reason_path.read_text(encoding="utf-8").startswith("privacy:"):
+                continue
+            event = _safe_load(src)
+            if event is None or not validate_event(event).ok:
+                counts["invalid"] += 1
+                continue
+            if privacy.sanitize_event(event)[2]:
+                counts["still_blocked"] += 1
+                continue
+            counts["eligible"] += 1
+            if not apply:
+                continue
+            audit_dir = archive / src.parent.name
+            audit_dir.mkdir(parents=True, exist_ok=True)
+            # Keep the reason alongside an explicit recovery receipt, while
+            # moving the original event bytes through the ordinary pipeline.
+            reason_path.replace(audit_dir / reason_path.name)
+            destination = inbox.move_event(src, target_bucket="inbox", target_day=src.parent.name)
+            (audit_dir / f"{event['event_id']}.recovery.json").write_text(
+                json.dumps({"event_id": event["event_id"], "destination": str(destination.relative_to(root)), "action": "revalidated_and_requeued"}) + "\n", encoding="utf-8")
+            counts["requeued"] += 1
+    return counts
+
+
 def _process_one(root: Path, src: Path) -> tuple[str, str | None, dict[str, Any] | None]:
     payload = _safe_load(src)
     if payload is None:

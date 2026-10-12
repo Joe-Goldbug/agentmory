@@ -1,5 +1,35 @@
 {
-  "id": "outside-of-project",
-  "name": "Outside of Project",
-  "updatedAt": "2026-07-18T08:00:12.439590Z"
+  "id":  "outside-of-project",
+  "name":  "Outside of Project",
+  "permissionGrants":  {
+    "permissionGrants":  {
+      "allow":  [
+        "command(ls)",
+        "command(grep)",
+        "read_file(/Users/ethan/.config/opencode/opencode.json)",
+        "read_file(/Users/ethan/.opencode/opencode.json)",
+        "read_file(/Users/ethan/.opencode/reachapi-bridge.js)",
+        "unsandboxed(curl -s -X POST \"https://api.deepseek.com/v1/chat/completions\" -H \"Authorization: Bearer sk-ac9da5a220e745ddb8e29f6ec0868a42\" -H \"Content-Type: application/json\" -d '{\n    \"model\": \"deepseek-v4-flash\",\n    \"messages\": [{\"role\": \"user\", \"content\": \"hi\"}],\n    \"max_tokens\": 10\n  }')",
+        "unsandboxed(curl -s -X POST \"https://api.deepseek.com/chat/completions\" -H \"Authorization: Bearer sk-ac9da5a220e745ddb8e29f6ec0868a42\" -H \"Content-Type: application/json\" -d '{\n    \"model\": \"deepseek-v4-flash\",\n    \"messages\": [{\"role\": \"user\", \"content\": \"hi\"}],\n    \"max_tokens\": 10\n  }')",
+        "read_file(/Users/ethan/.zshenv)",
+        "read_file(/Users/ethan/.zshrc)",
+        "write_file(/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/AntigravitySync/brain/41ed0360-50d5-4908-9776-c86be8618016/implementation_plan.md)",
+        "command(rm -f /Users/ethan/.opencode/.minimax_key /Users/ethan/.opencode/.minimax_key.backup.before-key-change.20260727_215601)",
+        "write_file(/Users/ethan/.config/opencode/opencode.json)",
+        "write_file(/Users/ethan/.opencode/opencode.json)",
+        "write_file(/Users/ethan/.zshenv)",
+        "command(opencode)",
+        "read_file(/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/AntigravitySync/brain/41ed0360-50d5-4908-9776-c86be8618016/.system_generated/tasks/task-70.log)",
+        "read_file(/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/AntigravitySync/brain/41ed0360-50d5-4908-9776-c86be8618016/.system_generated/tasks/task-81.log)",
+        "write_file(/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/AntigravitySync/brain/41ed0360-50d5-4908-9776-c86be8618016/walkthrough.md)",
+        "read_file(/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/global/config/skills/ponytail/SKILL.md)",
+        "write_file(/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/global/config/skills/code-review/SKILL.md)",
+        "read_file(/Users/ethan/Desktop/Anchor产品分析)",
+        "write_file(/Users/ethan/Desktop/Anchor⚓️产品分析/Anchor产品分析.md)",
+        "command(ln)"
+      ]
+    },
+    "v2Migrated":  true
+  },
+  "updatedAt":  "2026-08-06T13:38:44.722610Z"
 }

@@ -163,7 +163,19 @@ def _payload_path(root: Path) -> Path:
     return root / RECEIPTS_PATH
 
 
-def _evidence_file(root: Path, evidence_path: str) -> Path | None:
+def build_event_location_index(root: Path) -> dict[str, list[Path]]:
+    """Index admissible locations once per query, retaining ambiguity checks."""
+    index: dict[str, list[Path]] = {}
+    for bucket in ("inbox", "processed"):
+        for path in (root / "raw" / "events" / bucket).rglob("*.json"):
+            if path.is_file():
+                index.setdefault(path.name, []).append(path)
+    return index
+
+
+def _evidence_file(
+    root: Path, evidence_path: str, *, event_index: dict[str, list[Path]] | None = None
+) -> Path | None:
     """Resolve evidence without accepting a path string as proof."""
 
     raw = str(evidence_path or "").strip()
@@ -176,6 +188,8 @@ def _evidence_file(root: Path, evidence_path: str) -> Path | None:
         relative = resolved.relative_to(root_resolved)
     except ValueError:
         return None
+    if relative.parts[:3] in {("raw", "events", "rejected"), ("raw", "events", "failed")}:
+        return None
     if resolved.is_file():
         return resolved
 
@@ -184,13 +198,15 @@ def _evidence_file(root: Path, evidence_path: str) -> Path | None:
     # file without treating arbitrary relocated paths as evidence.
     if relative.parts[:2] != ("raw", "events") or not relative.name.endswith(".json"):
         return None
-    event_root = root_resolved / "raw" / "events"
-    matches = tuple(path for path in event_root.rglob(relative.name) if path.is_file())
+    locations = event_index if event_index is not None else build_event_location_index(root_resolved)
+    matches = locations.get(relative.name, [])
     return matches[0] if len(matches) == 1 else None
 
 
-def _receipt_has_evidence(root: Path, receipt: dict[str, Any]) -> bool:
-    return _evidence_file(root, str(receipt.get("evidence_path") or "")) is not None
+def _receipt_has_evidence(
+    root: Path, receipt: dict[str, Any], *, event_index: dict[str, list[Path]] | None = None
+) -> bool:
+    return _evidence_file(root, str(receipt.get("evidence_path") or ""), event_index=event_index) is not None
 
 
 def validate_host_proof(
@@ -417,6 +433,7 @@ def latest_proof_receipts(
     *,
     tool: str,
     expected_project_id: str | None = None,
+    event_index: dict[str, list[Path]] | None = None,
 ) -> tuple[ProofReceipt | None, ProofReceipt | None]:
     """Return the most recent proof receipts for read/write, project-scoped."""
 
@@ -454,6 +471,7 @@ def latest_proof_receipts(
             entries_by_key[key] = item
     entries = list(entries_by_key.values())
 
+    locations = event_index if event_index is not None else build_event_location_index(root)
     scoped = [
         item
         for item in entries
@@ -461,11 +479,12 @@ def latest_proof_receipts(
         and item.get("status") == "verified"
         and bool(str(item.get("evidence_path") or "").strip())
         and bool(str(item.get("operation_id") or "").strip())
-        and _receipt_has_evidence(root, item)
+        and is_within_window(item)
         and (
             expected_project_id is None
             or item.get("project_id") == expected_project_id
         )
+        and _receipt_has_evidence(root, item, event_index=locations)
     ]
     reads = max(
         (
@@ -534,7 +553,8 @@ def capability_status(
             and bool(str(data.get("operation_id") or "").strip())
         )
 
-    if read_match and qualifies(read) and write_match and qualifies(write):
+    if (read_match and qualifies(read) and write_match and qualifies(write)
+            and read.get("project_id") == write.get("project_id")):
         return "verified_bidirectional"
     if read_match and qualifies(read):
         return "verified_read"

@@ -1,19 +1,108 @@
 {
+  "plugins": {
+    "modern-web-guidance-plugin": {
+      "enabled": true,
+      "installedFrom": {
+        "id": "antigravity-plugins-official/plugin/modern-web-guidance-plugin",
+        "marketplace": "antigravity-plugins-official",
+        "version": "1.0.6"
+      }
+    }
+  },
   "userSettings": {
+    "artifactReviewMode": "ARTIFACT_REVIEW_MODE_TURBO",
+    "autoExecutionPolicy": "CASCADE_COMMANDS_AUTO_EXECUTION_EAGER",
     "browserJsExecutionPolicy": "BROWSER_JS_EXECUTION_POLICY_ALWAYS_ASK",
+    "conversationWidth": "CONVERSATION_WIDTH_NARROW",
+    "customThemeSeedsDark": {
+      "background": "#282A36",
+      "foregroundOverride": "#F8F8F2",
+      "primary": "#BD93F9"
+    },
     "customThemeSeedsLight": {
       "background": "#F5F5F5",
       "foregroundOverride": "#383A42",
       "primary": "#4078F2"
     },
+    "enableTerminalSandbox": false,
     "globalPermissionGrants": {
       "allow": [
         "command(python3 -c '\nimport sys\nfilepath = \"/Users/ethan/Desktop/🌙光路Phōtódos/🌙光路10-剧本-解离\\.html\"\nwith open\\(filepath, \"r\", encoding=\"utf-8\"\\) as f:\n    lines = f\\.readlines\\(\\)\n\nfor i, line in enumerate\\(lines\\):\n    if \"ctx\\.restore\\(\\);\" in line and \"\\}\" in lines\\[i\\+1\\] and \"\\}\" in lines\\[i\\+2\\] and \"drawParticles\\(\\);\" in lines\\[i\\+3\\]:\n        print\\(\"Found the extra \\} at line\", i\\+2\\)\n        lines\\.pop\\(i\\+2\\)\n        break\n        \nwith open\\(filepath, \"w\", encoding=\"utf-8\"\\) as f:\n    f\\.writelines\\(lines\\)\nprint\\(\"Extra bracket removed\\.\"\\)\n')",
-        "command(cat \u003c\u003c'EOF' \u003e/Users/ethan/\\.gemini/antigravity/scratch/pup_test/real_check\\.js)",
-        "command(node /Users/ethan/\\.gemini/antigravity/scratch/pup_test/real_check\\.js)"
+        "command(ssh -o StrictHostKeyChecking=accept-new -T git@github.com)",
+        "command(git -c \"core.sshCommand=ssh -i ~/.ssh/id_rsa -o Port=443 -o HostName=ssh.github.com\" push origin main)",
+        "unsandboxed(python3 -c \"\nimport os, glob\n\nuser_uploaded = '/Users/ethan/.gemini/antigravity/brain/98c69c39-2aba-4c7a-b7ff-19d71d7cd198/.user_uploaded'\nfiles = sorted(glob.glob(os.path.join(user_uploaded, '*.*')), key=os.path.getmtime)\nfor f in files:\n    print(os.path.basename(f), os.path.getsize(f))\n\")",
+        "unsandboxed(python3 -c \"\nimport os, glob\nfrom PIL import Image\n\nbrain_dir = '/Users/ethan/.gemini/antigravity/brain/98c69c39-2aba-4c7a-b7ff-19d71d7cd198'\nfiles = [\n    'ch8_window_art_a_1784778908011.jpg',\n    'ch8_window_art_b_1784778941317.jpg',\n    'v10_ch8_window_rough_charcoal_hd_4x3_1784864164774.jpg',\n    'v8_ch8_window_masterpiece_hd_4x3_1784863615491.jpg',\n    'v7_ch8_charcoal_window_4x3.jpg',\n    'v6_ch8_photo_styled_4x3.jpg'\n]\n\nfor f in files:\n    p = os.path.join(brain_dir, f)\n    if os.path.exists(p):\n        print(f, os.path.getsize(p))\n\")",
+        "write_file(/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/Trae solo配置/dotfiles/claude/settings.json)",
+        "unsandboxed(curl -X POST \"https://api.deepseek.com/v1/messages\" -H \"x-api-key: sk-ac9da5a220e745ddb8e29f6ec0868a42\" -H \"anthropic-version: 2023-06-01\" -H \"content-type: application/json\" -d '{\n    \"model\": \"deepseek-v4-flash\",\n    \"max_tokens\": 50,\n    \"messages\": [{\"role\": \"user\", \"content\": \"Hi\"}]\n  }')",
+        "unsandboxed(curl -i -X POST \"https://api.deepseek.com/v1/messages\" -H \"x-api-key: sk-ac9da5a220e745ddb8e29f6ec0868a42\" -H \"anthropic-version: 2023-06-01\" -H \"content-type: application/json\" -d '{\n    \"model\": \"deepseek-v4-flash\",\n    \"max_tokens\": 50,\n    \"messages\": [{\"role\": \"user\", \"content\": \"Hi\"}]\n  }')",
+        "command(/Users/ethan/.local/bin/claude)",
+        "write_file(/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/AntigravitySync/brain/cce6676a-7607-4c7a-849e-aad0b3f51e8e/implementation_plan.md)",
+        "command(python3 - \u003c\u003c'EOF')",
+        "read_file(/Users/ethan/Library/Application Support/llm-workmem-runtime/llm-workmem/wiki/concepts/workflow-policy.md)",
+        "command(PYTHONPATH=\"/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem\" \"/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/.venv/bin/python3\" -m lwm.cli audit \"/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem\" \u0026\u0026 PYTHONPATH=\"/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem\" \"/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/.venv/bin/python3\" -m lwm.cli attach \"/Users/ethan/Documents/antigravity\" --root \"/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem\" \u0026\u0026 PYTHONPATH=\"/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem\" \"/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/.venv/bin/python3\" -m lwm.cli install-global \"/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem\")",
+        "command(PYTHONPATH=\"/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem\" \"/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/.venv/bin/python3\" -m lwm.cli analyze \"/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem\")",
+        "write_file(/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/AntigravitySync/brain/cce6676a-7607-4c7a-849e-aad0b3f51e8e/walkthrough.md)",
+        "command(PYTHONPATH=\"/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem\" \"/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/.venv/bin/python3\" -m lwm.cli audit \"/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem\")",
+        "command(git fetch)",
+        "command(git checkout)",
+        "command(bun install)",
+        "write_file(/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/AntigravitySync/brain/e5272b2f-845d-4b82-ac45-550203ac14b4/implementation_plan.md)",
+        "write_file(/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/AntigravitySync/brain/e5272b2f-845d-4b82-ac45-550203ac14b4/walkthrough.md)",
+        "command(curl -s -o /dev/null -w \"%{http_code}\\n\" http://localhost:3102/)",
+        "command(node -e '\nconst fs = require(\"fs\");\nfunction checkHtml(file) {\n  const content = fs.readFileSync(file, \"utf8\");\n  const scripts = content.match(/\u003cscript[\\s\\S]*?\u003c\\/script\u003e/gi) || [];\n  let errCount = 0;\n  scripts.forEach((s, idx) =\u003e {\n    const code = s.replace(/^\u003cscript.*?\u003e/i, \"\").replace(/\u003c\\/script\u003e$/i, \"\");\n    try {\n      new Function(code);\n      console.log(`[PASS] ${file} script #${idx+1} syntax OK`);\n    } catch (e) {\n      console.error(`[FAIL] ${file} script #${idx+1} syntax error:`, e);\n      errCount++;\n    }\n  });\n  return errCount;\n}\n\nconst err1 = checkHtml(\"🌙光路10-剧本-解离.html\");\nconst err2 = checkHtml(\".deploy/index.html\");\nprocess.exit(err1 + err2 === 0 ? 0 : 1);\n')",
+        "command(open)",
+        "command(rm -rf apps/admin/.next)",
+        "command(git push joe-goldbug feature/Ather-Ethan:feature/Ather-Ethan)",
+        "command(git status)",
+        "command(cat)",
+        "command(grep)",
+        "command(head)",
+        "command(ls)",
+        "command(echo \"export * from './events';\" \u003e\u003e packages/core/src/assessment/index.ts)",
+        "command(psql)",
+        "command(mkdir)",
+        "command(sed -i '' 's|../../../../lib/db|../../../lib/db|g' apps/admin/app/api/feedback/route.ts)",
+        "command(node --import tsx -e \"\nimport { authApp } from './src/app/api/auth/auth-app.ts';\nimport { db } from './src/db/index.ts';\nimport { users } from './src/db/schema.ts';\nimport { eq } from 'drizzle-orm';\n\nasync function test() {\n  const user = await db.query.users.findFirst({\n    where: eq(users.email, 'idream@site.com'),\n  });\n  console.log('User 1 query result:', user ? {\n    id: user.id,\n    email: user.email,\n    username: user.username,\n    status: user.status,\n    legacyPassword: user.legacyPassword,\n    legacyLoginSalt: user.legacyLoginSalt,\n  } : 'NOT FOUND');\n}\ntest().then(() =\u003e process.exit(0)).catch(e =\u003e { console.error(e); process.exit(1); });\n\")",
+        "command(npx tsx scripts/migration-archive/backfill-dream-tags.ts)",
+        "command(node --import tsx -e \"\nimport { db } from './src/db/index.ts';\nimport { dreams, dreamImages, dreamTags, tags, comments, users } from './src/db/schema.ts';\nimport { eq, desc } from 'drizzle-orm';\n\nasync function test() {\n  console.log('🔍 Testing Next.js Drizzle integration with real DB...');\n\n  // 1. Get recent dreams\n  const recentDreams = await db.query.dreams.findMany({\n    limit: 3,\n    orderBy: [desc(dreams.createdAt)],\n    with: {\n      user: {\n        columns: { id: true, username: true, avatar: true }\n      },\n      images: true,\n      comments: { limit: 2 },\n      tags: {\n        with: { tag: true }\n      }\n    }\n  });\n\n  console.log('✅ Query dreams success! Count:', recentDreams.length);\n  for (const d of recentDreams) {\n    console.log({\n      id: d.id,\n      title: d.title,\n      author: d.user?.username,\n      imageCount: d.images.length,\n      commentCount: d.comments.length,\n      tagCount: d.tags.length,\n      tags: d.tags.map(t =\u003e t.tag.name)\n    });\n  }\n}\ntest().then(() =\u003e process.exit(0)).catch(e =\u003e { console.error('Drizzle query failed:', e); process.exit(1); });\n\")",
+        "command(bash scripts/maintenance/ssh_cmd.sh \"certbot certificates\")",
+        "read_file(/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/global/config/plugins/modern-web-guidance-plugin/skills/modern-web-guidance/SKILL.md)",
+        "read_file(/Users/ethan/Library/Mobile Documents/com~apple~CloudDocs/Downloads/LLM-WorkMem/global/config/skills/ponytail/SKILL.md)",
+        "command(git diff)",
+        "command(python3 -c \"import os; print('\\n'.join(repr(f) + ' -\u003e ' + f for f in sorted(os.listdir('.'))))\")",
+        "command(git ls-files)",
+        "command(python3 -c \"\nimport os, hashlib\n\nfiles = [\n    '光路Phōtódos.html',\n    '🌙光路Phōtódos.html',\n    '光路Phōtódos.html',\n    '光路01-上瘾-玩法.html',\n    '🌙光路01-上瘾-玩法.html'\n]\nfor f in files:\n    if os.path.exists(f):\n        h = hashlib.sha256(open(f, 'rb').read()).hexdigest()[:12]\n        size = os.path.getsize(f)\n        print(f'{f}: {size} bytes, sha256={h}')\n    else:\n        print(f'{f}: NOT FOUND')\n\")",
+        "command(rm -f .lang-button-actual.png .lang-button-v2.png 光路Phōtódos.backup-pre-i18n.html)",
+        "command(python3 -c \"\nwith open('光路Phōtódos.html', 'r', encoding='utf-8') as f:\n    text = f.read()\n\nimport re\nm = re.findall(r'(\\b(fetch|locales|loadLocale|setLanguage|changeLang)[^\\n]*)', text)\nfor line, _ in m[:30]:\n    print(line)\n\")",
+        "command(python3 -c \"\nwith open('光路Phōtódos.html', 'r', encoding='utf-8') as f:\n    text = f.read()\n\nimport re\nmatches = [m.start() for m in re.finditer(r'mdesc-', text)]\nfor idx in matches:\n    print(text[max(0, idx-40):min(len(text), idx+80)].replace('\\n', ' '))\n\")",
+        "command(python3 -c \"\nimport json\nfor lang in ['zh', 'en', 'de', 'pt', 'ru']:\n    with open(f'locales/locales-{lang}.json', encoding='utf-8') as f:\n        data = json.load(f)\n    print(lang, 'tagline_2:', data.get('menu', {}).get('tagline_2'))\n\")",
+        "command(node -e '\nconst fs = require(\"fs\");\nconst html = fs.readFileSync(\".deploy/index.html\", \"utf-8\");\nconst scripts = html.match(/\u003cscript[\\s\\S]*?\u003c\\/script\u003e/g) || [];\nconsole.log(\"Total script tags in .deploy/index.html:\", scripts.length);\nscripts.forEach((tag, i) =\u003e {\n  const code = tag.replace(/^\u003cscript[^\u003e]*\u003e/, \"\").replace(/\u003c\\/script\u003e$/, \"\");\n  const vm = require(\"vm\");\n  new vm.Script(code, { filename: `script_${i}.js` });\n  console.log(`Script ${i} compiled successfully (${code.length} bytes)`);\n});\n')",
+        "command(python3 -c \"\nimport os\nfor item in os.listdir('/Users/ethan/Desktop'):\n    if '光路' in item:\n        print('Found:', repr(item), [ord(c) for c in item])\n        sub = os.path.join('/Users/ethan/Desktop', item)\n        if os.path.isdir(sub):\n            print('Files inside:')\n            for f in sorted(os.listdir(sub)):\n                print('  ', repr(f))\n\")",
+        "command(python3 -c \"\nwith open('🌙光路10-剧本-解离.html') as f:\n    text = f.read()\n\nfor i, line in enumerate(text.splitlines()):\n    if 'exitOpen' in line:\n        print(f'{i+1}: {line}')\n\")",
+        "command(python3 -c \"\nwith open('🌙光路10-剧本-解离.html') as f:\n    text = f.read()\n\nidx = text.find('function spawnExit')\nprint(text[idx:idx+400])\n\")",
+        "command(python3 -c \"\nwith open('🌙光路10-剧本-解离.html') as f:\n    text = f.read()\n\nfor line in text.splitlines():\n    if 'exit' in line.lower() and ('arrow' in line.lower() or 'guide' in line.lower() or 'indicator' in line.lower() or 'beacon' in line.lower() or 'compass' in line.lower() or 'pointer' in line.lower()):\n        print(line)\n\")",
+        "command(python3 -c \"\nwith open('🌙光路10-剧本-解离.html') as f:\n    text = f.read()\n\nfor i, line in enumerate(text.splitlines()):\n    if 'exitDoor' in line:\n        print(f'{i+1}: {line.strip()[:100]}')\n\")",
+        "command(python3 -c \"\nwith open('🌙光路10-剧本-解离.html') as f:\n    text = f.read()\n\nidx = text.find('startLevelAfterIntro')\nif idx != -1:\n    print(text[idx-50:idx+350])\nelse:\n    print('startLevelAfterIntro NOT FOUND!')\n\")",
+        "command(python3 -c \"\nwith open('🌙光路10-剧本-解离.html') as f:\n    text = f.read()\n\nimport re\n\nfor el in ['intro-page', 'clear-page', 'instructions-overlay', 'clear-hint', 'intro-hint']:\n    matches = [line.strip() for line in text.splitlines() if el in line and ('click' in line or 'touch' in line or 'pointer' in line or 'addEventListener' in line)]\n    print(f'{el} listeners:', matches)\n\")",
+        "command(python3 -c \"\nwith open('🌙光路10-剧本-解离.html') as f:\n    text = f.read()\n\nimport re\nmatches = [line.strip() for line in text.splitlines() if 'credits' in line and ('click' in line or 'touch' in line or 'addEventListener' in line)]\nprint('credits listeners:', matches)\n\")",
+        "command(python3 -c \"\nwith open('🌙光路10-剧本-解离.html') as f:\n    text = f.read()\n\nimport re\nfor i, line in enumerate(text.splitlines()):\n    if 'playerDying' in line or 'playerBDying' in line:\n        print(f'{i+1}: {line.strip()[:100]}')\n\")",
+        "command(python3 -c \"\nwith open('🌙光路10-剧本-解离.html') as f:\n    text = f.read()\n\nimport re\nmatches = [line.strip() for line in text.splitlines() if 'CHAPTER_NAMES' in line]\nfor m in matches:\n    print(m)\n\")",
+        "command(python3 -c \"\nwith open('.deploy/index.html') as f:\n    text = f.read()\n\nimport re\n\n# check if there are any undefined variables or missing objects\nprint('Checking .deploy/index.html:')\nprint('Total characters:', len(text))\nscripts = re.findall(r'\u003cscript.*?\u003e([\\s\\S]*?)\u003c/script\u003e', text)\nprint(f'Scripts count: {len(scripts)}')\n\n# Check for CHAPTER_MECHANICS in .deploy/index.html\nprint('CHAPTER_MECHANICS in deploy:', 'CHAPTER_MECHANICS' in text)\n# Check for showIntroPage in deploy\nprint('showIntroPage in deploy:', 'showIntroPage' in text)\n# Check for nextLevel in deploy\nprint('nextLevel in deploy:', 'nextLevel' in text)\n\")",
+        "command(python3 -c \"\nwith open('.deploy/index.html') as f:\n    text = f.read()\n\nidx = text.find('function showIntroPage')\nprint(text[idx:idx+500])\n\")",
+        "command(python3 -c \"\nwith open('.deploy/index.html') as f:\n    text = f.read()\n\nprint('intro-mechanic in deploy:', 'intro-mechanic' in text)\n\")",
+        "command(python3 -c \"\nwith open('🌙光路10-剧本-解离.html') as f:\n    text = f.read()\n\nimport re\n\n# find where playerB position is updated in update()\nmatches = [line.strip() for line in text.splitlines() if 'playerB.x' in line or 'playerB.y' in line]\nprint(f'Found {len(matches)} lines mentioning playerB coordinates.')\nfor m in matches[:20]:\n    print('  ', m[:100])\n\")",
+        "command(python3 -c \"\nwith open('🌙光路10-剧本-解离.html') as f:\n    text = f.read()\n\nidx = text.find('if(keys.ArrowLeft')\nprint(text[idx-50:idx+400])\n\")",
+        "command(python3 -c \"\nwith open('🌙光路10-剧本-解离.html') as f:\n    text = f.read()\n\nimport re\nmatches = [line.strip() for line in text.splitlines() if 'fakeBList' in line or 'fakeB' in line]\nprint(matches)\n\")",
+        "command(python3 -c \"\nwith open('🌙光路10-剧本-解离.html') as f:\n    text = f.read()\n\nidx = text.find('function useSkill')\nprint(text[idx:idx+800])\n\")",
+        "command(python3 -c \"\nwith open('🌙光路10-剧本-解离.html') as f:\n    text = f.read()\n\nfor i, line in enumerate(text.splitlines()):\n    if 'function useSkill' in line:\n        print(f'useSkill is at line {i+1}')\n\")"
       ]
     },
+    "nonWorkspaceFileAccessPolicy": "AGENT_SETTING_POLICY_ALLOW",
+    "permissionGrantsV2Migrated": true,
+    "permissionPreset": "AGENT_PERMISSION_PRESET_TURBO",
+    "remoteControlEnabled": false,
     "remoteControlHostname": "10-0-0-55-hidden-jet",
-    "themeMode": "THEME_MODE_LIGHT"
+    "sandboxEnabledAtV2Migration": true,
+    "themeMode": "THEME_MODE_INHERIT"
   }
 }

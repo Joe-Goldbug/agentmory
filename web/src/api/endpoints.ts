@@ -27,3 +27,4 @@ export const ENDPOINTS = {
   leasesAcquire: '/api/leases/acquire',
   leasesRelease: '/api/leases/release',
 } as const;
+

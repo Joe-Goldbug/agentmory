@@ -74,7 +74,7 @@ def finish(receipt: CycleReceipt, *, status: str, **counts: int | str | None) ->
     return CycleReceipt(**values)
 
 
-def is_due(root: Path, interval_seconds: int = 43200, now: float | None = None) -> bool:
+def is_due(root: Path, interval_seconds: int = 21600, now: float | None = None) -> bool:
     current = time.time() if now is None else now
     # v2 is the authoritative full-cycle clock. Keep the v1 fallback so old
     # installations can finish their migration without losing scheduling.

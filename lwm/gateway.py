@@ -401,7 +401,6 @@ def _handle_subscription(root: Path, params: dict[str, list[str]], body: Any) ->
         },
     ]
 
-
 # --- small markdown helpers (candidates live as Markdown, not JSON) ---
 
 
@@ -598,7 +597,7 @@ def _handle_backup_bundle(root: Path, params: dict[str, list[str]], body: Any) -
     return backup.create_backup_bundle(root, compact=compact)
 
 
-def _handle_backup_restore(root: Path, body: Any) -> Any:
+def _handle_backup_restore(root: Path, body: Any = None, params: dict[str, list[str]] | None = None, *args: Any, **kwargs: Any) -> Any:
     from lwm import backup
 
     payload = body or {}
@@ -676,6 +675,7 @@ ROUTES: dict[str, Callable[[Path, dict[str, list[str]], Any], Any]] = {
     "/api/vault/download": _handle_vault_download,
     "/api/vault/list": _handle_vault_list,
     "/api/backup/bundle": _handle_backup_bundle,
+    "/api/backup/restore": _handle_backup_restore,
     "/api/leases/active": _handle_leases_active,
     "/api/leases": _handle_leases_list,
 }

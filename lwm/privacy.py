@@ -229,6 +229,28 @@ def redact_text(text: str) -> tuple[str, tuple[str, ...]]:
     return redacted, tuple(applied)
 
 
+def _source_scan_text(source: dict[str, Any], session_id: Any) -> str:
+    """Keep host conversation identity distinct from authentication secrets."""
+    proof = source.get("host_proof")
+    if not isinstance(proof, dict):
+        return " ".join(str(value) for value in source.values())
+    scan_proof = dict(proof)
+    identity = proof.get("session_id")
+    if (
+        isinstance(identity, str)
+        and identity == session_id
+        and proof.get("integration")
+        and proof.get("event")
+        and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}", identity)
+    ):
+        # Scan the value for actual credential formats, but not the misleading
+        # authentication-style key name. The original event remains untouched.
+        scan_proof.pop("session_id")
+        scan_proof["conversation_identity"] = identity
+    scan_source = {**source, "host_proof": scan_proof}
+    return " ".join(str(value) for value in scan_source.values())
+
+
 def sanitize_event(
     payload: dict[str, Any],
     *,
@@ -300,7 +322,7 @@ def sanitize_event(
     for json_key in ("$.source",):
         value = out.get("source")
         if isinstance(value, dict):
-            source_text = " ".join(str(v) for v in value.values())
+            source_text = _source_scan_text(value, out.get("session_id"))
             scan_targets.append((json_key, source_text))
 
     for json_field, value in scan_targets:

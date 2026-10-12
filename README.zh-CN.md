@@ -1,5 +1,7 @@
 # llm-workmem
 
+> **最新备份设计（2026-10-11）**：Team 与企业可选 LWM 公司托管、受支持的去中心化存储或双副本，链上存证独立选择。以 [最新战略](docs/business_plan/WEB2_WEB3_BACKUP_STRATEGY_AND_TOKENOMICS.md) 替代下文旧备份、合规与金融结论。下文相关 CLI 示例、性能和 Web3 功能描述须经实现与恢复验证后，才能作为已上线能力；不构成永久保存或合规保证。
+
 <p align="center">
   <img src="assets/logo.svg" alt="llm-workmem" width="480" /><br />
   <sub>跨 Agent 统一工作记忆与知识管理和备份系统</sub>
@@ -8,7 +10,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python: >=3.11](https://img.shields.io/badge/Python->=3.11-green.svg)](pyproject.toml)
 
-一个与你共同演进的 LLM 工作记忆、知识管理与去中心化备份系统。源自 [Karpathy 的 LLM-WorkMem 哲学](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)，现已全面升级为面向现代 AI 编程工作流的**跨 Agent 工作记忆、任务交接（Handoff）、证据联邦与 Web2-Web3 丝滑无瑕区块链备份引擎**。
+LLM-WorkMem 的产品方向是跨 Agent 统一工作记忆、知识管理与备份系统，整合有来源的任务交接、可恢复加密备份和可选独立验真。具体功能可用性以实现和验收记录为准。
 
 [English Documentation](README.md)
 
@@ -88,7 +90,8 @@
 ### 2. 证据与编译器层（Evidence & Compiler Plane）
 - **真实核心准入（`lwm hub ingest`）**：将输入事件严格分类为 `durable`（可沉淀工程事实）、`operational`（生命周期/命令等运行噪音）或 `rejected`。
 - **项目记忆确定性重建（`lwm hub rebuild-projects` / `reflect`）**：依据摄入事件自动生成项目状态页（近期决策、Bugfix、验证记录与遗留问题），每条记忆均带有精确到文件与 UUID 的证据链链接。
-- **统一原生记忆联邦（`lwm hub federation`）**：将分散在 OpenCode（`MEMORY.md`）、Codex、Claude Code、Antigravity 中的原生记忆统一抽取、去重并解决冲突，生成带时间戳的不可变发布版本（`release-*.json`）。
+- **统一原生记忆联邦（`lwm hub federation`）**：将 OpenCode（`MEMORY.md`）、Codex、Claude Code、Antigravity 等来源的原生记忆抽取、去重，按明确的优先级与替代规则处理，标记未解决的冲突候选并生成带时间戳的发布版本（`release-*.json`）；这不等于自动理解和解决所有语义冲突。
+- **记忆审核与更新**：审核接口支持接受、拒绝或晋级分析候选；记忆联邦区分有效、冲突、陈旧和已被替代的记录，明确的来源更新可替代旧记录。这里管理的是共享记忆，不是自动修复项目代码，也不保证判断每条说法的真伪。独立 HTML 的采纳／撤回交互仅为演示，不写入真实后台，也不证明所有 IDE 会立即撤销已读取的内容。
 - **LLM 记忆编译器（`lwm hub analyze --pending`）**：基于每日 Token 预算与重试状态机，分析多项目间的复用工作流与模式，生成结构化候选对象（`candidates-*.md`）。
 - **稳定晋级门禁（`lwm hub promote-analysis`）**：严格要求跨至少两个不同项目（`MIN_PROMOTION_PROJECTS >= 2`）并具备正面验证结果才可晋级为全局规则（`wiki/global/*.md`）；当下游证据撤回或被推翻时，自动触发版本回退与撤回。
 

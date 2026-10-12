@@ -395,7 +395,7 @@ def test_schedule_command_writes_launchd_bundle(tmp_path: Path, monkeypatch) -> 
     assert "installed non-editable" in runner_content
     plist_content = plist.read_text(encoding="utf-8")
     assert "<key>RunAtLoad</key>" in plist_content
-    assert "<key>StartInterval</key>\n  <integer>43200</integer>" in plist_content
+    assert "<key>StartInterval</key>\n  <integer>21600</integer>" in plist_content
     assert "FullCycleInterval" not in plist_content
     assert "Application Support/llm-workmem-runtime" in plist_content
     # Schedule generation must not silently perform the ownership migration.

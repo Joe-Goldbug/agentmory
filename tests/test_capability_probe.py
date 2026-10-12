@@ -13,6 +13,34 @@ from lwm.capability_proof import capability_status
 from lwm.tool_registry import ToolDefinition, ToolRegistry
 
 
+def test_empty_session_end_does_not_hide_published_work(tmp_path: Path) -> None:
+    from lwm.events import make_event
+    from lwm.project_memory import project_page_path
+
+    work = make_event(tool="codex", project_path="/work", project_id="p",
+                      event_type="bugfix", importance="project",
+                      changes=["Fixed clock"], verification=["clock test PASS"])
+    relative = f"raw/events/processed/2026-10-11/{work['event_id']}.json"
+    path = tmp_path / relative
+    path.parent.mkdir(parents=True)
+    path.write_text(json.dumps(work))
+    page = project_page_path(tmp_path, "p")
+    page.parent.mkdir(parents=True, exist_ok=True)
+    page.write_text(f"Source: {work['event_id']}")
+    record(tmp_path, tool="codex", direction="write", project_id="p",
+           source="native-hook", evidence_path=relative, operation_id="work-1")
+    end = make_event(tool="codex", project_path="/work", project_id="p",
+                     event_type="session_summary", importance="scratch")
+    end_relative = f"raw/events/processed/2026-10-11/{end['event_id']}.json"
+    (tmp_path / end_relative).write_text(json.dumps(end))
+    record(tmp_path, tool="codex", direction="write", project_id="p",
+           source="native-hook", evidence_path=end_relative, operation_id="end-1")
+    assert probe(tmp_path, home=tmp_path / "home")["codex"]["useful_memory_status"] == "published"
+    # Rejected evidence can never sustain a published claim.
+    path.unlink()
+    assert probe(tmp_path, home=tmp_path / "home")["codex"]["useful_memory_status"] == "operational_only"
+
+
 def _evidence(root: Path, relative: str) -> str:
     path = root / relative
     path.parent.mkdir(parents=True, exist_ok=True)

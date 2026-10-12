@@ -33,7 +33,7 @@ import os
 import sys
 from pathlib import Path
 
-from adapters.hooks._common import structured_handoff
+from adapters.hooks._common import analysis_job, host_results
 
 ROOT_HINT = Path(
     os.environ.get("LWM_ROOT")
@@ -97,13 +97,14 @@ def _last_user_text(hook_input: dict) -> str:
 
 
 def main() -> int:
+    if analysis_job():
+        return 0
     hook_input = _safe_load_stdin()
     project_path = _project_path(hook_input)
     session_id = _session_id(hook_input)
     if not project_path or not session_id:
         return 0
-    last_user = _last_user_text(hook_input)[:600]
-    handoff_summary = structured_handoff(hook_input)
+    handoff_summary = host_results(hook_input, host="claude-code")
     task_id = hook_input.get("task_id")
     if task_id is None and handoff_summary:
         task_id = handoff_summary.get("task_id")
@@ -116,7 +117,7 @@ def main() -> int:
             project_path=str(project_path),
             session_id=session_id,
             task_id=str(task_id) if task_id else None,
-            task=last_user or "(no user text)",
+            task="Claude host stopped; completion unknown",
             handoff_summary=handoff_summary,
             source="native-hook",
             host_proof={

@@ -123,3 +123,22 @@ export interface SearchHit {
   snippet: string;
   pagePath: string;
 }
+
+// ⑨ Web3 链上备份
+export interface BackupBundleResponse {
+  version: number;
+  sha256: string;
+  byteSize: number;
+  tarBase64: string;
+  timestamp: string;
+}
+
+export interface Web3BackupRecord {
+  app: string;
+  version: number;
+  sha256: string;
+  storageUri: string;
+  timestamp: number;
+  txHash: string;
+  slot?: number;
+}
