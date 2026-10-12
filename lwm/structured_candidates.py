@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -18,6 +19,15 @@ from lwm.project_memory import classify_event, load_processed_events
 
 CANDIDATES_DIR = Path("state/candidates")
 CandidateState = Literal["pending_review", "accepted", "rejected", "corrected"]
+
+TRANSPORT_TAGS = frozenset({
+    "codex", "vscode", "kiro", "antigravity", "gemini-cli", "structured-summary",
+    "opencode", "claude-code", "trae", "trae-solo", "shell", "minimax",
+})
+
+
+def generic_observation(task: str) -> bool:
+    return bool(re.fullmatch(r"observed [\w-]+ turn results", task.strip(), re.I))
 
 
 def _now() -> str:
@@ -103,6 +113,8 @@ def build_workflow_candidates(
     admitted = _durable_events(events)
     for event in admitted:
         task = str(event.get("task") or "observation").strip().lower()
+        if generic_observation(task):
+            continue
         key = ("task", str(event.get("tool") or "unknown"), task)
         groups.setdefault(key, []).append(event)
     # Exact wording is only one seed. Repeated action + verification themes
@@ -121,6 +133,8 @@ def build_workflow_candidates(
         for tag in set(
             str(tag).strip().casefold() for tag in event.get("tags") or () if str(tag).strip()
         ):
+            if tag in TRANSPORT_TAGS:
+                continue
             themes.setdefault((str(event.get("tool") or "unknown"), tag), []).append(event)
     for (tool, tag), group in themes.items():
         ids = {str(event.get("event_id")) for event in group if event.get("event_id")}
@@ -171,6 +185,8 @@ def build_relationship_candidates(
         for tag in set(
             str(tag).strip().casefold() for tag in event.get("tags") or () if str(tag).strip()
         ):
+            if tag in TRANSPORT_TAGS:
+                continue
             buckets.setdefault(tag, []).append(event)
     candidates: list[RelationshipCandidate] = []
     for tag, group in buckets.items():
@@ -252,18 +268,15 @@ def save_candidate(root: Path, candidate: WorkflowCandidate | RelationshipCandid
             "rejected",
             "corrected",
         }:
-            support_changed = any(
-                set(existing.get(key) or ()) != set(getattr(candidate, key))
-                for key in ("evidence_ids", "counterevidence_ids")
-            )
-            if not support_changed:
+            # Regeneration cannot revoke a previously recorded counterexample.
+            counters = set(existing.get("counterevidence_ids") or ()) | set(candidate.counterevidence_ids)
+            updated = {
+                "evidence_ids": sorted((set(existing.get("evidence_ids") or ()) | set(candidate.evidence_ids)) - counters),
+                "counterevidence_ids": sorted(counters),
+            }
+            if all(set(existing.get(key) or ()) == set(value) for key, value in updated.items()):
                 return target
-            existing.update(
-                {
-                    key: list(getattr(candidate, key))
-                    for key in ("evidence_ids", "counterevidence_ids")
-                }
-            )
+            existing.update(updated)
             existing["semantic_topic"] = candidate.semantic_topic
             existing["identity_scope"] = candidate.identity_scope
             existing["evidence_revision"] = int(existing.get("evidence_revision") or 1) + 1
@@ -296,7 +309,10 @@ def seed_analysis_candidates(root: Path, events: Iterable[dict[str, Any]]) -> li
     """Bridge reviewable candidates into the optional Memory Compiler queue."""
 
     from lwm.memory_compiler import Candidate as AnalysisCandidate
-    from lwm.memory_compiler import seed_candidate
+    from lwm.memory_compiler import load_candidate, seed_candidate
+    from lwm.queue_compaction import compact_analysis_queue
+
+    compact_analysis_queue(root)
 
     evidence = tuple(events)
     event_index = {
@@ -322,8 +338,16 @@ def seed_analysis_candidates(root: Path, events: Iterable[dict[str, Any]]) -> li
         )
         if review_state == "rejected":
             continue
+        existing_analysis = load_candidate(root, review_path.stem)
+        counters = set(candidate.counterevidence_ids)
+        if isinstance(review_payload, dict):
+            counters.update(review_payload.get("counterevidence_ids") or ())
+        if existing_analysis is not None:
+            counters.update(existing_analysis.counterevidence_ids)
+        # Missing counterevidence must remain visible to validation, not vanish.
         evidence_ids = tuple(
-            event_id for event_id in candidate.evidence_ids if event_id in event_index
+            event_id for event_id in candidate.evidence_ids
+            if event_id in event_index and event_id not in counters
         )
         if not evidence_ids:
             continue
@@ -350,6 +374,7 @@ def seed_analysis_candidates(root: Path, events: Iterable[dict[str, Any]]) -> li
             claim=claim,
             scope=scope,
             evidence_ids=evidence_ids,
+            counterevidence_ids=tuple(sorted(counters)),
             context=context,
             uncertainty="Generated from admitted durable evidence; compiler review required.",
             validity="unknown",

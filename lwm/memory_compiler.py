@@ -48,7 +48,7 @@ RETRY_DIR = Path("state/analysis/retry")
 
 CONFIG_PATH = Path("state/analysis/config.json")
 PROJECT_DRAFTS_DIR = Path("state/analysis/projects")
-PROMPT_VERSION = 4
+PROMPT_VERSION = 5
 DEFAULT_TIMEOUT_SECONDS = 30
 DEFAULT_DAILY_TOKEN_BUDGET = 50_000
 DEFAULT_MAX_ATTEMPTS = 3
@@ -56,6 +56,8 @@ RETRY_BACKOFF = (60, 300, 1800)
 MAX_PROVIDER_RESPONSE_BYTES = 256 * 1024
 DEFAULT_REQUEST_TOKEN_BUDGET = 16_000
 OUTPUT_TOKEN_ALLOWANCE = 1200
+DEFAULT_UNCERTAINTY_QUESTION = "Task completion and claim support are unknown unless explicitly verified."
+ADMISSION_ESTIMATE_BASIS = "serialized_utf8_bytes_not_actual_tokens"
 RESULT_TEXT_BYTE_LIMITS = {"claim": 240, "context": 600, "uncertainty": 360}
 CONFIGURATION_FAILURES = frozenset(
     {
@@ -297,6 +299,7 @@ def analysis_usability(
         "human_review_required": True,
         "hard_provider_token_cap": config.provider != "codex_cli",
         "budget_policy": "reserve_input_estimate_and_output_allowance",
+        "admission_estimate_basis": ADMISSION_ESTIMATE_BASIS,
         "internal_job_env": "LWM_ANALYSIS_JOB=1",
     }
 
@@ -393,8 +396,8 @@ def seed_candidate(root: Path, candidate: Candidate) -> Path:
     existing = load_candidate(root, candidate.candidate_id)
     if existing is not None:
         if existing.state in {"pending_analysis", "retry_wait", "analyzed"} and (
-            existing.evidence_ids != candidate.evidence_ids
-            or existing.counterevidence_ids != candidate.counterevidence_ids
+            set(existing.evidence_ids) != set(candidate.evidence_ids)
+            or set(existing.counterevidence_ids) != set(candidate.counterevidence_ids)
         ):
             state = "pending_analysis" if existing.state == "analyzed" else existing.state
             if existing.state == "analyzed":
@@ -941,10 +944,14 @@ def sanitize_evidence(evidence: Iterable[dict[str, Any]], *, max_chars: int = 80
 
 
 def estimate_tokens(*items: Any) -> int:
-    """Conservative local estimate used only for the daily safety budget."""
+    """Byte-based request/daily admission estimate, not tokenizer usage.
+
+    The historical name and reservation arithmetic are retained for callers.
+    Provider-reported actual tokens are reconciled separately.
+    """
 
     material = json.dumps(items, ensure_ascii=False, sort_keys=True)
-    # UTF-8 bytes are a conservative ceiling, including non-Latin evidence.
+    # Count serialized UTF-8 bytes; this is not a provider token guarantee.
     return max(1, len(material.encode("utf-8")))
 
 
@@ -952,7 +959,24 @@ def build_analysis_request(
     candidate: Candidate, evidence: list[dict[str, Any]], *, max_chars: int = 800
 ) -> tuple[str, dict[str, Any]]:
     """Serialize one complete, bounded evidence envelope, never slice JSON."""
-    safe = sanitize_evidence(evidence, max_chars=max_chars)
+    # Compact only the prompt projection: persisted validation hashes keep
+    # their existing sanitizer representation, including analyzed batch hashes.
+    projected = []
+    uncertain_ids = set()
+    for item in evidence:
+        row = dict(item)
+        questions = row.get("open_questions")
+        if questions == DEFAULT_UNCERTAINTY_QUESTION:
+            questions = [questions]
+        if isinstance(questions, list) and DEFAULT_UNCERTAINTY_QUESTION in questions:
+            row["open_questions"] = [q for q in questions if q != DEFAULT_UNCERTAINTY_QUESTION]
+            uncertain_ids.add(str(row.get("event_id")))
+        projected.append(row)
+    safe = sorted(sanitize_evidence(projected, max_chars=max_chars),
+                  key=lambda row: str(row.get("event_id", "")))
+    for row in safe:
+        if str(row.get("event_id")) in uncertain_ids:
+            row["completion_support"] = "unverified"
     expected = set(candidate.evidence_ids) | set(candidate.counterevidence_ids)
     delivered = {str(item.get("event_id")) for item in safe}
     coverage = {
@@ -994,6 +1018,12 @@ def build_analysis_request(
         "not verbatim transcripts. Preserve failed checks, counterexamples, scope and uncertainty; "
         "source ID coverage does not mean every original word was delivered."
     )
+    for key in ("scope", "evidence_ids", "counterevidence_ids"):
+        payload["candidate"][key] = sorted(set(payload["candidate"][key]))
+    if uncertain_ids:
+        payload["uncertainty_metadata"] = {
+            "completion_support=unverified": DEFAULT_UNCERTAINTY_QUESTION,
+        }
     prompt = json.dumps(_safe_json_strings(payload), ensure_ascii=False, sort_keys=True)
     return prompt, coverage
 
@@ -1532,7 +1562,7 @@ def _analysis_merge_request(
     root: Path, candidate: Candidate, events: dict[str, dict[str, Any]]
 ) -> tuple[Candidate, str, list[dict[str, Any]], list[Candidate]] | None:
     """Send complete child analyses, not another unbounded raw-ID envelope."""
-    children = [load_candidate(root, cid) for cid in candidate.analysis_inputs]
+    children = [load_candidate(root, cid) for cid in sorted(candidate.analysis_inputs)]
     if any(child is None or child.state != "analyzed" for child in children):
         return None
     expected = set(candidate.evidence_ids) | set(candidate.counterevidence_ids)
@@ -1595,6 +1625,43 @@ def _fail_analysis_dependency(
     report["errors"].append(f"{reason}:{candidate.candidate_id}")
 
 
+def _pending_priority(
+    candidate: Candidate, events: dict[str, dict[str, Any]],
+    config: AnalysisConfig, reference: datetime,
+) -> tuple[Any, ...]:
+    """Prefer complete useful single requests; after seven days, oldest first.
+
+    Aging bounds priority deferral, not completion under an exhausted budget.
+    This changes root ordering only, never source partitions or admission.
+    """
+    from lwm.project_memory import classify_event
+    from lwm.stable_promotion import _active_event
+
+    ids = set(candidate.evidence_ids) | set(candidate.counterevidence_ids)
+    rows = [events[eid] for eid in sorted(ids) if eid in events
+            and _active_event(events[eid])
+            and classify_event(events[eid]).durability == "durable"]
+    timestamps = []
+    for value in [candidate.created_at, *(row.get("timestamp") for row in rows)]:
+        try:
+            parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+            timestamps.append(parsed.replace(tzinfo=timezone.utc).timestamp()
+                              if parsed.tzinfo is None else parsed.timestamp())
+        except ValueError:
+            timestamps.append(None)
+    observed = [stamp for stamp in timestamps[1:] if stamp is not None]
+    newest = max(observed, default=reference.timestamp())
+    created = timestamps[0] if timestamps[0] is not None else newest
+    if reference.timestamp() - created >= 7 * 86400:
+        return (0, created, candidate.candidate_id)
+    prompt, coverage = build_analysis_request(candidate, rows)
+    size = estimate_tokens(prompt) + OUTPUT_TOKEN_ALLOWANCE
+    complete_small = coverage["complete"] and size <= config.request_token_budget
+    useful = candidate.kind == "workflow" or any(row.get("event_type") == "decision" for row in rows)
+    return (1, not (complete_small and useful), not complete_small,
+            size if complete_small else 0, -newest, candidate.candidate_id)
+
+
 def _analyze_pending_unlocked(
     root: Path,
     *,
@@ -1647,15 +1714,14 @@ def _analyze_pending_unlocked(
     from lwm.stable_promotion import _active_event
 
     events = _load_processed_event_index(root)
-    paths = list((root / ANALYSIS_DIR).glob("*.json"))
-    def newest_evidence(path: Path) -> tuple[str, str]:
-        item = load_candidate(root, path.stem)
-        timestamps = [str(events.get(eid, {}).get("timestamp") or "")
-                      for eid in (item.evidence_ids if item else ())]
-        return max(timestamps, default=""), path.stem
+    pending = [item for path in (root / ANALYSIS_DIR).glob("*.json")
+               if (item := load_candidate(root, path.stem))
+               and not item.analysis_parent_id
+               and item.state in {"pending_analysis", "retry_wait"}]
     # Internal batches are scheduled only through their current parent plan.
-    work = deque(path.stem for path in sorted(paths, key=newest_evidence, reverse=True)
-                 if (item := load_candidate(root, path.stem)) and not item.analysis_parent_id)
+    work = deque(item.candidate_id for item in sorted(
+        pending, key=lambda item: _pending_priority(item, events, config, reference)
+    ))
     expanded: set[str] = set()
     while work:
         candidate = load_candidate(root, work.popleft())
@@ -1739,6 +1805,7 @@ def _analyze_pending_unlocked(
         report["coverage"][candidate.candidate_id] = coverage
         estimated_tokens = estimate_tokens(prompt) + OUTPUT_TOKEN_ALLOWANCE
         coverage["estimated_tokens"] = estimated_tokens
+        coverage["admission_estimate_basis"] = ADMISSION_ESTIMATE_BASIS
         coverage["request_token_budget"] = config.request_token_budget
         coverage["dispatched"] = False
         if children and estimated_tokens > config.request_token_budget:

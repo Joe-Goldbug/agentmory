@@ -148,3 +148,40 @@ def test_rejected_review_candidate_is_not_seeded_for_analysis(tmp_path: Path) ->
 
     assert all(path.stem != candidate.candidate_id for path in paths)
     assert load_candidate(tmp_path, candidate.candidate_id) is None
+
+
+@pytest.mark.parametrize("state", ["pending_review", "accepted", "corrected", "rejected"])
+def test_regeneration_preserves_reviewed_counterevidence(tmp_path, state):
+    events = _events()
+    path = save_candidate(tmp_path, build_workflow_candidates(events)[0])
+    payload = json.loads(path.read_text())
+    payload.update(state=state, correction="Keep the failed check", counterevidence_ids=["e-1"])
+    path.write_text(json.dumps(payload))
+    for _ in range(2):
+        generate_candidates(tmp_path, events)
+        seed_analysis_candidates(tmp_path, events)
+        actual = json.loads(path.read_text())
+        assert actual["state"] == state
+        assert actual["correction"] == "Keep the failed check"
+        assert actual["counterevidence_ids"] == ["e-1"]
+        assert "e-1" not in actual["evidence_ids"]
+        analysis = load_candidate(tmp_path, path.stem)
+        if state == "rejected":
+            assert analysis is None
+        else:
+            assert analysis.counterevidence_ids == ("e-1",)
+            assert "e-1" not in analysis.evidence_ids
+
+
+def test_seeding_preserves_existing_analysis_counterevidence(tmp_path):
+    from dataclasses import replace
+    from lwm.memory_compiler import save_candidate as save_analysis
+
+    events = _events()
+    candidate = build_workflow_candidates(events)[0]
+    seed_analysis_candidates(tmp_path, events)
+    existing = load_candidate(tmp_path, candidate.candidate_id)
+    save_analysis(tmp_path, replace(existing, counterevidence_ids=("missing-source",)))
+    seed_analysis_candidates(tmp_path, events)
+    actual = load_candidate(tmp_path, candidate.candidate_id)
+    assert actual.counterevidence_ids == ("missing-source",)
