@@ -13,8 +13,12 @@ interface PhantomProvider {
 }
 
 function getProvider(): PhantomProvider | null {
-  const w = window as unknown as { solana?: PhantomProvider; phantom?: PhantomProvider };
-  return w.phantom ?? w.solana ?? null;
+  const w = window as unknown as {
+    phantom?: { solana?: PhantomProvider };
+    solana?: PhantomProvider;
+    solflare?: PhantomProvider;
+  };
+  return w.phantom?.solana ?? w.solana ?? w.solflare ?? null;
 }
 
 export default function LoginView() {

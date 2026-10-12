@@ -39,6 +39,7 @@ export function walletNonce(address: string) {
 export function walletVerify(address: string, nonce: string, signature: string, email?: string) {
   return request<AuthResult>('/api/auth/wallet/verify', {
     method: 'POST',
+    headers: authHeaders(),
     body: JSON.stringify({ address, nonce, signature, email }),
   });
 }

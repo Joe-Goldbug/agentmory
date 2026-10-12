@@ -33,14 +33,27 @@ def _now_iso() -> str:
     return datetime.now(UTC).astimezone().isoformat(timespec="seconds")
 
 
-def create_backup_bundle(root: Path) -> dict[str, Any]:
-    """将 root 下的 SAFE_DIRS 打包为 tar.gz 内存流，计算 SHA-256 并返回 Base64 包。"""
+ONCHAIN_MAX_TAR_BYTES = 1800
+CORE_MEMORY_PATHS: tuple[str, ...] = (
+    "wiki/purpose.md",
+    "wiki/overview.md",
+    "state/project-map.json",
+    "state/promotion-state.json",
+)
+
+
+def create_backup_bundle(root: Path, *, compact: bool = False) -> dict[str, Any]:
+    """将 root 下的 SAFE_DIRS 打包为 tar.gz 内存流，计算 SHA-256 并返回 Base64 包。
+
+    当 ``compact=True`` 且完整归档超过链上单批次交易容量时，自动筛选核心跨设备记忆文件打包，
+    确保归档密文可直接完整写入 Solana Devnet 链上交易。
+    """
     root = root.resolve()
     bio = io.BytesIO()
     included_dirs: list[str] = []
     file_count = 0
 
-    with tarfile.open(fileobj=bio, mode="w:gz") as tar:
+    with tarfile.open(fileobj=bio, mode="w:gz", compresslevel=9) as tar:
         for folder_name in SAFE_DIRS:
             target = root / folder_name
             if not target.exists():
@@ -57,6 +70,31 @@ def create_backup_bundle(root: Path) -> dict[str, Any]:
                 file_count += 1
 
     tar_bytes = bio.getvalue()
+    if compact and len(tar_bytes) > ONCHAIN_MAX_TAR_BYTES:
+        compact_bio = io.BytesIO()
+        compact_dirs: set[str] = set()
+        compact_count = 0
+        with tarfile.open(fileobj=compact_bio, mode="w:gz", compresslevel=9) as tar:
+            for rel_path in CORE_MEMORY_PATHS:
+                fp = root / rel_path
+                if fp.is_file():
+                    tar.add(fp, arcname=rel_path)
+                    compact_dirs.add(rel_path.split("/")[0])
+                    compact_count += 1
+            if compact_count == 0:
+                for folder_name in SAFE_DIRS:
+                    target = root / folder_name
+                    if target.is_dir():
+                        for fp in sorted(target.rglob("*"))[:3]:
+                            if fp.is_file():
+                                arcname = str(fp.relative_to(root)).replace("\\", "/")
+                                tar.add(fp, arcname=arcname)
+                                compact_dirs.add(folder_name)
+                                compact_count += 1
+        tar_bytes = compact_bio.getvalue()
+        included_dirs = [d for d in SAFE_DIRS if d in compact_dirs]
+        file_count = compact_count
+
     bundle_hash = hashlib.sha256(tar_bytes).hexdigest()
 
     return {
@@ -67,6 +105,7 @@ def create_backup_bundle(root: Path) -> dict[str, Any]:
         "included_dirs": included_dirs,
         "file_count": file_count,
         "created_at": _now_iso(),
+        "compact": compact,
     }
 
 

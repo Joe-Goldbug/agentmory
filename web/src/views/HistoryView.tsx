@@ -6,6 +6,7 @@ import { useI18n } from '../i18n';
 import { useAuth } from '../auth/AuthContext';
 import {
   commitSnapshotOnSolana,
+  connectAndAuthenticateWallet,
   executeColdBackup,
   executeColdRestore,
   executeCrossDeviceRestoreFromChain,
@@ -14,7 +15,7 @@ import type { HistoryItem } from '../types';
 
 export default function HistoryView() {
   const { t, lang } = useI18n();
-  const { user } = useAuth();
+  const { user, login } = useAuth();
   const { data, loading, error, reload } = useAsyncData(() => fetchHistory(50), [lang]);
   const [activeId, setActiveId] = useState<string>('');
   const [filterProject, setFilterProject] = useState('');
@@ -35,13 +36,25 @@ export default function HistoryView() {
   );
   const current = items.find((i) => i.id === activeId) ?? items[0];
 
+  async function requireAuthenticatedWallet(): Promise<string> {
+    if (user?.wallets?.[0]) {
+      return user.wallets[0];
+    }
+    const authRes = await connectAndAuthenticateWallet(user?.email);
+    login(authRes.token, authRes.user);
+    return authRes.address;
+  }
+
   async function handleRunColdBackup() {
-    const wallet = user?.wallets?.[0] || '7xKXtg9P4WMEMdemoDevnetWallet111111111111111';
     setColdBackupLoading(true);
     setColdBackupStatus(t('history.coldBackupRunning'));
     try {
+      const wallet = await requireAuthenticatedWallet();
       const res = await executeColdBackup(wallet, current?.project || 'llm-workmem', 1);
-      setColdBackupStatus(`✅ 冷备成功！Tx: ${res.attestation.tx_hash.slice(0, 8)}… Slot: #${res.attestation.slot}`);
+      const chunkCount = res.attestation.chunk_tx_hashes?.length || 1;
+      setColdBackupStatus(
+        `✅ 链上加密冷备成功！已写入 ${chunkCount} 笔 Solana Devnet 分片交易 · 主存证 Tx: ${res.attestation.tx_hash.slice(0, 8)}… Slot: #${res.attestation.slot}`
+      );
       reload();
     } catch (err) {
       setColdBackupStatus(`⚠️ 冷备失败: ${(err as Error).message}`);
@@ -51,13 +64,14 @@ export default function HistoryView() {
   }
 
   async function handleRestore(item: HistoryItem) {
-    const uri = item.detail.attestation?.storage_uri || `ar://${(item.detail.evidenceHash || item.id).slice(0, 32)}`;
+    const uri = item.detail.attestation?.storage_uri || `solana://devnet/tx/${item.detail.attestation?.tx_hash || ''}`;
     const hash = item.detail.evidenceHash || item.id;
     setRestoringId(item.id);
     setRestoreMsg(t('history.restoreRunning'));
     try {
-      const res = await executeColdRestore(uri, hash);
-      setRestoreMsg(`✅ ${t('history.restoreSuccess')}（已还原 ${res.restored_files} 个文件）`);
+      const wallet = await requireAuthenticatedWallet();
+      const res = await executeColdRestore(uri, hash, wallet);
+      setRestoreMsg(`✅ ${t('history.restoreSuccess')}（已从链上解密还原 ${res.restored_files} 个文件）`);
       reload();
     } catch (err) {
       setRestoreMsg(`⚠️ 还原失败: ${(err as Error).message}`);
@@ -67,17 +81,17 @@ export default function HistoryView() {
   }
 
   async function handleCrossDeviceRestore() {
-    const wallet = user?.wallets?.[0] || '7xKXtg9P4WMEMdemoDevnetWallet111111111111111';
     setCrossRestoreLoading(true);
     setRestoreMsg(
       lang === 'zh'
-        ? '正在从 Solana 链上与去中心化网络检索并复原最新记忆…'
-        : 'Retrieving and restoring memory from Solana chain...'
+        ? '正在拉起钱包并从 Solana Devnet 账本检索并复原最新加密记忆…'
+        : 'Connecting wallet and restoring memory from Solana Devnet chain...'
     );
     try {
+      const wallet = await requireAuthenticatedWallet();
       const res = await executeCrossDeviceRestoreFromChain(wallet, current?.project || 'llm-workmem');
       setRestoreMsg(
-        `✅ 链上跨设备找回成功！已安全解密还原 ${res.restored.restored_files} 个工作记忆文件（Slot: #${res.attestation.slot}）`
+        `✅ 链上跨设备找回成功！已从 Solana Devnet 解密还原 ${res.restored.restored_files} 个工作记忆文件（Slot: #${res.attestation.slot}）`
       );
       reload();
     } catch (err) {
@@ -88,10 +102,10 @@ export default function HistoryView() {
   }
 
   async function handleCommitToSolana(item: HistoryItem) {
-    const wallet = user?.wallets?.[0] || '7xKXtg9P4WMEMdemoDevnetWallet111111111111111';
     setCommittingId(item.id);
     setCommitMsg('');
     try {
+      const wallet = await requireAuthenticatedWallet();
       const att = await commitSnapshotOnSolana(
         wallet,
         item.id,
@@ -106,7 +120,7 @@ export default function HistoryView() {
         cluster: att.cluster,
         explorer_url: att.explorer_url,
         timestamp: att.timestamp,
-        storage_uri: `ar://${(item.detail.evidenceHash || item.id).slice(0, 32)}`,
+        storage_uri: att.storage_uri || `solana://devnet/tx/${att.tx_hash}`,
       };
       setCommitMsg(`✅ 成功固化至 Solana Devnet！Slot: #${att.slot.toLocaleString()}`);
       reload();

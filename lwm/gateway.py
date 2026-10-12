@@ -482,7 +482,7 @@ def _handle_solana_purchase(root: Path, body: Any) -> Any:
     token_amount = int((body or {}).get("token_amount", 10))
     quota_added = int((body or {}).get("quota_added", 10))
     config = solana_storage.get_solana_config(root)
-    default_verify = bool(config.get("enforce_rpc_verification", False))
+    default_verify = bool(config.get("enforce_rpc_verification", True))
     verify_rpc = bool((body or {}).get("verify_rpc", default_verify))
     if not wallet or not tx_hash:
         raise ApiError(HTTPStatus.BAD_REQUEST, "E_BAD_PARAMS", "缺少 wallet 或 tx_hash")
@@ -503,14 +503,24 @@ def _handle_solana_commit(root: Path, body: Any) -> Any:
     snapshot_hash = str((body or {}).get("snapshot_hash", "")).strip()
     tx_hash = str((body or {}).get("tx_hash", "")).strip()
     slot = (body or {}).get("slot")
+    chunk_tx_hashes = (body or {}).get("chunk_tx_hashes")
     config = solana_storage.get_solana_config(root)
-    default_verify = bool(config.get("enforce_rpc_verification", False))
+    default_verify = bool(config.get("enforce_rpc_verification", True))
     verify_rpc = bool((body or {}).get("verify_rpc", default_verify))
     if not wallet or not event_id or not snapshot_hash or not tx_hash:
         raise ApiError(HTTPStatus.BAD_REQUEST, "E_BAD_PARAMS", "缺少必要参数")
     try:
         return solana_storage.record_attestation(
-            root, wallet, event_id, project_id, version, snapshot_hash, tx_hash, slot, verify_rpc=verify_rpc
+            root,
+            wallet,
+            event_id,
+            project_id,
+            version,
+            snapshot_hash,
+            tx_hash,
+            slot,
+            verify_rpc=verify_rpc,
+            chunk_tx_hashes=chunk_tx_hashes,
         )
     except ValueError as exc:
         raise ApiError(HTTPStatus.BAD_REQUEST, "E_QUOTA_EXCEEDED", str(exc)) from exc
@@ -583,7 +593,9 @@ def _handle_vault_list(root: Path, params: dict[str, list[str]], body: Any) -> A
 def _handle_backup_bundle(root: Path, params: dict[str, list[str]], body: Any) -> Any:
     from lwm import backup
 
-    return backup.create_backup_bundle(root)
+    compact_param = ((params.get("compact") or [""])[0]).strip().lower()
+    compact = compact_param in ("1", "true", "yes")
+    return backup.create_backup_bundle(root, compact=compact)
 
 
 def _handle_backup_restore(root: Path, body: Any) -> Any:
@@ -709,7 +721,7 @@ def _dispatch(
     if method == "POST" and path == "/api/auth/wallet/nonce":
         return webauth.handle_wallet_nonce(root, body)
     if method == "POST" and path == "/api/auth/wallet/verify":
-        return webauth.handle_wallet_verify(root, body)
+        return webauth.handle_wallet_verify(root, body, auth_header)
     if method == "GET" and path == "/api/auth/me":
         return webauth.handle_me(root, body, auth_header)
     if method == "POST" and path == "/api/auth/logout":

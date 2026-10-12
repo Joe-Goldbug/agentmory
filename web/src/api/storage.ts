@@ -8,9 +8,6 @@
  *    亦能安全缓存密文并支持端到端完整加解密恢复流程。
  */
 
-const VAULT_STORAGE_KEY_PREFIX = 'lwm_encrypted_vault_';
-
-// 去中心化存储网关列表
 const ARWEAVE_GATEWAYS = [
   'https://gateway.irys.xyz',
   'https://arweave.net',
@@ -61,17 +58,13 @@ async function uploadToIrysDevnet(
       }
     }
   } catch (err) {
-    // Devnet 节点有时可能不稳定或网络受限，平滑降级至本地金库与通用内容寻址
-    console.info('Irys Devnet 直连上传未完成，进入双轨金库存储链路:', err);
+    console.info('Irys Devnet 直连上传未完成，进入双轨加密金库链路:', err);
   }
   return null;
 }
 
 /**
- * 上传加密快照数据包至去中心化存储或本地安全金库
- */
-/**
- * 上传加密快照数据包至去中心化存储或本地安全金库
+ * 上传加密快照数据包至去中心化存储与服务端加密金库（不写入浏览器 localStorage）
  */
 export async function uploadEncryptedSnapshot(
   packedCiphertextBase64: string,
@@ -82,7 +75,7 @@ export async function uploadEncryptedSnapshot(
 
   let uri = '';
   let txId = snapshotHash.slice(0, 32);
-  let network = 'local-vault-hybrid';
+  let network = 'solana-devnet-onchain';
 
   // 1. 尝试通过网关执行 IPFS Pinning (Pinata / Content Addressed CID)
   try {
@@ -97,7 +90,8 @@ export async function uploadEncryptedSnapshot(
       signal: AbortSignal.timeout(8000),
     });
     if (pinResp.ok) {
-      const pinResult = await pinResp.json();
+      const pinEnvelope = await pinResp.json();
+      const pinResult = pinEnvelope?.data || pinEnvelope;
       if (pinResult?.uri) {
         uri = pinResult.uri;
         txId = pinResult.cid || pinResult.tx_id || txId;
@@ -118,20 +112,11 @@ export async function uploadEncryptedSnapshot(
     }
   }
 
-  // 确定最终内容寻址 URI
   if (!uri) {
     uri = `ar://${txId}`;
   }
 
-  // 3. 本地 LocalStorage 缓存（保证即时亚毫秒级读取与离线可用）
-  try {
-    localStorage.setItem(VAULT_STORAGE_KEY_PREFIX + uri, packedCiphertextBase64);
-    localStorage.setItem(VAULT_STORAGE_KEY_PREFIX + txId, packedCiphertextBase64);
-  } catch (err) {
-    console.warn('LocalStorage 写入受限 (可能超出浏览器配额):', err);
-  }
-
-  // 4. 同步持久化至后台安全密文金库 (state/vault/)
+  // 3. 同步持久化至后台安全密文金库 (state/vault/)，辅助镜像加速
   try {
     await fetch('/api/vault/upload', {
       method: 'POST',
@@ -148,7 +133,7 @@ export async function uploadEncryptedSnapshot(
       }),
     });
   } catch (_err) {
-    // 允许网络受限或离线开发运行时，由 LocalStorage 兜底
+    // 即使后端金库未响应，后续仍由 Solana Devnet 链上分片交易直接承载密文
   }
 
   return {
@@ -161,19 +146,10 @@ export async function uploadEncryptedSnapshot(
 
 /**
  * 根据内容寻址 URI 下载加密数据包 (Base64)
- * 支持 LocalStorage -> 本地后端金库 -> 全球去中心化公共网关 多级回退拉取
+ * 支持 服务端加密金库 -> Arweave 公共网关 -> IPFS 公共网关 多级拉取
  */
 export async function downloadEncryptedSnapshot(uri: string): Promise<string> {
-  // 1. 优先从 Local Vault 缓存读取
-  const fromVault =
-    localStorage.getItem(VAULT_STORAGE_KEY_PREFIX + uri) ||
-    localStorage.getItem(VAULT_STORAGE_KEY_PREFIX + uri.replace('ar://', '').replace('ipfs://', ''));
-
-  if (fromVault) {
-    return fromVault;
-  }
-
-  // 2. 尝试从本地后台密文金库 (/api/vault/download) 读取
+  // 1. 尝试从后台密文金库 (/api/vault/download) 读取
   try {
     const res = await fetch(`/api/vault/download?uri=${encodeURIComponent(uri)}`);
     if (res.ok) {

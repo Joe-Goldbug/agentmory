@@ -3,6 +3,7 @@ import { Icons } from './Icons';
 import { useAuth } from '../auth/AuthContext';
 import { useI18n } from '../i18n';
 import {
+  connectAndAuthenticateWallet,
   fetchSolanaConfig,
   fetchWalletQuota,
   getSolBalance,
@@ -19,9 +20,9 @@ interface Props {
 }
 
 export default function SolanaQuotaModal({ onClose, onSuccess }: Props) {
-  const { user } = useAuth();
+  const { user, login } = useAuth();
   const { t } = useI18n();
-  const wallet = user?.wallets?.[0] || '7xKXtg9P4WMEMdemoDevnetWallet111111111111111';
+  const wallet = user?.wallets?.[0] || '';
 
   const [config, setConfig] = useState<SolanaConfig | null>(null);
   const [quota, setQuota] = useState<WalletQuota | null>(null);
@@ -39,8 +40,33 @@ export default function SolanaQuotaModal({ onClose, onSuccess }: Props) {
         if (c.rpc_url) setCustomRpc(c.rpc_url);
       })
       .catch(console.warn);
-    refreshData();
+    if (wallet) {
+      refreshData(wallet);
+    }
   }, [wallet]);
+
+  async function handleConnectWallet(): Promise<string> {
+    setLoading(true);
+    setStatusMsg(null);
+    try {
+      const authRes = await connectAndAuthenticateWallet(user?.email);
+      login(authRes.token, authRes.user);
+      await refreshData(authRes.address);
+      setStatusMsg({
+        type: 'ok',
+        text: `✅ 钱包已通过 Ed25519 签名认证并绑定: ${authRes.address.slice(0, 8)}…${authRes.address.slice(-6)}`,
+      });
+      return authRes.address;
+    } catch (err) {
+      setStatusMsg({
+        type: 'err',
+        text: `钱包连接或签名认证失败: ${(err as Error).message}`,
+      });
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }
 
   async function handleSaveConfig() {
     setSavingConfig(true);
@@ -55,11 +81,12 @@ export default function SolanaQuotaModal({ onClose, onSuccess }: Props) {
     }
   }
 
-  async function refreshData() {
+  async function refreshData(targetWallet: string = wallet) {
+    if (!targetWallet) return;
     try {
-      const q = await fetchWalletQuota(wallet);
+      const q = await fetchWalletQuota(targetWallet);
       setQuota(q);
-      const bal = await getSolBalance(wallet);
+      const bal = await getSolBalance(targetWallet);
       setSolBalance(bal);
     } catch (err) {
       console.warn('刷新钱包数据失败:', err);
@@ -70,13 +97,14 @@ export default function SolanaQuotaModal({ onClose, onSuccess }: Props) {
     setLoading(true);
     setStatusMsg(null);
     try {
-      const sig = await requestDevnetAirdrop(wallet);
+      const activeWallet = wallet || (await handleConnectWallet());
+      const sig = await requestDevnetAirdrop(activeWallet);
       setStatusMsg({
         type: 'ok',
         text: t('solana.airdropSuccess'),
         link: `https://explorer.solana.com/tx/${sig}?cluster=devnet`,
       });
-      await refreshData();
+      await refreshData(activeWallet);
     } catch (err) {
       setStatusMsg({
         type: 'err',
@@ -91,13 +119,15 @@ export default function SolanaQuotaModal({ onClose, onSuccess }: Props) {
     setLoading(true);
     setStatusMsg(null);
     try {
-      const res = await purchaseStorageQuota(wallet, 10, 10);
+      const activeWallet = wallet || (await handleConnectWallet());
+      const res = await purchaseStorageQuota(activeWallet, 10, 10);
       setQuota(res.quota);
       setStatusMsg({
         type: 'ok',
         text: t('solana.purchaseSuccess'),
         link: res.explorerUrl,
       });
+      await refreshData(activeWallet);
       if (onSuccess) onSuccess();
     } catch (err) {
       setStatusMsg({
@@ -144,18 +174,30 @@ export default function SolanaQuotaModal({ onClose, onSuccess }: Props) {
           <div className="p-4 rounded-xl bg-white/[0.03] border border-white/10 space-y-2 text-xs">
             <div className="flex justify-between items-center">
               <span className="text-gray-400 font-medium">绑定钱包:</span>
-              <span className="font-mono text-purple-300 font-semibold truncate max-w-[240px]">
-                {wallet.slice(0, 8)}…{wallet.slice(-8)}
-              </span>
+              {wallet ? (
+                <span className="font-mono text-purple-300 font-semibold truncate max-w-[240px]">
+                  {wallet.slice(0, 8)}…{wallet.slice(-8)}
+                </span>
+              ) : (
+                <button
+                  onClick={() => handleConnectWallet().catch(() => {})}
+                  disabled={loading}
+                  className="text-xs px-2.5 py-1 rounded-lg bg-purple-600/30 border border-purple-500/50 text-purple-200 hover:bg-purple-600/50 transition font-semibold"
+                >
+                  🔗 立即拉起钱包认证绑定
+                </button>
+              )}
             </div>
             <div className="flex justify-between items-center">
               <span className="text-gray-400 font-medium">测试网 SOL 余额:</span>
-              <span className="font-mono text-white font-bold">{solBalance.toFixed(4)} SOL</span>
+              <span className="font-mono text-white font-bold">
+                {wallet ? `${solBalance.toFixed(4)} SOL` : '未连接钱包'}
+              </span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-gray-400 font-medium">当前可用上链存证:</span>
               <span className="text-purple-400 font-bold text-sm">
-                {quota ? `${quota.available} 次` : '加载中…'}
+                {wallet ? (quota ? `${quota.available} 次` : '加载中…') : '连接钱包后激活 (赠 3 次)'}
               </span>
             </div>
           </div>
